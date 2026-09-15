@@ -1,0 +1,78 @@
+package domain
+
+import "time"
+
+// Contractor — Контрагент (Покупатель или Поставщик) из Раздела 3 ТЗ
+type Contractor struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+type Role string
+
+const (
+	RoleManager Role = "manager"
+	RoleMaster  Role = "master"
+	RoleWorker  Role = "worker"
+)
+
+type User struct {
+	ID           int64     `json:"id"`
+	Username     string    `json:"username"`
+	PasswordHash string    `json:"-"` // Игнорируем при сериализации в JSON
+	Role         Role      `json:"role"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// LogItem — Бревно (из Раздела 3 ТЗ)
+type LogItem struct {
+	ID         int64   `json:"id"`
+	ArrivalID  int64   `json:"arrival_id"`
+	LengthMM   int     `json:"length_mm"`
+	DiameterMM int     `json:"diameter_mm"`
+	Species    string  `json:"species"`
+	Count      int     `json:"count"`
+	VolumeM3   float64 `json:"volume_m3"`
+}
+
+// LogArrival — Поступление круглого леса (из Раздела 3 ТЗ)
+type LogArrival struct {
+	ID          int64     `json:"id"`
+	SupplierID  int64     `json:"supplier_id"`
+	CarrierID   int64     `json:"carrier_id"`
+	TruckNumber string    `json:"truck_number"`
+	ArrivalDate string    `json:"arrival_date"` // YYYY-MM-DD
+	CreatedBy   int64     `json:"created_by"`
+	CreatedAt   time.Time `json:"created_at"`
+	Items       []LogItem `json:"items,omitempty"`
+}
+
+type SawedLog struct {
+	ID       int64   `json:"id"`
+	SawingID int64   `json:"sawing_id"`
+	LogID    *int64  `json:"log_id,omitempty"`
+	VolumeM3 float64 `json:"volume_m3"`
+}
+
+// Board — Полученная доска (Раздел 3 ТЗ)
+type Board struct {
+	ID         int64    `json:"id"`
+	HeightMM   int      `json:"height_mm"`
+	WidthMM    int      `json:"width_mm"`
+	LengthMM   int      `json:"length_mm"`
+	Species    string   `json:"species"`
+	Grade      string   `json:"grade"`
+	Count      int      `json:"count"`
+	VolumeM3   float64  `json:"volume_m3"`
+	PricePerM3 *float64 `json:"price_per_m3,omitempty"`
+}
+
+// SawingOperation — Операция распила (Раздел 3 ТЗ)
+type SawingOperation struct {
+	ID        int64      `json:"id"`
+	WorkerID  int64      `json:"worker_id"`
+	Date      string     `json:"date"` // YYYY-MM-DD
+	CreatedAt time.Time  `json:"created_at"`
+	Logs      []SawedLog `json:"logs,omitempty"`
+	Boards    []Board    `json:"boards,omitempty"`
+}
