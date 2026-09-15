@@ -1,1 +1,19 @@
+# Секреты
 .env
+
+# macOS
+.DS_Store
+
+# Логи
+*.log
+
+# Бинарники
+bin/
+*.exe
+
+# IDE
+.idea/
+.vscode/
+
+# Go
+vendor/
