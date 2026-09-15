@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 	"telegram-mini-app/connection"
-	"telegram-mini-app/internal/router"
+	httptransport "telegram-mini-app/internal/transport/http"
 	"time"
 )
 
@@ -26,7 +26,7 @@ func main() {
 	log.Println("Сервер успешно подключен!")
 
 	// 3. Инициализация chi-роутера из нашего нового пакета
-	router := router.NewRouter(dbPool)
+	router := httptransport.NewRouter(dbPool)
 
 	// 4. Запуск сервера
 	server := &http.Server{

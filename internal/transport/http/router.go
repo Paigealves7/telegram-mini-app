@@ -1,4 +1,4 @@
-package router
+package http
 
 import (
 	"net/http"
@@ -8,10 +8,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	arrivalhttp "telegram-mini-app/internal/transport/http"
-	authhttp "telegram-mini-app/internal/transport/http"
-	dicthttp "telegram-mini-app/internal/transport/http"
 )
 
 func NewRouter(db *pgxpool.Pool) http.Handler {
@@ -32,9 +28,10 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	// 1. Создаем слой репозитория и хэндлеров (Инициализация)
 	repo := repository.NewRepository(db)
-	dictHandler := dicthttp.NewDictHandler(repo) // из dict_handler.go
-	authHandler := authhttp.NewAuthHandler(repo) // Из auth_handler.go
-	arrivalHandler := arrivalhttp.NewArrivalHandler(repo)
+	dictHandler := NewDictHandler(repo) // из dict_handler.go
+	authHandler := NewAuthHandler(repo) // Из auth_handler.go
+	arrivalHandler := NewArrivalHandler(repo)
+	sawingHandler := NewSawingHandler(repo) // Из sawing_handler.go
 
 	// 3. Эндпоинт проверки здоровья (Health check)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -62,9 +59,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		r.Post("/arrivals", arrivalHandler.CreateArrival) // POST /api/v1/arrivals
 
 		// Распил
-		r.Post("/sawing", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("Операция распила"))
-		})
+		r.Post("/sawing", sawingHandler.CreateSawing) // POST /api/v1/sawing
 	})
 
 	return r
