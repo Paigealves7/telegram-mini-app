@@ -76,3 +76,24 @@ type SawingOperation struct {
 	Logs      []SawedLog `json:"logs,omitempty"`
 	Boards    []Board    `json:"boards,omitempty"`
 }
+
+// SaleItem — Позиция в чеке/накладной продажи (Раздел 3 ТЗ)
+type SaleItem struct {
+	ID       int64   `json:"id"`
+	SaleID   int64   `json:"sale_id"`
+	BoardID  int64   `json:"board_id"`
+	Count    int     `json:"count"`
+	Price    float64 `json:"price"`
+	VolumeM3 float64 `json:"volume_m3"`
+}
+
+// Sale — Накладная продажи (Раздел 3 ТЗ)
+type Sale struct {
+	ID          int64      `json:"id"`
+	BuyerID     int64      `json:"buyer_id"`
+	TotalAmount float64    `json:"total_amount"`
+	SaleDate    string     `json:"sale_date"` // YYYY-MM-DD
+	CreatedBy   int64      `json:"created_by"`
+	CreatedAt   time.Time  `json:"created_at"`
+	Items       []SaleItem `json:"items,omitempty"`
+}

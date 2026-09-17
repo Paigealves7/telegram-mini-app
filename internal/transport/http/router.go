@@ -32,6 +32,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	authHandler := NewAuthHandler(repo) // Из auth_handler.go
 	arrivalHandler := NewArrivalHandler(repo)
 	sawingHandler := NewSawingHandler(repo) // Из sawing_handler.go
+	salesHandler := NewSalesHandler(repo)   // Инициализация sales_handler.go
 
 	// 3. Эндпоинт проверки здоровья (Health check)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +61,9 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 		// Распил
 		r.Post("/sawing", sawingHandler.CreateSawing) // POST /api/v1/sawing
+
+		// Продажи (Раздел 4 ТЗ)
+		r.Post("/sales", salesHandler.CreateSale) // POST /api/v1/sales
 	})
 
 	return r

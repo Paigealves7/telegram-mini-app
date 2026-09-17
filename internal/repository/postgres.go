@@ -210,3 +210,69 @@ func (r *Repository) CreateSawingOperation(
 	op.Boards = producedBoards
 	return op, nil
 }
+
+// CreateSale — сохранение продажи и списание досок в транзакции
+func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []domain.SaleItem) (*domain.Sale, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Создаем запись продажи
+	saleQuery := `
+		INSERT INTO sales (buyer_id, total_amount, sale_date, created_by)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at`
+
+	err = tx.QueryRow(ctx, saleQuery,
+		sale.BuyerID,
+		sale.TotalAmount,
+		sale.SaleDate,
+		sale.CreatedBy,
+	).Scan(&sale.ID, &sale.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Вставляем позиции продажи
+	itemQuery := `
+		INSERT INTO sale_items (sale_id, board_id, count, price, volume_m3)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id`
+
+	// 3. Обновляем (уменьшаем) остаток на складе boards
+	updateBoardQuery := `
+		UPDATE boards 
+		SET count = count - $1 
+		WHERE id = $2 AND count >= $1`
+
+	for i := range items {
+		items[i].SaleID = sale.ID
+		err := tx.QueryRow(ctx, itemQuery,
+			sale.ID,
+			items[i].BoardID,
+			items[i].Count,
+			items[i].Price,
+			items[i].VolumeM3,
+		).Scan(&items[i].ID)
+		if err != nil {
+			return nil, err
+		}
+
+		res, err := tx.Exec(ctx, updateBoardQuery, items[i].Count, items[i].BoardID)
+		if err != nil {
+			return nil, err
+		}
+		if res.RowsAffected() == 0 {
+			return nil, pgx.ErrNoRows // Недостаточно досок на складе
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	sale.Items = items
+	return sale, nil
+}
