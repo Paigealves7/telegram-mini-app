@@ -5,9 +5,20 @@ import (
 	"net/http"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+var jwtSecret = []byte("your_super_secret_key") // В продакшене брать из os.Getenv("JWT_SECRET")
+
+type Claims struct {
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
+	jwt.RegisteredClaims
+}
 
 type AuthHandler struct {
 	repo *repository.Repository
@@ -56,30 +67,38 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-// Login — POST /api/v1/auth/login
+// Login — POST /api/v1/auth/login (выдает JWT токен)
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "некорректный тело запроса", http.StatusBadRequest)
+		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
 		return
 	}
 
 	user, err := h.repo.GetUserByUsername(r.Context(), req.Username)
-	if err != nil {
+	if err != nil || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
 		http.Error(w, "неверный логин или пароль", http.StatusUnauthorized)
 		return
 	}
 
-	// Сравниваем хеш с введенным паролем
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		http.Error(w, "неверный логин или пароль", http.StatusUnauthorized)
+	claims := &Claims{
+		UserID: user.ID,
+		Role:   string(user.Role),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtSecret)
+	if err != nil {
+		http.Error(w, "ошибка генерации токена", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "успешный вход",
-		"user":    user,
+	json.NewEncoder(w).Encode(map[string]string{
+		"token": tokenString,
 	})
 }

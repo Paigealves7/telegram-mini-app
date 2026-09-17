@@ -97,3 +97,37 @@ type Sale struct {
 	CreatedAt   time.Time  `json:"created_at"`
 	Items       []SaleItem `json:"items,omitempty"`
 }
+
+type OrderStatus string
+
+const (
+	OrderStatusPending    OrderStatus = "pending"
+	OrderStatusInProgress OrderStatus = "in_progress"
+	OrderStatusCompleted  OrderStatus = "completed"
+	OrderStatusCancelled  OrderStatus = "cancelled"
+)
+
+// OrderItem — Позиция в заказе (Раздел 3 ТЗ)
+type OrderItem struct {
+	ID         int64    `json:"id"`
+	OrderID    int64    `json:"order_id"`
+	HeightMM   int      `json:"height_mm"`
+	WidthMM    int      `json:"width_mm"`
+	LengthMM   int      `json:"length_mm"`
+	Species    string   `json:"species"`
+	Grade      string   `json:"grade"`
+	Count      int      `json:"count"`
+	VolumeM3   float64  `json:"volume_m3"`
+	PricePerM3 *float64 `json:"price_per_m3,omitempty"`
+}
+
+// Order — Заказ от покупателя (Раздел 3 ТЗ)
+type Order struct {
+	ID          int64       `json:"id"`
+	CustomerID  int64       `json:"customer_id"`
+	Status      OrderStatus `json:"status"`
+	TotalAmount float64     `json:"total_amount"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+	Items       []OrderItem `json:"items,omitempty"`
+}

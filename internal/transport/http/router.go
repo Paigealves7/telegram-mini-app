@@ -33,6 +33,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	arrivalHandler := NewArrivalHandler(repo)
 	sawingHandler := NewSawingHandler(repo) // Из sawing_handler.go
 	salesHandler := NewSalesHandler(repo)   // Инициализация sales_handler.go
+	orderHandler := NewOrderHandler(repo)   // Из order_handler.go
 
 	// 3. Эндпоинт проверки здоровья (Health check)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -44,26 +45,29 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		w.Write([]byte("OK! Сервер и БД работают."))
 	})
 
-	// 4. Группировка API по верстке из вашего ТЗ
+	// 4. Защита маршрутов
 	r.Route("/api/v1", func(r chi.Router) {
 
+		// Публичные ручки
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", authHandler.Register) // POST /api/v1/auth/register
-			r.Post("/login", authHandler.Login)       // POST /api/v1/auth/login
+			r.Post("/register", authHandler.Register)
+			r.Post("/login", authHandler.Login)
 		})
 
-		// Справочники
-		r.Get("/contractors", dictHandler.GetContractors)    // GET  /api/v1/contractors
-		r.Post("/contractors", dictHandler.CreateContractor) // POST /api/v1/contractors
+		// Защищенные ручки (требуют JWT)
+		r.Group(func(r chi.Router) {
+			r.Use(AuthMiddleware)
 
-		// Поступления
-		r.Post("/arrivals", arrivalHandler.CreateArrival) // POST /api/v1/arrivals
+			r.Get("/contractors", dictHandler.GetContractors)
+			r.Post("/contractors", dictHandler.CreateContractor)
 
-		// Распил
-		r.Post("/sawing", sawingHandler.CreateSawing) // POST /api/v1/sawing
+			r.Post("/arrivals", arrivalHandler.CreateArrival)
+			r.Post("/sawing", sawingHandler.CreateSawing)
+			r.Post("/sales", salesHandler.CreateSale)
 
-		// Продажи (Раздел 4 ТЗ)
-		r.Post("/sales", salesHandler.CreateSale) // POST /api/v1/sales
+			r.Get("/orders", orderHandler.GetOrders)
+			r.Post("/orders", orderHandler.CreateOrder)
+		})
 	})
 
 	return r
