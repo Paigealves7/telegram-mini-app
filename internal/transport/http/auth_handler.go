@@ -102,3 +102,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"token": tokenString,
 	})
 }
+
+func generateToken(claims *Claims) (string, error) {
+	claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(24 * time.Hour))
+	claims.IssuedAt = jwt.NewNumericDate(time.Now())
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
+}

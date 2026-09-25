@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"os"
 	"telegram-mini-app/internal/repository"
 
 	"github.com/go-chi/chi"
@@ -34,6 +35,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	sawingHandler := NewSawingHandler(repo) // Из sawing_handler.go
 	salesHandler := NewSalesHandler(repo)   // Инициализация sales_handler.go
 	orderHandler := NewOrderHandler(repo)   // Из order_handler.go
+	tgAuthHandler := NewTelegramAuthHandler(repo, os.Getenv("TELEGRAM_BOT_TOKEN"))
 
 	// 3. Эндпоинт проверки здоровья (Health check)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +54,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", authHandler.Register)
 			r.Post("/login", authHandler.Login)
+			r.Post("/telegram", tgAuthHandler.LoginViaTelegram)
 		})
 
 		// Защищенные ручки (требуют JWT)
