@@ -1,4 +1,4 @@
-package telegramminiapp
+package main
 
 import (
 	"context"

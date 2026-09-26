@@ -7,7 +7,7 @@ import (
 )
 
 func Connect(ctx context.Context) (*pgxpool.Pool, error) {
-	connStr := "postgres://postgres:Zombi2010@localhost:5432/telegram-mini-app_db"
+	connStr := "postgres://postgres:Zombi2010@postgres:5432/telegram-mini-app_db"
 	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		return nil, err

@@ -5,6 +5,9 @@ CREATE TYPE role AS ENUM ('manager', 'master', 'worker');
 CREATE TYPE warehouse_type AS ENUM ('logs', 'boards');
 CREATE TYPE order_status AS ENUM ('new', 'in_progress', 'completed', 'canceled');
 CREATE TYPE operation_type AS ENUM ('arrival', 'sawing', 'sale', 'order');
+CREATE TYPE user_role AS ENUM ('user', 'admin', 'worker');
+
+ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'::user_role;
 
 -- 2. Таблицы
 CREATE TABLE users (
