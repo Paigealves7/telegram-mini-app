@@ -16,10 +16,10 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.CleanPath)
+	// Убрали middleware.CleanPath, чтобы не было паники!
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{},
+		AllowedOrigins:   []string{"*"}, // Поставим "*", чтобы Telegram Mini App не блокировался по CORS
 		AllowedMethods:   []string{"POST", "GET", "DELETE", "PUT", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -29,12 +29,12 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	// 1. Создаем слой репозитория и хэндлеров (Инициализация)
 	repo := repository.NewRepository(db)
-	dictHandler := NewDictHandler(repo) // из dict_handler.go
-	authHandler := NewAuthHandler(repo) // Из auth_handler.go
+	dictHandler := NewDictHandler(repo)
+	authHandler := NewAuthHandler(repo)
 	arrivalHandler := NewArrivalHandler(repo)
-	sawingHandler := NewSawingHandler(repo) // Из sawing_handler.go
-	salesHandler := NewSalesHandler(repo)   // Инициализация sales_handler.go
-	orderHandler := NewOrderHandler(repo)   // Из order_handler.go
+	sawingHandler := NewSawingHandler(repo)
+	salesHandler := NewSalesHandler(repo)
+	orderHandler := NewOrderHandler(repo)
 	tgAuthHandler := NewTelegramAuthHandler(repo, os.Getenv("TELEGRAM_BOT_TOKEN"))
 
 	// 3. Эндпоинт проверки здоровья (Health check)
@@ -74,5 +74,4 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	})
 
 	return r
-
 }

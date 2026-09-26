@@ -43,6 +43,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Если роль не передана в JSON, ставим дефолтную (проверь допустимые значения enum в своей SQL-миграции)
+	if req.Role == "" {
+		req.Role = "worker" // или "user" / "admin" в зависимости от названий в твоем enum
+	}
+
 	// Хешируем пароль перед сохранением
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
