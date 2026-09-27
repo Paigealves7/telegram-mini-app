@@ -22,7 +22,6 @@ type CreateSawingRequest struct {
 	Boards   []domain.Board    `json:"boards"`
 }
 
-// CreateSawing — POST /api/v1/sawing (Раздел 4 ТЗ)
 func (h *SawingHandler) CreateSawing(w http.ResponseWriter, r *http.Request) {
 	var req CreateSawingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Logs) == 0 || len(req.Boards) == 0 {

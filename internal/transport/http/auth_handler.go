@@ -28,14 +28,13 @@ func NewAuthHandler(repo *repository.Repository) *AuthHandler {
 	return &AuthHandler{repo: repo}
 }
 
-// RegisterRequest — DTO для регистрации
 type RegisterRequest struct {
 	Username string      `json:"username"`
 	Password string      `json:"password"`
 	Role     domain.Role `json:"role"`
 }
 
-// Register — POST /api/v1/auth/register
+// POST /api/v1/auth/register
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
@@ -43,12 +42,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Если роль не передана в JSON, ставим дефолтную (проверь допустимые значения enum в своей SQL-миграции)
 	if req.Role == "" {
-		req.Role = "worker" // или "user" / "admin" в зависимости от названий в твоем enum
+		req.Role = "worker"
 	}
 
-	// Хешируем пароль перед сохранением
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, "ошибка хеширования пароля", http.StatusInternalServerError)
@@ -66,13 +63,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
-// LoginRequest — DTO для входа
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-// Login — POST /api/v1/auth/login (выдает JWT токен)
+// выдает JWT токен
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

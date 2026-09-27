@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-// Contractor — Контрагент (Покупатель или Поставщик) из Раздела 3 ТЗ
+// Контрагент (Покупатель или Поставщик)
 type Contractor struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
@@ -19,12 +19,12 @@ const (
 type User struct {
 	ID           int64     `json:"id"`
 	Username     string    `json:"username"`
-	PasswordHash string    `json:"-"` // Игнорируем при сериализации в JSON
+	PasswordHash string    `json:"-"`
 	Role         Role      `json:"role"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-// LogItem — Бревно (из Раздела 3 ТЗ)
+// Бревно
 type LogItem struct {
 	ID         int64   `json:"id"`
 	ArrivalID  int64   `json:"arrival_id"`
@@ -35,13 +35,13 @@ type LogItem struct {
 	VolumeM3   float64 `json:"volume_m3"`
 }
 
-// LogArrival — Поступление круглого леса (из Раздела 3 ТЗ)
+// Поступление круглого леса
 type LogArrival struct {
 	ID          int64     `json:"id"`
 	SupplierID  int64     `json:"supplier_id"`
 	CarrierID   int64     `json:"carrier_id"`
 	TruckNumber string    `json:"truck_number"`
-	ArrivalDate string    `json:"arrival_date"` // YYYY-MM-DD
+	ArrivalDate string    `json:"arrival_date"`
 	CreatedBy   int64     `json:"created_by"`
 	CreatedAt   time.Time `json:"created_at"`
 	Items       []LogItem `json:"items,omitempty"`
@@ -54,7 +54,7 @@ type SawedLog struct {
 	VolumeM3 float64 `json:"volume_m3"`
 }
 
-// Board — Полученная доска (Раздел 3 ТЗ)
+// Полученная доска
 type Board struct {
 	ID         int64    `json:"id"`
 	HeightMM   int      `json:"height_mm"`
@@ -67,17 +67,17 @@ type Board struct {
 	PricePerM3 *float64 `json:"price_per_m3,omitempty"`
 }
 
-// SawingOperation — Операция распила (Раздел 3 ТЗ)
+// Операция распила
 type SawingOperation struct {
 	ID        int64      `json:"id"`
 	WorkerID  int64      `json:"worker_id"`
-	Date      string     `json:"date"` // YYYY-MM-DD
+	Date      string     `json:"date"`
 	CreatedAt time.Time  `json:"created_at"`
 	Logs      []SawedLog `json:"logs,omitempty"`
 	Boards    []Board    `json:"boards,omitempty"`
 }
 
-// SaleItem — Позиция в чеке/накладной продажи (Раздел 3 ТЗ)
+// Позиция в чеке/накладной продажи
 type SaleItem struct {
 	ID       int64   `json:"id"`
 	SaleID   int64   `json:"sale_id"`
@@ -87,12 +87,12 @@ type SaleItem struct {
 	VolumeM3 float64 `json:"volume_m3"`
 }
 
-// Sale — Накладная продажи (Раздел 3 ТЗ)
+// Накладная продажи
 type Sale struct {
 	ID          int64      `json:"id"`
 	BuyerID     int64      `json:"buyer_id"`
 	TotalAmount float64    `json:"total_amount"`
-	SaleDate    string     `json:"sale_date"` // YYYY-MM-DD
+	SaleDate    string     `json:"sale_date"`
 	CreatedBy   int64      `json:"created_by"`
 	CreatedAt   time.Time  `json:"created_at"`
 	Items       []SaleItem `json:"items,omitempty"`
@@ -107,7 +107,7 @@ const (
 	OrderStatusCanceled   OrderStatus = "canceled"
 )
 
-// OrderItem — позиция заказа (ссылается на доску из таблицы boards)
+// позиция заказа
 type OrderItem struct {
 	ID       int64   `json:"id"`
 	OrderID  int64   `json:"order_id"`
@@ -117,7 +117,7 @@ type OrderItem struct {
 	Price    float64 `json:"price"`
 }
 
-// Order — заказ покупателя
+// заказ покупателя
 type Order struct {
 	ID            int64       `json:"id"`
 	MasterID      int64       `json:"master_id"`

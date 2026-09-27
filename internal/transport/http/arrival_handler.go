@@ -20,11 +20,11 @@ type CreateArrivalRequest struct {
 	CarrierID   int64            `json:"carrier_id"`
 	TruckNumber string           `json:"truck_number"`
 	ArrivalDate string           `json:"arrival_date"`
-	CreatedBy   int64            `json:"created_by"` // На шаге с авторизацией будем брать из JWT
+	CreatedBy   int64            `json:"created_by"`
 	Items       []domain.LogItem `json:"items"`
 }
 
-// CreateArrival — POST /api/v1/arrivals (Раздел 4 ТЗ)
+// POST /api/v1/arrivals
 func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
 	var req CreateArrivalRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Items) == 0 {

@@ -14,7 +14,6 @@ func NewDictHandler(repo *repository.Repository) *DictHandler {
 	return &DictHandler{repo: repo}
 }
 
-// GetContractors — GET /contractors (Раздел 4)
 func (h *DictHandler) GetContractors(w http.ResponseWriter, r *http.Request) {
 	contractors, err := h.repo.GetContractors(r.Context())
 	if err != nil {
@@ -26,7 +25,6 @@ func (h *DictHandler) GetContractors(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(contractors)
 }
 
-// CreateContractor — POST /contractors (Раздел 4)
 func (h *DictHandler) CreateContractor(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name string `json:"name"`

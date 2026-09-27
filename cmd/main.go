@@ -25,10 +25,8 @@ func main() {
 
 	log.Println("Сервер успешно подключен!")
 
-	// 3. Инициализация chi-роутера из нашего нового пакета
 	router := httptransport.NewRouter(dbPool)
 
-	// 4. Запуск сервера
 	server := &http.Server{
 		Addr:    ":8080",
 		Handler: router,
@@ -41,7 +39,6 @@ func main() {
 		}
 	}()
 
-	// 5. Ожидание сигнала остановки (Ctrl+C)
 	<-ctx.Done()
 	log.Println("Остановка сервера...")
 

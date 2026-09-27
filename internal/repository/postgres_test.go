@@ -24,7 +24,6 @@ func TestCreateLogArrival_Transaction(t *testing.T) {
 
 	repo := NewRepository(pool)
 
-	// 1. Создаем тестового контрагента (поставщика/перевозчика)
 	supplier, err := repo.CreateContractor(ctx, "Тестовый Поставщик")
 	if err != nil {
 		t.Fatalf("ошибка создания тестового поставщика: %v", err)
@@ -35,13 +34,12 @@ func TestCreateLogArrival_Transaction(t *testing.T) {
 		t.Fatalf("ошибка создания тестового перевозчика: %v", err)
 	}
 
-	// 2. Создаем тестового пользователя
 	user, err := repo.CreateUser(ctx, "test_master", "password_hash", domain.RoleMaster)
 	if err != nil {
 		t.Fatalf("ошибка создания тестового пользователя: %v", err)
 	}
 
-	// 3. Выполняем тест с реальными ID из базы
+	//тест с реальными ID из базы
 	arrival := &domain.LogArrival{
 		SupplierID:  supplier.ID,
 		CarrierID:   carrier.ID,

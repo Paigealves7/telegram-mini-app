@@ -16,7 +16,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	// Убрали middleware.CleanPath, чтобы не было паники!
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"}, // Поставим "*", чтобы Telegram Mini App не блокировался по CORS
@@ -27,7 +26,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		MaxAge:           300,
 	}))
 
-	// 1. Создаем слой репозитория и хэндлеров (Инициализация)
 	repo := repository.NewRepository(db)
 	dictHandler := NewDictHandler(repo)
 	authHandler := NewAuthHandler(repo)
@@ -37,7 +35,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	orderHandler := NewOrderHandler(repo)
 	tgAuthHandler := NewTelegramAuthHandler(repo, os.Getenv("TELEGRAM_BOT_TOKEN"))
 
-	// 3. Эндпоинт проверки здоровья (Health check)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(r.Context()); err != nil {
 			http.Error(w, "База данных недоступна", http.StatusInternalServerError)
@@ -47,7 +44,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		w.Write([]byte("OK! Сервер и БД работают."))
 	})
 
-	// 4. Защита маршрутов
 	r.Route("/api/v1", func(r chi.Router) {
 
 		// Публичные ручки

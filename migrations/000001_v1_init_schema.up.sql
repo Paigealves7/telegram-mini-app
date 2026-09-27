@@ -1,6 +1,3 @@
--- 000001_init_schema.up.sql
-
--- 1. ENUM-типы
 CREATE TYPE role AS ENUM ('manager', 'master', 'worker');
 CREATE TYPE warehouse_type AS ENUM ('logs', 'boards');
 CREATE TYPE order_status AS ENUM ('new', 'in_progress', 'completed', 'canceled');
@@ -9,7 +6,6 @@ CREATE TYPE user_role AS ENUM ('user', 'admin', 'worker');
 
 ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'::user_role;
 
--- 2. Таблицы
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,

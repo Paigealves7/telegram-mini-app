@@ -16,7 +16,6 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-// GetContractors — получение всех контрагентов (Раздел 4: GET /contractors)
 func (r *Repository) GetContractors(ctx context.Context) ([]domain.Contractor, error) {
 	query := `SELECT id, name FROM contractors ORDER BY id DESC`
 
@@ -34,7 +33,6 @@ func (r *Repository) GetContractors(ctx context.Context) ([]domain.Contractor, e
 	return contractors, nil
 }
 
-// CreateContractor — создание контрагента (Раздел 4: POST /contractors)
 func (r *Repository) CreateContractor(ctx context.Context, name string) (*domain.Contractor, error) {
 	query := `INSERT INTO contractors (name) VALUES ($1) RETURNING id, name`
 
@@ -47,7 +45,6 @@ func (r *Repository) CreateContractor(ctx context.Context, name string) (*domain
 	return &c, nil
 }
 
-// CreateUser — сохранение нового пользователя
 func (r *Repository) CreateUser(ctx context.Context, username, passwordHash string, role domain.Role) (*domain.User, error) {
 	query := `
 		INSERT INTO users (username, password_hash, role) 
@@ -68,7 +65,6 @@ func (r *Repository) CreateUser(ctx context.Context, username, passwordHash stri
 	return &user, nil
 }
 
-// GetUserByUsername — поиск пользователя для логина
 func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
 	query := `SELECT id, username, password_hash, role, created_at FROM users WHERE username = $1`
 
@@ -87,7 +83,6 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*d
 	return &user, nil
 }
 
-// CreateLogArrival — сохранение поступления леса и списка бревен в транзакции
 func (r *Repository) CreateLogArrival(ctx context.Context, arrival *domain.LogArrival, items []domain.LogItem) (*domain.LogArrival, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -95,7 +90,6 @@ func (r *Repository) CreateLogArrival(ctx context.Context, arrival *domain.LogAr
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. Вставляем шапку прихода в log_arrivals
 	arrivalQuery := `
 		INSERT INTO log_arrivals (supplier_id, carrier_id, truck_number, arrival_date, created_by)
 		VALUES ($1, $2, $3, $4, $5)
@@ -112,7 +106,6 @@ func (r *Repository) CreateLogArrival(ctx context.Context, arrival *domain.LogAr
 		return nil, err
 	}
 
-	// 2. Вставляем позицию каждого бревна в log_items
 	itemQuery := `
 		INSERT INTO log_items (arrival_id, length_mm, diameter_mm, species, count, volume_m3)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -142,7 +135,7 @@ func (r *Repository) CreateLogArrival(ctx context.Context, arrival *domain.LogAr
 	return arrival, nil
 }
 
-// CreateSawingOperation — атомарное проведение распила бревен и прихода досок
+// атомарное проведение распила бревен и прихода досок
 func (r *Repository) CreateSawingOperation(
 	ctx context.Context,
 	op *domain.SawingOperation,
@@ -155,7 +148,6 @@ func (r *Repository) CreateSawingOperation(
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. Создаем шапку операции
 	sawingQuery := `
 		INSERT INTO sawing_operations (worker_id, date)
 		VALUES ($1, $2)
@@ -166,7 +158,6 @@ func (r *Repository) CreateSawingOperation(
 		return nil, err
 	}
 
-	// 2. Записываем списываемые бревна
 	logQuery := `
 		INSERT INTO sawed_logs (sawing_id, log_id, volume_m3)
 		VALUES ($1, $2, $3)
@@ -180,7 +171,6 @@ func (r *Repository) CreateSawingOperation(
 		}
 	}
 
-	// 3. Записываем полученные доски на склад пиломатериалов
 	boardQuery := `
 		INSERT INTO boards (height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -211,7 +201,6 @@ func (r *Repository) CreateSawingOperation(
 	return op, nil
 }
 
-// CreateSale — сохранение продажи и списание досок в транзакции
 func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []domain.SaleItem) (*domain.Sale, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -219,7 +208,6 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. Создаем запись продажи
 	saleQuery := `
 		INSERT INTO sales (buyer_id, total_amount, sale_date, created_by)
 		VALUES ($1, $2, $3, $4)
@@ -235,13 +223,11 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 		return nil, err
 	}
 
-	// 2. Вставляем позиции продажи
 	itemQuery := `
 		INSERT INTO sale_items (sale_id, board_id, count, price, volume_m3)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id`
 
-	// 3. Обновляем (уменьшаем) остаток на складе boards
 	updateBoardQuery := `
 		UPDATE boards 
 		SET count = count - $1 
@@ -265,7 +251,7 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 			return nil, err
 		}
 		if res.RowsAffected() == 0 {
-			return nil, pgx.ErrNoRows // Недостаточно досок на складе
+			return nil, pgx.ErrNoRows
 		}
 	}
 

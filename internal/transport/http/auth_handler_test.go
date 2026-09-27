@@ -8,7 +8,6 @@ import (
 )
 
 func TestLogin_InvalidRequestBody(t *testing.T) {
-	// Создаем хэндлер с пустым репозиторием, так как до БД запрос не должен дойти
 	handler := NewAuthHandler(nil)
 
 	// Отправляем некорректный JSON

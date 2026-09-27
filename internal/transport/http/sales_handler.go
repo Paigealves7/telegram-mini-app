@@ -23,7 +23,6 @@ type CreateSaleRequest struct {
 	Items       []domain.SaleItem `json:"items"`
 }
 
-// CreateSale — POST /api/v1/sales (Раздел 4 ТЗ)
 func (h *SalesHandler) CreateSale(w http.ResponseWriter, r *http.Request) {
 	var req CreateSaleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Items) == 0 {
