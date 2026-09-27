@@ -101,33 +101,32 @@ type Sale struct {
 type OrderStatus string
 
 const (
-	OrderStatusPending    OrderStatus = "pending"
+	OrderStatusNew        OrderStatus = "new"
 	OrderStatusInProgress OrderStatus = "in_progress"
 	OrderStatusCompleted  OrderStatus = "completed"
-	OrderStatusCancelled  OrderStatus = "cancelled"
+	OrderStatusCanceled   OrderStatus = "canceled"
 )
 
-// OrderItem — Позиция в заказе (Раздел 3 ТЗ)
+// OrderItem — позиция заказа (ссылается на доску из таблицы boards)
 type OrderItem struct {
-	ID         int64    `json:"id"`
-	OrderID    int64    `json:"order_id"`
-	HeightMM   int      `json:"height_mm"`
-	WidthMM    int      `json:"width_mm"`
-	LengthMM   int      `json:"length_mm"`
-	Species    string   `json:"species"`
-	Grade      string   `json:"grade"`
-	Count      int      `json:"count"`
-	VolumeM3   float64  `json:"volume_m3"`
-	PricePerM3 *float64 `json:"price_per_m3,omitempty"`
+	ID       int64   `json:"id"`
+	OrderID  int64   `json:"order_id"`
+	BoardID  int64   `json:"board_id"`
+	Count    int     `json:"count"`
+	VolumeM3 float64 `json:"volume_m3"`
+	Price    float64 `json:"price"`
 }
 
-// Order — Заказ от покупателя (Раздел 3 ТЗ)
+// Order — заказ покупателя
 type Order struct {
-	ID          int64       `json:"id"`
-	CustomerID  int64       `json:"customer_id"`
-	Status      OrderStatus `json:"status"`
-	TotalAmount float64     `json:"total_amount"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
-	Items       []OrderItem `json:"items,omitempty"`
+	ID            int64       `json:"id"`
+	MasterID      int64       `json:"master_id"`
+	ContractorID  int64       `json:"contractor_id"`
+	Notes         string      `json:"notes,omitempty"`
+	DeliveryPrice float64     `json:"delivery_price"`
+	ExtraPrice    float64     `json:"extra_price"`
+	Status        OrderStatus `json:"status"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
+	Items         []OrderItem `json:"items,omitempty"`
 }

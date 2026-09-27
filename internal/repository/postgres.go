@@ -285,36 +285,35 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 	defer tx.Rollback(ctx)
 
 	orderQuery := `
-		INSERT INTO orders (customer_id, status, total_amount)
-		VALUES ($1, $2, $3)
-		RETURNING id, created_at, updated_at`
+        INSERT INTO orders (master_id, contractor_id, notes, delivery_price, extra_price, status)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, created_at, updated_at`
 
-	err = tx.QueryRow(ctx, orderQuery, order.CustomerID, order.Status, order.TotalAmount).Scan(
-		&order.ID,
-		&order.CreatedAt,
-		&order.UpdatedAt,
-	)
+	err = tx.QueryRow(ctx, orderQuery,
+		order.MasterID,
+		order.ContractorID,
+		order.Notes,
+		order.DeliveryPrice,
+		order.ExtraPrice,
+		order.Status,
+	).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 
 	itemQuery := `
-		INSERT INTO order_items (order_id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id`
+        INSERT INTO order_boards (order_id, board_id, count, volume_m3, price)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id`
 
 	for i := range items {
 		items[i].OrderID = order.ID
 		err := tx.QueryRow(ctx, itemQuery,
 			order.ID,
-			items[i].HeightMM,
-			items[i].WidthMM,
-			items[i].LengthMM,
-			items[i].Species,
-			items[i].Grade,
+			items[i].BoardID,
 			items[i].Count,
 			items[i].VolumeM3,
-			items[i].PricePerM3,
+			items[i].Price,
 		).Scan(&items[i].ID)
 		if err != nil {
 			return nil, err
@@ -329,9 +328,11 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 	return order, nil
 }
 
-// GetOrders — получение всех заказов
 func (r *Repository) GetOrders(ctx context.Context) ([]domain.Order, error) {
-	query := `SELECT id, customer_id, status, total_amount, created_at, updated_at FROM orders ORDER BY id DESC`
+	query := `
+        SELECT id, master_id, contractor_id, notes, delivery_price, extra_price, status, created_at, updated_at 
+        FROM orders 
+        ORDER BY id DESC`
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
@@ -342,7 +343,17 @@ func (r *Repository) GetOrders(ctx context.Context) ([]domain.Order, error) {
 	var orders []domain.Order
 	for rows.Next() {
 		var o domain.Order
-		if err := rows.Scan(&o.ID, &o.CustomerID, &o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt); err != nil {
+		if err := rows.Scan(
+			&o.ID,
+			&o.MasterID,
+			&o.ContractorID,
+			&o.Notes,
+			&o.DeliveryPrice,
+			&o.ExtraPrice,
+			&o.Status,
+			&o.CreatedAt,
+			&o.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		orders = append(orders, o)

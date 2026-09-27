@@ -16,12 +16,14 @@ func NewOrderHandler(repo *repository.Repository) *OrderHandler {
 }
 
 type CreateOrderRequest struct {
-	CustomerID  int64              `json:"customer_id"`
-	TotalAmount float64            `json:"total_amount"`
-	Items       []domain.OrderItem `json:"items"`
+	MasterID      int64              `json:"master_id"`
+	ContractorID  int64              `json:"contractor_id"`
+	Notes         string             `json:"notes"`
+	DeliveryPrice float64            `json:"delivery_price"`
+	ExtraPrice    float64            `json:"extra_price"`
+	Items         []domain.OrderItem `json:"items"`
 }
 
-// CreateOrder — POST /api/v1/orders (Раздел 4 ТЗ)
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	var req CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Items) == 0 {
@@ -30,9 +32,12 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	order := &domain.Order{
-		CustomerID:  req.CustomerID,
-		Status:      domain.OrderStatusPending,
-		TotalAmount: req.TotalAmount,
+		MasterID:      req.MasterID,
+		ContractorID:  req.ContractorID,
+		Notes:         req.Notes,
+		DeliveryPrice: req.DeliveryPrice,
+		ExtraPrice:    req.ExtraPrice,
+		Status:        domain.OrderStatusNew,
 	}
 
 	result, err := h.repo.CreateOrder(r.Context(), order, req.Items)
@@ -46,7 +51,6 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
-// GetOrders — GET /api/v1/orders (Раздел 4 ТЗ)
 func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	orders, err := h.repo.GetOrders(r.Context())
 	if err != nil {
