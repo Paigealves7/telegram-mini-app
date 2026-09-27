@@ -1,8 +1,10 @@
 package http
 
 import (
+	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"telegram-mini-app/internal/repository"
 
 	"github.com/go-chi/chi"
@@ -42,6 +44,32 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK! Сервер и БД работают."))
+	})
+
+	// Получаем абсолютный путь к рабочей директории
+	workDir, err := os.Getwd()
+	if err != nil {
+		log.Printf("ошибка получения рабочей директории: %v", err)
+	}
+	webDir := filepath.Join(workDir, "web")
+
+	// Кастомный FileServer для правильной работы с корнем и 404
+	fileServer := http.FileServer(http.Dir(webDir))
+
+	// Обработка статики и файла index.html
+	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		// Проверяем, существует ли запрашиваемый файл
+		filePath := filepath.Join(webDir, filepath.Clean(r.URL.Path))
+		info, err := os.Stat(filePath)
+
+		if err != nil || info.IsDir() {
+			// Если путь "/" или запрошен несуществующий файл/папка — отдаем index.html
+			http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
+			return
+		}
+
+		// Если файл существует (например, CSS, JS, картинка) — отдаем его
+		fileServer.ServeHTTP(w, r)
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
