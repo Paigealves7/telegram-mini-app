@@ -2,9 +2,12 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
+	"telegram-mini-app/pkg/telegram"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -110,4 +113,56 @@ func generateToken(claims *Claims) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtSecret)
+}
+
+func (h *AuthHandler) TelegramAuth(w http.ResponseWriter, r *http.Request) {
+	var req TelegramAuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.InitData == "" {
+		http.Error(w, "некорректное тело запроса (отсутствует init_data)", http.StatusBadRequest)
+		return
+	}
+
+	botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if botToken == "" {
+		http.Error(w, "конфигурационная ошибка сервера (TELEGRAM_BOT_TOKEN)", http.StatusInternalServerError)
+		return
+	}
+
+	// Валидируем подпись Telegram
+	tgUser, err := telegram.ValidateInitData(req.InitData, botToken)
+	if err != nil {
+		http.Error(w, "ошибка проверки подписи Telegram: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	// Формируем уникальный username (например: tg_12345678)
+	username := fmt.Sprintf("tg_%d", tgUser.ID)
+
+	// Ищем пользователя или создаем нового
+	user, err := h.repo.GetUserByUsername(r.Context(), username)
+	if err != nil {
+		// Если не найден — авторегистрация
+		user, err = h.repo.CreateUser(r.Context(), username, "tg_authenticated", domain.RoleWorker)
+		if err != nil {
+			http.Error(w, "ошибка создания пользователя: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Генерируем JWT-токен
+	claims := &Claims{
+		UserID: user.ID,
+		Role:   string(user.Role),
+	}
+
+	tokenString, err := generateToken(claims)
+	if err != nil {
+		http.Error(w, "ошибка генерации токена: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"token": tokenString,
+	})
 }
