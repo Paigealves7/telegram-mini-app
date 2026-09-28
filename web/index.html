@@ -250,21 +250,25 @@
             }
 
             const payload = {
-                arrival_item_id: parseInt(document.getElementById('sawing_arrival_item_id').value),
-                logs_processed: parseInt(document.getElementById('sawing_logs_processed').value),
-                sawing_date: new Date().toISOString().split('T')[0],
-                output_items: [{
-                    product_type: document.getElementById('lumber_type').value,
-                    lumber_type: document.getElementById('lumber_type').value,
-                    thickness_mm: parseInt(document.getElementById('lumber_thickness').value),
-                    width_mm: parseInt(document.getElementById('lumber_width').value),
-                    length_mm: parseInt(document.getElementById('lumber_length').value),
-                    count: parseInt(document.getElementById('lumber_count').value),
-                    volume_m3: parseFloat(document.getElementById('lumber_volume').value)
-                }]
+                worker_id: 1,
+                date: new Date().toISOString().split('T')[0],
+                logs: [
+                    {
+                        arrival_item_id: parseInt(document.getElementById('sawing_arrival_item_id').value),
+                        quantity: parseInt(document.getElementById('sawing_logs_processed').value)
+                    }
+                ],
+                boards: [
+                    {
+                        type: document.getElementById('lumber_type').value,
+                        thickness: parseInt(document.getElementById('lumber_thickness').value),
+                        width: parseInt(document.getElementById('lumber_width').value),
+                        length: parseInt(document.getElementById('lumber_length').value),
+                        quantity: parseInt(document.getElementById('lumber_count').value),
+                        volume: parseFloat(document.getElementById('lumber_volume').value)
+                    }
+                ]
             };
-
-            console.log("Sending payload:", payload);
 
             fetch('/api/v1/sawing', {
                 method: 'POST',
