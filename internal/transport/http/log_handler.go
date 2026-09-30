@@ -7,15 +7,15 @@ import (
 	"telegram-mini-app/internal/repository"
 )
 
-type BoardHandler struct {
+type LogHandler struct {
 	repo *repository.Repository
 }
 
-func NewBoardHandler(repo *repository.Repository) *BoardHandler {
-	return &BoardHandler{repo: repo}
+func NewLogHandler(repo *repository.Repository) *LogHandler {
+	return &LogHandler{repo: repo}
 }
 
-func (h *BoardHandler) GetList(w http.ResponseWriter, r *http.Request) {
+func (h *LogHandler) GetList(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	offset := 0
 
@@ -26,12 +26,12 @@ func (h *BoardHandler) GetList(w http.ResponseWriter, r *http.Request) {
 		offset = o
 	}
 
-	boards, err := h.repo.GetAllBoards(r.Context(), limit, offset)
+	logs, err := h.repo.GetAllLogs(r.Context(), limit, offset)
 	if err != nil {
-		http.Error(w, `{"error":"failed to fetch boards"}`, http.StatusInternalServerError)
+		http.Error(w, `{"error":"не удалось получить список сырья"}`, http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(boards)
+	json.NewEncoder(w).Encode(logs)
 }
