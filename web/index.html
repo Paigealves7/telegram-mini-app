@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sawmill Mini App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -51,10 +51,10 @@
     </style>
 </head>
 <body>
-    <h2>🪵 Пилорама Mini App</h2>
+    <h2>🪵 Цифровая Пилорама</h2>
 
     <!-- Статус авторизации -->
-    <div class="card">
+    <div class="card" id="auth-card">
         <div id="status" class="status">Авторизация...</div>
         <div id="user-info">Проверка данных Telegram...</div>
     </div>
@@ -72,11 +72,11 @@
         <h3>📥 Оформление прихода леса</h3>
         
         <div class="form-group">
-            <label>ID Поставщика (Supplier ID)</label>
+            <label>ID Поставщика</label>
             <input type="number" id="supplier_id" class="form-control" value="1">
         </div>
         <div class="form-group">
-            <label>ID Перевозчика (Carrier ID)</label>
+            <label>ID Перевозчика</label>
             <input type="number" id="carrier_id" class="form-control" value="1">
         </div>
         <div class="form-group">
@@ -115,9 +115,6 @@
                 </div>
             </div>
         </div>
-
-        <button class="btn" style="margin-bottom: 12px;" onclick="submitArrival()">Сохранить приход</button>
-        <button class="btn btn-secondary" onclick="showScreen('main-nav')">Назад в меню</button>
     </div>
 
     <!-- Экран 2: Распиловка -->
@@ -125,7 +122,7 @@
         <h3>🪚 Учет распиловки</h3>
 
         <div class="form-group">
-            <label>ID партии прихода (Arrival Log ID)</label>
+            <label>ID партии прихода (Сырье)</label>
             <input type="number" id="sawing_arrival_item_id" class="form-control" value="1">
         </div>
 
@@ -135,7 +132,7 @@
         </div>
 
         <hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 16px 0;">
-        <h4>Полученная продукция (доска/брус)</h4>
+        <h4>Полученная продукция</h4>
 
         <div class="log-item">
             <div class="form-group">
@@ -167,19 +164,12 @@
                 <input type="number" step="0.01" id="lumber_volume" class="form-control" value="1.8">
             </div>
         </div>
-
-        <button class="btn" style="margin-bottom: 12px;" onclick="submitSawing()">Сохранить распиловку</button>
-        <button class="btn btn-secondary" onclick="showScreen('main-nav')">Назад в меню</button>
     </div>
 
     <!-- Экран 3: Заказы -->
     <div id="orders-screen" class="card screen">
         <h3>📋 Заказы</h3>
-        <button class="btn" style="margin-bottom: 16px;" onclick="showScreen('create-order-screen')">+ Создать заказ</button>
-        
         <div id="orders-list">Загрузка заказов...</div>
-        
-        <button class="btn btn-secondary" style="margin-top: 12px;" onclick="showScreen('main-nav')">Назад в меню</button>
     </div>
 
     <!-- Экран 3.1: Создание заказа -->
@@ -187,17 +177,17 @@
         <h3>Создание нового заказа</h3>
 
         <div class="form-group">
-            <label>ID Клиента (Customer ID)</label>
+            <label>ID Клиента</label>
             <input type="number" id="order_customer_id" class="form-control" value="1">
         </div>
 
         <div class="form-group">
             <label>Статус</label>
-            <input type="text" id="order_status" class="form-control" value="new">
+            <input type="text" id="order_status" class="form-control" value="new" disabled>
         </div>
 
         <hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 16px 0;">
-        <h4>Позиции заказа</h4>
+        <h4>Позиции заказа (Доска)</h4>
 
         <div class="log-item">
             <div class="form-group">
@@ -229,9 +219,6 @@
                 <input type="number" id="order_price_per_m3" class="form-control" value="18000">
             </div>
         </div>
-
-        <button class="btn" style="margin-bottom: 12px;" onclick="submitOrder()">Сохранить заказ</button>
-        <button class="btn btn-secondary" onclick="showScreen('orders-screen')">Отмена</button>
     </div>
 
     <!-- Экран 4: Склад -->
@@ -239,34 +226,79 @@
         <h3>📦 Остатки на складе</h3>
         
         <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <button class="btn" style="flex: 1;" onclick="loadWarehouse('boards')">Доски / Пиломатериалы</button>
-            <button class="btn btn-secondary" style="flex: 1;" onclick="loadWarehouse('logs')">Бревна / Сырье</button>
+            <button class="btn" style="flex: 1;" onclick="loadWarehouse('boards')">Пиломатериалы</button>
+            <button class="btn btn-secondary" style="flex: 1;" onclick="loadWarehouse('logs')">Сырье</button>
         </div>
 
         <div id="warehouse-list">Загрузка данных...</div>
-
-        <button class="btn btn-secondary" style="margin-top: 12px;" onclick="showScreen('main-nav')">Назад в меню</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const initData = tg.initData;
+        let currentScreen = 'main-nav';
+
+        // Настройка обработки кнопки НАЗАД
+        tg.BackButton.onClick(() => {
+            if (currentScreen === 'create-order-screen') {
+                showScreen('orders-screen');
+            } else {
+                showScreen('main-nav');
+            }
+        });
+
+        // Настройка обработки ГЛАВНОЙ КНОПКИ
+        tg.onEvent('mainButtonClicked', () => {
+            if (currentScreen === 'arrivals-screen') submitArrival();
+            else if (currentScreen === 'sawing-screen') submitSawing();
+            else if (currentScreen === 'orders-screen') showScreen('create-order-screen');
+            else if (currentScreen === 'create-order-screen') submitOrder();
+        });
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
+            currentScreen = screenId;
+
+            // Логика Back Button
+            if (screenId === 'main-nav') {
+                tg.BackButton.hide();
+                document.getElementById('auth-card').style.display = 'block';
+            } else {
+                tg.BackButton.show();
+                document.getElementById('auth-card').style.display = 'none';
+            }
+
+            // Логика Main Button
+            tg.MainButton.hide();
+            tg.MainButton.enable();
+            tg.MainButton.hideProgress();
+
+            if (screenId === 'arrivals-screen') {
+                tg.MainButton.setText("СОХРАНИТЬ ПРИХОД");
+                tg.MainButton.show();
+            } else if (screenId === 'sawing-screen') {
+                tg.MainButton.setText("СОХРАНИТЬ РАСПИЛОВКУ");
+                tg.MainButton.show();
+            } else if (screenId === 'orders-screen') {
+                tg.MainButton.setText("СОЗДАТЬ ЗАКАЗ");
+                tg.MainButton.show();
+            } else if (screenId === 'create-order-screen') {
+                tg.MainButton.setText("СОХРАНИТЬ ЗАКАЗ");
+                tg.MainButton.show();
+            }
         }
 
-        if (!initData) {
+        // Авторизация при старте
+        if (!tg.initData) {
             document.getElementById('status').innerText = "⚠️ Внимание";
             document.getElementById('user-info').innerText = "Запустите приложение внутри Telegram!";
         } else {
             fetch('/api/v1/auth/telegram', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ init_data: initData })
+                body: JSON.stringify({ init_data: tg.initData })
             })
             .then(res => res.json())
             .then(data => {
@@ -284,47 +316,52 @@
             });
         }
 
+        function handleError(errText) {
+            tg.HapticFeedback.notificationOccurred('error');
+            tg.showAlert("Ошибка: " + errText);
+            tg.MainButton.hideProgress();
+        }
+
+        function handleSuccess(msg) {
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.showAlert(msg);
+            showScreen('main-nav');
+        }
+
         // 1. Сохранение прихода
         function submitArrival() {
+            tg.MainButton.showProgress();
             const token = localStorage.getItem('jwt_token');
-            const items = [{
-                species: document.querySelector('.log-species').value,
-                length_mm: parseInt(document.querySelector('.log-length').value),
-                diameter_mm: parseInt(document.querySelector('.log-diameter').value),
-                count: parseInt(document.querySelector('.log-count').value),
-                volume_m3: parseFloat(document.querySelector('.log-volume').value)
-            }];
-
             const payload = {
                 supplier_id: parseInt(document.getElementById('supplier_id').value),
                 carrier_id: parseInt(document.getElementById('carrier_id').value),
                 truck_number: document.getElementById('truck_number').value,
                 arrival_date: new Date().toISOString().split('T')[0],
                 created_by: 1,
-                items: items
+                items: [{
+                    species: document.querySelector('.log-species').value,
+                    length_mm: parseInt(document.querySelector('.log-length').value),
+                    diameter_mm: parseInt(document.querySelector('.log-diameter').value),
+                    count: parseInt(document.querySelector('.log-count').value),
+                    volume_m3: parseFloat(document.querySelector('.log-volume').value)
+                }]
             };
 
             fetch('/api/v1/arrivals', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify(payload)
             })
-            .then(res => {
-                if (res.status === 201 || res.ok) {
-                    alert("✅ Приход леса успешно зарегистрирован!");
-                    showScreen('main-nav');
-                } else {
-                    return res.text().then(text => { throw new Error(text) });
-                }
+            .then(async res => {
+                if (res.ok) handleSuccess("✅ Приход леса успешно зарегистрирован!");
+                else handleError(await res.text());
             })
-            .catch(err => alert("Ошибка: " + err.message));
+            .catch(err => handleError(err.message));
         }
 
         // 2. Сохранение распиловки
         function submitSawing() {
+            tg.MainButton.showProgress();
             const token = localStorage.getItem('jwt_token');
             const payload = {
                 worker_id: 1,
@@ -345,22 +382,14 @@
 
             fetch('/api/v1/sawing', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify(payload)
             })
             .then(async res => {
-                if (res.status === 201 || res.ok) {
-                    alert("✅ Операция распиловки успешно сохранена!");
-                    showScreen('main-nav');
-                } else {
-                    const errText = await res.text();
-                    alert("Ошибка сервера: " + errText);
-                }
+                if (res.ok) handleSuccess("✅ Операция распиловки сохранена!");
+                else handleError(await res.text());
             })
-            .catch(err => alert("Ошибка отправки: " + err.message));
+            .catch(err => handleError(err.message));
         }
 
         // 3. Загрузка списка заказов
@@ -369,94 +398,34 @@
             const container = document.getElementById('orders-list');
             container.innerHTML = "Загрузка...";
 
-            fetch('/api/v1/orders', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            })
+            fetch('/api/v1/orders', { headers: { 'Authorization': 'Bearer ' + token } })
             .then(res => res.json())
             .then(orders => {
                 if (!orders || orders.length === 0) {
                     container.innerHTML = "<p style='color: #71717a;'>Список заказов пуст</p>";
                     return;
                 }
-                
                 let html = "";
                 orders.forEach(o => {
                     html += `
                         <div class="order-card">
                             <div class="order-header">
-                                <span>Заказ #${o.id || o.ID}</span>
-                                <span class="badge">${o.status || 'new'}</span>
+                                <span>Заказ #${o.id}</span>
+                                <span class="badge">${o.status}</span>
                             </div>
-                            <div class="order-sub">Клиент ID: ${o.customer_id || o.CustomerID || 1}</div>
+                            <div class="order-sub">Клиент ID: ${o.contractor_id || 1}</div>
                         </div>
                     `;
                 });
                 container.innerHTML = html;
             })
-            .catch(err => {
-                container.innerHTML = "<p style='color: #ef4444;'>Ошибка загрузки заказов</p>";
-            });
-        }
-
-        // 5. Загрузка остатков склада
-        function loadWarehouse(type = 'boards') {
-            const token = localStorage.getItem('jwt_token');
-            const container = document.getElementById('warehouse-list');
-            container.innerHTML = "Загрузка...";
-
-            const endpoint = type === 'boards' ? '/api/v1/boards' : '/api/v1/logs';
-
-            fetch(endpoint, {
-                headers: { 'Authorization': 'Bearer ' + token }
-            })
-            .then(async res => {
-                if (!res.ok) {
-                    const errText = await res.text();
-                    throw new Error(`HTTP ${res.status}: ${errText || res.statusText}`);
-                }
-                return res.json();
-            })
-            .then(items => {
-                if (!items || items.length === 0) {
-                    container.innerHTML = "<p style='color: #71717a;'>На складе нет позиций</p>";
-                    return;
-                }
-
-                let html = "";
-                items.forEach(item => {
-                    if (type === 'boards') {
-                        html += `
-                            <div class="order-card">
-                                <div class="order-header">
-                                    <span>${item.species || 'Пиломатериал'} (${item.height_mm || item.HeightMM || 0}x${item.width_mm || item.WidthMM || 0}x${item.length_mm || item.LengthMM || 0} мм)</span>
-                                    <span class="badge">${item.count || item.Count || 0} шт</span>
-                                </div>
-                                <div class="order-sub">Сорт: ${item.grade || '1'} | Объем: ${item.volume_m3 || item.VolumeM3 || 0} м³</div>
-                            </div>
-                        `;
-                    } else {
-                        html += `
-                            <div class="order-card">
-                                <div class="order-header">
-                                    <span>${item.species || 'Бревно'} (Ø${item.diameter_mm || item.DiameterMM || 0} мм, L:${item.length_mm || item.LengthMM || 0} мм)</span>
-                                    <span class="badge">${item.count || item.Count || 0} шт</span>
-                                </div>
-                                <div class="order-sub">Объем: ${item.volume_m3 || item.VolumeM3 || 0} м³</div>
-                            </div>
-                        `;
-                    }
-                });
-                container.innerHTML = html;
-            })
-            .catch(err => {
-                container.innerHTML = `<p style='color: #ef4444;'>${err.message}</p>`;
-            });
+            .catch(err => container.innerHTML = "<p style='color: #ef4444;'>Ошибка загрузки заказов</p>");
         }
 
         // 4. Сохранение нового заказа
         function submitOrder() {
+            tg.MainButton.showProgress();
             const token = localStorage.getItem('jwt_token');
-
             const payload = {
                 master_id: 1,
                 contractor_id: parseInt(document.getElementById('order_customer_id').value) || 1,
@@ -464,35 +433,74 @@
                 notes: "",
                 delivery_price: 0,
                 extra_price: 0,
-                items: [
-                    {
-                        board_id: 1, // ID доски из базы данных (или 1 для теста)
-                        count: parseInt(document.getElementById('order_quantity').value) || 1,
-                        price: parseFloat(document.getElementById('order_price_per_m3').value) || 0,
-                        volume_m3: 0.1
-                    }
-                ]
+                items: [{
+                    board_id: 1, 
+                    count: parseInt(document.getElementById('order_quantity').value) || 1,
+                    price: parseFloat(document.getElementById('order_price_per_m3').value) || 0,
+                    volume_m3: 0.1
+                }]
             };
 
             fetch('/api/v1/orders', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                 body: JSON.stringify(payload)
             })
             .then(async res => {
-                if (res.status === 201 || res.ok) {
-                    alert("✅ Заказ успешно создан!");
+                if (res.ok) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                    tg.showAlert("✅ Заказ успешно создан!");
                     loadOrders();
                     showScreen('orders-screen');
-                } else {
-                    const errText = await res.text();
-                    alert("Ошибка при создании заказа: " + errText);
-                }
+                } else handleError(await res.text());
             })
-            .catch(err => alert("Ошибка отправки: " + err.message));
+            .catch(err => handleError(err.message));
+        }
+
+        // 5. Загрузка остатков склада
+        function loadWarehouse(type = 'boards') {
+            const token = localStorage.getItem('jwt_token');
+            const container = document.getElementById('warehouse-list');
+            container.innerHTML = "Загрузка...";
+            const endpoint = type === 'boards' ? '/api/v1/boards' : '/api/v1/logs';
+
+            fetch(endpoint, { headers: { 'Authorization': 'Bearer ' + token } })
+            .then(async res => {
+                if (!res.ok) throw new Error(await res.text() || res.statusText);
+                return res.json();
+            })
+            .then(items => {
+                if (!items || items.length === 0) {
+                    container.innerHTML = "<p style='color: #71717a;'>На складе нет позиций</p>";
+                    return;
+                }
+                let html = "";
+                items.forEach(item => {
+                    if (type === 'boards') {
+                        html += `
+                            <div class="order-card">
+                                <div class="order-header">
+                                    <span>${item.species || 'Доска'} (${item.height_mm}x${item.width_mm}x${item.length_mm} мм)</span>
+                                    <span class="badge">${item.count} шт</span>
+                                </div>
+                                <div class="order-sub">Сорт: ${item.grade || '1'} | Объем: ${item.volume_m3} м³</div>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="order-card">
+                                <div class="order-header">
+                                    <span>${item.species || 'Бревно'} (Ø${item.diameter_mm} мм, L:${item.length_mm} мм)</span>
+                                    <span class="badge">${item.count} шт</span>
+                                </div>
+                                <div class="order-sub">Объем: ${item.volume_m3} м³</div>
+                            </div>
+                        `;
+                    }
+                });
+                container.innerHTML = html;
+            })
+            .catch(err => container.innerHTML = `<p style='color: #ef4444;'>${err.message}</p>`);
         }
     </script>
 </body>
