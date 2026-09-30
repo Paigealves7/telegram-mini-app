@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 )
@@ -52,7 +53,17 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
-	orders, err := h.repo.GetOrders(r.Context())
+	limit := 50
+	offset := 0
+
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+	}
+	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && o >= 0 {
+		offset = o
+	}
+
+	orders, err := h.repo.GetOrders(r.Context(), limit, offset)
 	if err != nil {
 		http.Error(w, "ошибка получения заказов: "+err.Error(), http.StatusInternalServerError)
 		return
