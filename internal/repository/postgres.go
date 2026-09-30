@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"telegram-mini-app/internal/domain"
 
 	"github.com/jackc/pgx/v5"
@@ -346,4 +347,45 @@ func (r *Repository) GetOrders(ctx context.Context) ([]domain.Order, error) {
 	}
 
 	return orders, nil
+}
+
+func (r *Repository) GetAllBoards(ctx context.Context) ([]domain.Board, error) {
+	query := `
+		SELECT id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3
+		FROM boards
+		ORDER BY id DESC
+	`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	boards := make([]domain.Board, 0)
+	for rows.Next() {
+		var b domain.Board
+		var price sql.NullFloat64
+
+		if err := rows.Scan(
+			&b.ID,
+			&b.HeightMM,
+			&b.WidthMM,
+			&b.LengthMM,
+			&b.Species,
+			&b.Grade,
+			&b.Count,
+			&b.VolumeM3,
+			&price,
+		); err != nil {
+			return nil, err
+		}
+
+		if price.Valid {
+			b.PricePerM3 = &price.Float64
+		}
+
+		boards = append(boards, b)
+	}
+
+	return boards, rows.Err()
 }

@@ -36,6 +36,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	salesHandler := NewSalesHandler(repo)
 	orderHandler := NewOrderHandler(repo)
 	tgAuthHandler := NewTelegramAuthHandler(repo, os.Getenv("TELEGRAM_BOT_TOKEN"))
+	boardHandler := NewBoardHandler(repo)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(r.Context()); err != nil {
@@ -84,6 +85,8 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		// Защищенные ручки (требуют JWT)
 		r.Group(func(r chi.Router) {
 			r.Use(AuthMiddleware)
+
+			r.Get("/boards", boardHandler.GetList)
 
 			r.Get("/contractors", dictHandler.GetContractors)
 			r.Post("/contractors", dictHandler.CreateContractor)

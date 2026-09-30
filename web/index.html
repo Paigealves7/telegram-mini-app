@@ -30,9 +30,7 @@
             border: none; padding: 10px; border-radius: 8px; font-weight: 600;
             cursor: pointer; text-align: center; width: 100%; box-sizing: border-box;
         }
-        .btn-secondary {
-            background-color: #e4e4e7; color: #18181b;
-        }
+        .btn-secondary { background-color: #e4e4e7; color: #18181b; }
         .form-group { margin-bottom: 12px; }
         .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #3f3f46; }
         .form-control {
@@ -42,6 +40,14 @@
         .screen { display: none; }
         .screen.active { display: block; }
         .log-item { background: #ffffff; border: 1px solid #e4e4e7; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+        .order-card {
+            background: #ffffff; border: 1px solid #e4e4e7; padding: 12px; border-radius: 8px; margin-bottom: 8px;
+        }
+        .order-header { display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; margin-bottom: 4px; color: #18181b; }
+        .order-sub { font-size: 12px; color: #71717a; margin-bottom: 8px; }
+        .badge {
+            font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -57,8 +63,8 @@
     <div id="main-nav" class="nav-grid screen">
         <button class="btn" onclick="showScreen('arrivals-screen')">📥 Приход леса</button>
         <button class="btn" onclick="showScreen('sawing-screen')">🪚 Распиловка</button>
-        <button class="btn btn-secondary" onclick="alert('Следующий этап')">📋 Заказы</button>
-        <button class="btn btn-secondary" onclick="alert('Следующий этап')">📦 Склад</button>
+        <button class="btn" onclick="loadOrders(); showScreen('orders-screen')">📋 Заказы</button>
+        <button class="btn" onclick="loadWarehouse('boards'); showScreen('warehouse-screen')">📦 Склад</button>
     </div>
 
     <!-- Экран 1: Приход леса -->
@@ -166,6 +172,82 @@
         <button class="btn btn-secondary" onclick="showScreen('main-nav')">Назад в меню</button>
     </div>
 
+    <!-- Экран 3: Заказы -->
+    <div id="orders-screen" class="card screen">
+        <h3>📋 Заказы</h3>
+        <button class="btn" style="margin-bottom: 16px;" onclick="showScreen('create-order-screen')">+ Создать заказ</button>
+        
+        <div id="orders-list">Загрузка заказов...</div>
+        
+        <button class="btn btn-secondary" style="margin-top: 12px;" onclick="showScreen('main-nav')">Назад в меню</button>
+    </div>
+
+    <!-- Экран 3.1: Создание заказа -->
+    <div id="create-order-screen" class="card screen">
+        <h3>Создание нового заказа</h3>
+
+        <div class="form-group">
+            <label>ID Клиента (Customer ID)</label>
+            <input type="number" id="order_customer_id" class="form-control" value="1">
+        </div>
+
+        <div class="form-group">
+            <label>Статус</label>
+            <input type="text" id="order_status" class="form-control" value="new">
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 16px 0;">
+        <h4>Позиции заказа</h4>
+
+        <div class="log-item">
+            <div class="form-group">
+                <label>Тип пиломатериала</label>
+                <input type="text" id="order_lumber_type" class="form-control" value="Обрезная доска">
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Толщина (мм)</label>
+                    <input type="number" id="order_thickness" class="form-control" value="50">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Ширина (мм)</label>
+                    <input type="number" id="order_width" class="form-control" value="150">
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Длина (мм)</label>
+                    <input type="number" id="order_length" class="form-control" value="6000">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Кол-во (шт)</label>
+                    <input type="number" id="order_quantity" class="form-control" value="100">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Цена за м³ (руб)</label>
+                <input type="number" id="order_price_per_m3" class="form-control" value="18000">
+            </div>
+        </div>
+
+        <button class="btn" style="margin-bottom: 12px;" onclick="submitOrder()">Сохранить заказ</button>
+        <button class="btn btn-secondary" onclick="showScreen('orders-screen')">Отмена</button>
+    </div>
+
+    <!-- Экран 4: Склад -->
+    <div id="warehouse-screen" class="card screen">
+        <h3>📦 Остатки на складе</h3>
+        
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button class="btn" style="flex: 1;" onclick="loadWarehouse('boards')">Доски / Пиломатериалы</button>
+            <button class="btn btn-secondary" style="flex: 1;" onclick="loadWarehouse('logs')">Бревна / Сырье</button>
+        </div>
+
+        <div id="warehouse-list">Загрузка данных...</div>
+
+        <button class="btn btn-secondary" style="margin-top: 12px;" onclick="showScreen('main-nav')">Назад в меню</button>
+    </div>
+
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
@@ -202,7 +284,7 @@
             });
         }
 
-        // Сохранение прихода
+        // 1. Сохранение прихода
         function submitArrival() {
             const token = localStorage.getItem('jwt_token');
             const items = [{
@@ -241,33 +323,24 @@
             .catch(err => alert("Ошибка: " + err.message));
         }
 
-        // Сохранение распиловки
+        // 2. Сохранение распиловки
         function submitSawing() {
             const token = localStorage.getItem('jwt_token');
-            if (!token) {
-                alert("Ошибка: отсутствует JWT токен");
-                return;
-            }
-
             const payload = {
                 worker_id: 1,
                 date: new Date().toISOString().split('T')[0],
-                logs: [
-                    {
-                        arrival_item_id: parseInt(document.getElementById('sawing_arrival_item_id').value),
-                        quantity: parseInt(document.getElementById('sawing_logs_processed').value)
-                    }
-                ],
-                boards: [
-                    {
-                        type: document.getElementById('lumber_type').value,
-                        thickness: parseInt(document.getElementById('lumber_thickness').value),
-                        width: parseInt(document.getElementById('lumber_width').value),
-                        length: parseInt(document.getElementById('lumber_length').value),
-                        quantity: parseInt(document.getElementById('lumber_count').value),
-                        volume: parseFloat(document.getElementById('lumber_volume').value)
-                    }
-                ]
+                logs: [{
+                    arrival_item_id: parseInt(document.getElementById('sawing_arrival_item_id').value),
+                    quantity: parseInt(document.getElementById('sawing_logs_processed').value)
+                }],
+                boards: [{
+                    type: document.getElementById('lumber_type').value,
+                    thickness: parseInt(document.getElementById('lumber_thickness').value),
+                    width: parseInt(document.getElementById('lumber_width').value),
+                    length: parseInt(document.getElementById('lumber_length').value),
+                    quantity: parseInt(document.getElementById('lumber_count').value),
+                    volume: parseFloat(document.getElementById('lumber_volume').value)
+                }]
             };
 
             fetch('/api/v1/sawing', {
@@ -285,6 +358,138 @@
                 } else {
                     const errText = await res.text();
                     alert("Ошибка сервера: " + errText);
+                }
+            })
+            .catch(err => alert("Ошибка отправки: " + err.message));
+        }
+
+        // 3. Загрузка списка заказов
+        function loadOrders() {
+            const token = localStorage.getItem('jwt_token');
+            const container = document.getElementById('orders-list');
+            container.innerHTML = "Загрузка...";
+
+            fetch('/api/v1/orders', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(res => res.json())
+            .then(orders => {
+                if (!orders || orders.length === 0) {
+                    container.innerHTML = "<p style='color: #71717a;'>Список заказов пуст</p>";
+                    return;
+                }
+                
+                let html = "";
+                orders.forEach(o => {
+                    html += `
+                        <div class="order-card">
+                            <div class="order-header">
+                                <span>Заказ #${o.id || o.ID}</span>
+                                <span class="badge">${o.status || 'new'}</span>
+                            </div>
+                            <div class="order-sub">Клиент ID: ${o.customer_id || o.CustomerID || 1}</div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                container.innerHTML = "<p style='color: #ef4444;'>Ошибка загрузки заказов</p>";
+            });
+        }
+
+        // 5. Загрузка остатков склада
+        function loadWarehouse(type = 'boards') {
+            const token = localStorage.getItem('jwt_token');
+            const container = document.getElementById('warehouse-list');
+            container.innerHTML = "Загрузка...";
+
+            const endpoint = type === 'boards' ? '/api/v1/boards' : '/api/v1/logs';
+
+            fetch(endpoint, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(async res => {
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`HTTP ${res.status}: ${errText || res.statusText}`);
+                }
+                return res.json();
+            })
+            .then(items => {
+                if (!items || items.length === 0) {
+                    container.innerHTML = "<p style='color: #71717a;'>На складе нет позиций</p>";
+                    return;
+                }
+
+                let html = "";
+                items.forEach(item => {
+                    if (type === 'boards') {
+                        html += `
+                            <div class="order-card">
+                                <div class="order-header">
+                                    <span>${item.species || 'Пиломатериал'} (${item.height_mm || item.HeightMM || 0}x${item.width_mm || item.WidthMM || 0}x${item.length_mm || item.LengthMM || 0} мм)</span>
+                                    <span class="badge">${item.count || item.Count || 0} шт</span>
+                                </div>
+                                <div class="order-sub">Сорт: ${item.grade || '1'} | Объем: ${item.volume_m3 || item.VolumeM3 || 0} м³</div>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="order-card">
+                                <div class="order-header">
+                                    <span>${item.species || 'Бревно'} (Ø${item.diameter_mm || item.DiameterMM || 0} мм, L:${item.length_mm || item.LengthMM || 0} мм)</span>
+                                    <span class="badge">${item.count || item.Count || 0} шт</span>
+                                </div>
+                                <div class="order-sub">Объем: ${item.volume_m3 || item.VolumeM3 || 0} м³</div>
+                            </div>
+                        `;
+                    }
+                });
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                container.innerHTML = `<p style='color: #ef4444;'>${err.message}</p>`;
+            });
+        }
+
+        // 4. Сохранение нового заказа
+        function submitOrder() {
+            const token = localStorage.getItem('jwt_token');
+
+            const payload = {
+                master_id: 1,
+                contractor_id: parseInt(document.getElementById('order_customer_id').value) || 1,
+                status: document.getElementById('order_status').value || "new",
+                notes: "",
+                delivery_price: 0,
+                extra_price: 0,
+                items: [
+                    {
+                        board_id: 1, // ID доски из базы данных (или 1 для теста)
+                        count: parseInt(document.getElementById('order_quantity').value) || 1,
+                        price: parseFloat(document.getElementById('order_price_per_m3').value) || 0,
+                        volume_m3: 0.1
+                    }
+                ]
+            };
+
+            fetch('/api/v1/orders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(async res => {
+                if (res.status === 201 || res.ok) {
+                    alert("✅ Заказ успешно создан!");
+                    loadOrders();
+                    showScreen('orders-screen');
+                } else {
+                    const errText = await res.text();
+                    alert("Ошибка при создании заказа: " + errText);
                 }
             })
             .catch(err => alert("Ошибка отправки: " + err.message));
