@@ -17,18 +17,23 @@ func NewOrderHandler(repo *repository.Repository) *OrderHandler {
 }
 
 type CreateOrderRequest struct {
-	MasterID      int64              `json:"master_id"`
-	ContractorID  int64              `json:"contractor_id"`
+	MasterID      int64              `json:"master_id" validate:"required,gt=0"`
+	ContractorID  int64              `json:"contractor_id" validate:"required,gt=0"`
 	Notes         string             `json:"notes"`
-	DeliveryPrice float64            `json:"delivery_price"`
-	ExtraPrice    float64            `json:"extra_price"`
-	Items         []domain.OrderItem `json:"items"`
+	DeliveryPrice float64            `json:"delivery_price" validate:"gte=0"`
+	ExtraPrice    float64            `json:"extra_price" validate:"gte=0"`
+	Items         []domain.OrderItem `json:"items" validate:"required,min=1,dive"`
 }
 
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	var req CreateOrderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Items) == 0 {
-		http.Error(w, "некорректный JSON или пустой список позиций", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректный JSON", http.StatusBadRequest)
+		return
+	}
+
+	if err := Validate.Struct(req); err != nil {
+		http.Error(w, "ошибка валидации данных: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 

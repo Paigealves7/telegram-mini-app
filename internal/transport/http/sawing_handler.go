@@ -16,16 +16,21 @@ func NewSawingHandler(repo *repository.Repository) *SawingHandler {
 }
 
 type CreateSawingRequest struct {
-	WorkerID int64             `json:"worker_id"`
-	Date     string            `json:"date"`
-	Logs     []domain.SawedLog `json:"logs"`
-	Boards   []domain.Board    `json:"boards"`
+	WorkerID int64             `json:"worker_id" validate:"required,gt=0"`
+	Date     string            `json:"date" validate:"required"`
+	Logs     []domain.SawedLog `json:"logs" validate:"required,min=1,dive"`
+	Boards   []domain.Board    `json:"boards" validate:"required,min=1,dive"`
 }
 
 func (h *SawingHandler) CreateSawing(w http.ResponseWriter, r *http.Request) {
 	var req CreateSawingRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Logs) == 0 || len(req.Boards) == 0 {
-		http.Error(w, "некорректный JSON или пустой список бревен/досок", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректный JSON", http.StatusBadRequest)
+		return
+	}
+
+	if err := Validate.Struct(req); err != nil {
+		http.Error(w, "ошибка валидации данных: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
