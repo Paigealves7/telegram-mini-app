@@ -16,19 +16,23 @@ func NewArrivalHandler(repo *repository.Repository) *ArrivalHandler {
 }
 
 type CreateArrivalRequest struct {
-	SupplierID  int64            `json:"supplier_id"`
-	CarrierID   int64            `json:"carrier_id"`
-	TruckNumber string           `json:"truck_number"`
-	ArrivalDate string           `json:"arrival_date"`
-	CreatedBy   int64            `json:"created_by"`
-	Items       []domain.LogItem `json:"items"`
+	SupplierID  int64            `json:"supplier_id" validate:"required,gt=0"`
+	CarrierID   int64            `json:"carrier_id" validate:"required,gt=0"`
+	TruckNumber string           `json:"truck_number" validate:"required"`
+	ArrivalDate string           `json:"arrival_date" validate:"required"`
+	CreatedBy   int64            `json:"created_by" validate:"required,gt=0"`
+	Items       []domain.LogItem `json:"items" validate:"required,min=1,dive"` // dive валидирует элементы массива!
 }
 
-// POST /api/v1/arrivals
 func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
 	var req CreateArrivalRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Items) == 0 {
-		http.Error(w, "некорректный JSON или пустой список бревен", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректный JSON", http.StatusBadRequest)
+		return
+	}
+
+	if err := Validate.Struct(req); err != nil {
+		http.Error(w, "ошибка валидации данных: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 

@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 )
@@ -16,18 +17,23 @@ func NewOrderHandler(repo *repository.Repository) *OrderHandler {
 }
 
 type CreateOrderRequest struct {
-	MasterID      int64              `json:"master_id"`
-	ContractorID  int64              `json:"contractor_id"`
+	MasterID      int64              `json:"master_id" validate:"required,gt=0"`
+	ContractorID  int64              `json:"contractor_id" validate:"required,gt=0"`
 	Notes         string             `json:"notes"`
-	DeliveryPrice float64            `json:"delivery_price"`
-	ExtraPrice    float64            `json:"extra_price"`
-	Items         []domain.OrderItem `json:"items"`
+	DeliveryPrice float64            `json:"delivery_price" validate:"gte=0"`
+	ExtraPrice    float64            `json:"extra_price" validate:"gte=0"`
+	Items         []domain.OrderItem `json:"items" validate:"required,min=1,dive"`
 }
 
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	var req CreateOrderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Items) == 0 {
-		http.Error(w, "некорректный JSON или пустой список позиций", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректный JSON", http.StatusBadRequest)
+		return
+	}
+
+	if err := Validate.Struct(req); err != nil {
+		http.Error(w, "ошибка валидации данных: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -52,7 +58,17 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
-	orders, err := h.repo.GetOrders(r.Context())
+	limit := 50
+	offset := 0
+
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+	}
+	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && o >= 0 {
+		offset = o
+	}
+
+	orders, err := h.repo.GetOrders(r.Context(), limit, offset)
 	if err != nil {
 		http.Error(w, "ошибка получения заказов: "+err.Error(), http.StatusInternalServerError)
 		return

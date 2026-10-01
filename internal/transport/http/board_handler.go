@@ -1,0 +1,37 @@
+package http
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"telegram-mini-app/internal/repository"
+)
+
+type BoardHandler struct {
+	repo *repository.Repository
+}
+
+func NewBoardHandler(repo *repository.Repository) *BoardHandler {
+	return &BoardHandler{repo: repo}
+}
+
+func (h *BoardHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	limit := 50
+	offset := 0
+
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+	}
+	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && o >= 0 {
+		offset = o
+	}
+
+	boards, err := h.repo.GetAllBoards(r.Context(), limit, offset)
+	if err != nil {
+		http.Error(w, `{"error":"failed to fetch boards"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(boards)
+}

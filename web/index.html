@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sawmill Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            padding: 16px;
+            margin: 0;
+            background-color: var(--tg-theme-bg-color, #f4f4f5);
+            color: var(--tg-theme-text-color, #18181b);
+        }
+        .card {
+            background: var(--tg-theme-secondary-bg-color, #ffffff);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 16px;
+        }
+        .status { font-weight: 600; margin-bottom: 8px; font-size: 16px; }
+        .nav-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;
+        }
+        .btn {
+            background-color: var(--tg-theme-button-color, #2563eb);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none; padding: 10px; border-radius: 8px; font-weight: 600;
+            cursor: pointer; text-align: center; width: 100%; box-sizing: border-box;
+        }
+        .btn-secondary { background-color: #e4e4e7; color: #18181b; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #3f3f46; }
+        .form-control {
+            width: 100%; padding: 8px 10px; border: 1px solid #d4d4d8; border-radius: 6px;
+            box-sizing: border-box; font-size: 14px; background-color: #ffffff; color: #18181b;
+        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .log-item { background: #ffffff; border: 1px solid #e4e4e7; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+        .order-card {
+            background: #ffffff; border: 1px solid #e4e4e7; padding: 12px; border-radius: 8px; margin-bottom: 8px;
+        }
+        .order-header { display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; margin-bottom: 4px; color: #18181b; }
+        .order-sub { font-size: 12px; color: #71717a; margin-bottom: 4px; }
+        .badge {
+            font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <h2>🪵 Цифровая Пилорама</h2>
+
+    <!-- Статус авторизации -->
+    <div class="card" id="auth-card">
+        <div id="status" class="status">Авторизация...</div>
+        <div id="user-info">Проверка данных Telegram...</div>
+    </div>
+
+    <!-- Главное меню -->
+    <div id="main-nav" class="nav-grid screen">
+        <button class="btn" onclick="showScreen('arrivals-screen')">📥 Приход леса</button>
+        <button class="btn" onclick="showScreen('sawing-screen')">🪚 Распиловка</button>
+        <button class="btn" onclick="loadOrders(); showScreen('orders-screen')">📋 Заказы</button>
+        <button class="btn" onclick="loadWarehouse('boards'); showScreen('warehouse-screen')">📦 Склад</button>
+        
+        <!-- Кнопка статистики (изначально скрыта, пока не проверим роль) -->
+        <button class="btn btn-secondary" id="btn-stats" style="display: none; grid-column: span 2;" onclick="showScreen('stats-screen'); loadStatistics();">📊 Статистика</button>
+    </div>
+
+    <!-- Экран 1: Приход леса -->
+    <div id="arrivals-screen" class="card screen">
+        <h3>📥 Оформление прихода леса</h3>
+        <div class="form-group"><label>ID Поставщика</label><input type="number" id="supplier_id" class="form-control" value="1"></div>
+        <div class="form-group"><label>ID Перевозчика</label><input type="number" id="carrier_id" class="form-control" value="1"></div>
+        <div class="form-group"><label>Номер машины</label><input type="text" id="truck_number" class="form-control" value="А777АА777"></div>
+        <hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 16px 0;">
+        <h4>Бревна в партии</h4>
+        <div id="logs-container">
+            <div class="log-item">
+                <div class="form-group"><label>Порода</label><input type="text" class="form-control log-species" value="Сосна"></div>
+                <div style="display: flex; gap: 8px;">
+                    <div class="form-group" style="flex: 1;"><label>Длина (мм)</label><input type="number" class="form-control log-length" value="6000"></div>
+                    <div class="form-group" style="flex: 1;"><label>Диаметр (мм)</label><input type="number" class="form-control log-diameter" value="220"></div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <div class="form-group" style="flex: 1;"><label>Количество (шт)</label><input type="number" class="form-control log-count" value="15"></div>
+                    <div class="form-group" style="flex: 1;"><label>Объем (м³)</label><input type="number" step="0.01" class="form-control log-volume" value="3.45"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Экран 2: Распиловка -->
+    <div id="sawing-screen" class="card screen">
+        <h3>🪚 Учет распиловки</h3>
+        <div class="form-group"><label>ID партии прихода (Сырье)</label><input type="number" id="sawing_arrival_item_id" class="form-control" value="1"></div>
+        <div class="form-group"><label>Распилено бревен (шт)</label><input type="number" id="sawing_logs_processed" class="form-control" value="5"></div>
+        <hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 16px 0;">
+        <h4>Полученная продукция</h4>
+        <div class="log-item">
+            <div class="form-group"><label>Тип пиломатериала</label><input type="text" id="lumber_type" class="form-control" value="Обрезная доска"></div>
+            <div style="display: flex; gap: 8px;">
+                <div class="form-group" style="flex: 1;"><label>Толщина (мм)</label><input type="number" id="lumber_thickness" class="form-control" value="50"></div>
+                <div class="form-group" style="flex: 1;"><label>Ширина (мм)</label><input type="number" id="lumber_width" class="form-control" value="150"></div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <div class="form-group" style="flex: 1;"><label>Длина (мм)</label><input type="number" id="lumber_length" class="form-control" value="6000"></div>
+                <div class="form-group" style="flex: 1;"><label>Кол-во (шт)</label><input type="number" id="lumber_count" class="form-control" value="40"></div>
+            </div>
+            <div class="form-group"><label>Общий объем (м³)</label><input type="number" step="0.01" id="lumber_volume" class="form-control" value="1.8"></div>
+        </div>
+    </div>
+
+    <!-- Экран 3: Заказы -->
+    <div id="orders-screen" class="card screen">
+        <h3>📋 Заказы</h3>
+        <div id="orders-list">Загрузка заказов...</div>
+    </div>
+
+    <!-- Экран 3.1: Создание заказа -->
+    <div id="create-order-screen" class="card screen">
+        <h3>Создание нового заказа</h3>
+        <div class="form-group"><label>ID Клиента</label><input type="number" id="order_customer_id" class="form-control" value="1"></div>
+        <div class="form-group"><label>Статус</label><input type="text" id="order_status" class="form-control" value="new" disabled></div>
+        <hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 16px 0;">
+        <h4>Позиции заказа (Доска)</h4>
+        <div class="log-item">
+            <div class="form-group"><label>Тип пиломатериала</label><input type="text" id="order_lumber_type" class="form-control" value="Обрезная доска"></div>
+            <div style="display: flex; gap: 8px;">
+                <div class="form-group" style="flex: 1;"><label>Толщина (мм)</label><input type="number" id="order_thickness" class="form-control" value="50"></div>
+                <div class="form-group" style="flex: 1;"><label>Ширина (мм)</label><input type="number" id="order_width" class="form-control" value="150"></div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <div class="form-group" style="flex: 1;"><label>Длина (мм)</label><input type="number" id="order_length" class="form-control" value="6000"></div>
+                <div class="form-group" style="flex: 1;"><label>Кол-во (шт)</label><input type="number" id="order_quantity" class="form-control" value="100"></div>
+            </div>
+            <div class="form-group"><label>Цена за м³ (руб)</label><input type="number" id="order_price_per_m3" class="form-control" value="18000"></div>
+        </div>
+    </div>
+
+    <!-- Экран 4: Склад -->
+    <div id="warehouse-screen" class="card screen">
+        <h3>📦 Остатки на складе</h3>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button class="btn" style="flex: 1;" onclick="loadWarehouse('boards')">Пиломатериалы</button>
+            <button class="btn btn-secondary" style="flex: 1;" onclick="loadWarehouse('logs')">Сырье</button>
+        </div>
+        <div id="warehouse-list">Загрузка данных...</div>
+    </div>
+
+    <!-- Экран 5: Статистика -->
+    <div id="stats-screen" class="card screen">
+        <h3>📊 Статистика предприятия</h3>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <div class="form-group" style="flex: 1;">
+                <label>С даты</label>
+                <input type="date" id="stat_start" class="form-control">
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>По дату</label>
+                <input type="date" id="stat_end" class="form-control">
+            </div>
+        </div>
+        <button class="btn" style="margin-bottom: 16px;" onclick="loadStatistics()">Обновить данные</button>
+
+        <div class="nav-grid">
+            <div class="order-card" style="background: #f0fdf4; border-color: #bbf7d0;">
+                <div class="order-sub">Пришло сырья</div>
+                <div class="status" id="stat-arrived">0 м³</div>
+            </div>
+            <div class="order-card" style="background: #fffbeb; border-color: #fde68a;">
+                <div class="order-sub">Распилено сырья</div>
+                <div class="status" id="stat-sawed">0 м³</div>
+            </div>
+            <div class="order-card" style="background: #eff6ff; border-color: #bfdbfe;">
+                <div class="order-sub">Продано (объем)</div>
+                <div class="status" id="stat-sold-vol">0 м³</div>
+            </div>
+            <div class="order-card" style="background: #fdf2f8; border-color: #fbcfe8;">
+                <div class="order-sub">Выручка</div>
+                <div class="status" id="stat-sold-sum" style="color: #be185d;">0 ₽</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        let currentScreen = 'main-nav';
+
+        // Устанавливаем даты по умолчанию для статистики (1 число текущего месяца и сегодняшний день)
+        const dateNow = new Date();
+        document.getElementById('stat_end').value = dateNow.toISOString().split('T')[0];
+        document.getElementById('stat_start').value = new Date(dateNow.getFullYear(), dateNow.getMonth(), 2).toISOString().split('T')[0];
+
+        // Функция расшифровки JWT токена
+        function parseJwt(token) {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                return JSON.parse(decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+            } catch (e) { return null; }
+        }
+
+        tg.BackButton.onClick(() => {
+            if (currentScreen === 'create-order-screen') showScreen('orders-screen');
+            else showScreen('main-nav');
+        });
+
+        tg.onEvent('mainButtonClicked', () => {
+            if (currentScreen === 'arrivals-screen') submitArrival();
+            else if (currentScreen === 'sawing-screen') submitSawing();
+            else if (currentScreen === 'orders-screen') showScreen('create-order-screen');
+            else if (currentScreen === 'create-order-screen') submitOrder();
+        });
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            currentScreen = screenId;
+
+            if (screenId === 'main-nav') {
+                tg.BackButton.hide();
+                document.getElementById('auth-card').style.display = 'block';
+            } else {
+                tg.BackButton.show();
+                document.getElementById('auth-card').style.display = 'none';
+            }
+
+            tg.MainButton.hide();
+            tg.MainButton.enable();
+            tg.MainButton.hideProgress();
+
+            if (screenId === 'arrivals-screen') { tg.MainButton.setText("СОХРАНИТЬ ПРИХОД"); tg.MainButton.show(); }
+            else if (screenId === 'sawing-screen') { tg.MainButton.setText("СОХРАНИТЬ РАСПИЛОВКУ"); tg.MainButton.show(); }
+            else if (screenId === 'orders-screen') { tg.MainButton.setText("СОЗДАТЬ ЗАКАЗ"); tg.MainButton.show(); }
+            else if (screenId === 'create-order-screen') { tg.MainButton.setText("СОХРАНИТЬ ЗАКАЗ"); tg.MainButton.show(); }
+        }
+
+        // Авторизация
+        if (!tg.initData) {
+            document.getElementById('status').innerText = "⚠️ Локальный режим (Test)";
+            // Для тестов в браузере можешь хардкодить токен
+        } else {
+            fetch('/api/v1/auth/telegram', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ init_data: tg.initData })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.token) {
+                    document.getElementById('status').innerText = "✅ Успешный вход";
+                    document.getElementById('user-info').innerText = `Сотрудник: ${tg.initDataUnsafe.user?.first_name || 'User'}`;
+                    localStorage.setItem('jwt_token', data.token);
+                    
+                    // Проверяем роль и показываем кнопку "Статистика" если это Руководитель
+                    const jwtPayload = parseJwt(data.token);
+                    if (jwtPayload && jwtPayload.role === 'manager') {
+                        document.getElementById('btn-stats').style.display = 'block';
+                    }
+                    
+                    showScreen('main-nav');
+                } else {
+                    document.getElementById('status').innerText = "❌ Ошибка авторизации";
+                }
+            })
+            .catch(err => document.getElementById('status').innerText = "Ошибка сети: " + err);
+        }
+
+        function handleError(errText) {
+            tg.HapticFeedback.notificationOccurred('error');
+            tg.showAlert("Ошибка: " + errText);
+            tg.MainButton.hideProgress();
+        }
+
+        function handleSuccess(msg) {
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.showAlert(msg);
+            showScreen('main-nav');
+        }
+
+        // 1. Сохранение прихода
+        function submitArrival() {
+            tg.MainButton.showProgress();
+            const token = localStorage.getItem('jwt_token');
+            const payload = {
+                supplier_id: parseInt(document.getElementById('supplier_id').value),
+                carrier_id: parseInt(document.getElementById('carrier_id').value),
+                truck_number: document.getElementById('truck_number').value,
+                arrival_date: new Date().toISOString().split('T')[0],
+                created_by: 1,
+                items: [{
+                    species: document.querySelector('.log-species').value,
+                    length_mm: parseInt(document.querySelector('.log-length').value),
+                    diameter_mm: parseInt(document.querySelector('.log-diameter').value),
+                    count: parseInt(document.querySelector('.log-count').value),
+                    volume_m3: parseFloat(document.querySelector('.log-volume').value)
+                }]
+            };
+
+            fetch('/api/v1/arrivals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify(payload)
+            })
+            .then(async res => {
+                if (res.ok) handleSuccess("✅ Приход леса успешно зарегистрирован!");
+                else handleError(await res.text());
+            })
+            .catch(err => handleError(err.message));
+        }
+
+        // 2. Сохранение распиловки
+        function submitSawing() {
+            tg.MainButton.showProgress();
+            const token = localStorage.getItem('jwt_token');
+            const payload = {
+                worker_id: 1,
+                date: new Date().toISOString().split('T')[0],
+                logs: [{
+                    arrival_item_id: parseInt(document.getElementById('sawing_arrival_item_id').value),
+                    quantity: parseInt(document.getElementById('sawing_logs_processed').value)
+                }],
+                boards: [{
+                    type: document.getElementById('lumber_type').value,
+                    thickness: parseInt(document.getElementById('lumber_thickness').value),
+                    width: parseInt(document.getElementById('lumber_width').value),
+                    length: parseInt(document.getElementById('lumber_length').value),
+                    quantity: parseInt(document.getElementById('lumber_count').value),
+                    volume: parseFloat(document.getElementById('lumber_volume').value)
+                }]
+            };
+
+            fetch('/api/v1/sawing', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify(payload)
+            })
+            .then(async res => {
+                if (res.ok) handleSuccess("✅ Операция распиловки сохранена!");
+                else handleError(await res.text());
+            })
+            .catch(err => handleError(err.message));
+        }
+
+        // 3. Загрузка списка заказов
+        function loadOrders() {
+            const token = localStorage.getItem('jwt_token');
+            const container = document.getElementById('orders-list');
+            container.innerHTML = "Загрузка...";
+
+            fetch('/api/v1/orders', { headers: { 'Authorization': 'Bearer ' + token } })
+            .then(res => res.json())
+            .then(orders => {
+                if (!orders || orders.length === 0) {
+                    container.innerHTML = "<p style='color: #71717a;'>Список заказов пуст</p>";
+                    return;
+                }
+                let html = "";
+                orders.forEach(o => {
+                    html += `
+                        <div class="order-card">
+                            <div class="order-header">
+                                <span>Заказ #${o.id}</span>
+                                <span class="badge">${o.status}</span>
+                            </div>
+                            <div class="order-sub">Клиент ID: ${o.contractor_id || 1}</div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            })
+            .catch(err => container.innerHTML = "<p style='color: #ef4444;'>Ошибка загрузки заказов</p>");
+        }
+
+        // 4. Сохранение нового заказа
+        function submitOrder() {
+            tg.MainButton.showProgress();
+            const token = localStorage.getItem('jwt_token');
+            const payload = {
+                master_id: 1,
+                contractor_id: parseInt(document.getElementById('order_customer_id').value) || 1,
+                status: document.getElementById('order_status').value || "new",
+                notes: "",
+                delivery_price: 0,
+                extra_price: 0,
+                items: [{
+                    board_id: 1, 
+                    count: parseInt(document.getElementById('order_quantity').value) || 1,
+                    price: parseFloat(document.getElementById('order_price_per_m3').value) || 0,
+                    volume_m3: 0.1
+                }]
+            };
+
+            fetch('/api/v1/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify(payload)
+            })
+            .then(async res => {
+                if (res.ok) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                    tg.showAlert("✅ Заказ успешно создан!");
+                    loadOrders();
+                    showScreen('orders-screen');
+                } else handleError(await res.text());
+            })
+            .catch(err => handleError(err.message));
+        }
+
+        // 5. Загрузка остатков склада
+        function loadWarehouse(type = 'boards') {
+            const token = localStorage.getItem('jwt_token');
+            const container = document.getElementById('warehouse-list');
+            container.innerHTML = "Загрузка...";
+            const endpoint = type === 'boards' ? '/api/v1/boards' : '/api/v1/logs';
+
+            fetch(endpoint, { headers: { 'Authorization': 'Bearer ' + token } })
+            .then(async res => {
+                if (!res.ok) throw new Error(await res.text() || res.statusText);
+                return res.json();
+            })
+            .then(items => {
+                if (!items || items.length === 0) {
+                    container.innerHTML = "<p style='color: #71717a;'>На складе нет позиций</p>";
+                    return;
+                }
+                let html = "";
+                items.forEach(item => {
+                    if (type === 'boards') {
+                        html += `
+                            <div class="order-card">
+                                <div class="order-header">
+                                    <span>${item.species || 'Доска'} (${item.height_mm}x${item.width_mm}x${item.length_mm} мм)</span>
+                                    <span class="badge">${item.count} шт</span>
+                                </div>
+                                <div class="order-sub">Сорт: ${item.grade || '1'} | Объем: ${item.volume_m3} м³</div>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="order-card">
+                                <div class="order-header">
+                                    <span>${item.species || 'Бревно'} (Ø${item.diameter_mm} мм, L:${item.length_mm} мм)</span>
+                                    <span class="badge">${item.count} шт</span>
+                                </div>
+                                <div class="order-sub">Объем: ${item.volume_m3} м³</div>
+                            </div>
+                        `;
+                    }
+                });
+                container.innerHTML = html;
+            })
+            .catch(err => container.innerHTML = `<p style='color: #ef4444;'>${err.message}</p>`);
+        }
+
+        // Новая функция: Загрузка Статистики
+        function loadStatistics() {
+            const token = localStorage.getItem('jwt_token');
+            const start = document.getElementById('stat_start').value;
+            const end = document.getElementById('stat_end').value;
+
+            document.getElementById('stat-arrived').innerText = '...';
+            document.getElementById('stat-sawed').innerText = '...';
+            document.getElementById('stat-sold-vol').innerText = '...';
+            document.getElementById('stat-sold-sum').innerText = '...';
+
+            fetch(`/api/v1/statistics?start_date=${start}&end_date=${end}`, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(async res => {
+                if (!res.ok) throw new Error(await res.text());
+                return res.json();
+            })
+            .then(data => {
+                document.getElementById('stat-arrived').innerText = (data.total_logs_arrived_volume || 0).toFixed(2) + ' м³';
+                document.getElementById('stat-sawed').innerText = (data.total_logs_sawed_volume || 0).toFixed(2) + ' м³';
+                document.getElementById('stat-sold-vol').innerText = (data.total_sales_volume || 0).toFixed(2) + ' м³';
+                document.getElementById('stat-sold-sum').innerText = (data.total_sales_amount || 0).toLocaleString('ru-RU') + ' ₽';
+            })
+            .catch(err => {
+                tg.showAlert("Не удалось загрузить статистику: " + err.message);
+            });
+        }
+    </script>
+</body>
+</html>
