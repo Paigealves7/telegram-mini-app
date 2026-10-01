@@ -424,3 +424,41 @@ func (r *Repository) GetAllLogs(ctx context.Context, limit, offset int) ([]domai
 
 	return logs, rows.Err()
 }
+
+// НОВЫЙ МЕТОД ДЛЯ СТАТИСТИКИ
+func (r *Repository) GetStatisticsSummary(ctx context.Context, startDate, endDate string) (*domain.StatisticsSummary, error) {
+	stats := &domain.StatisticsSummary{}
+
+	// 1. Приход круглого леса (кубометры). Тут типы DATE, поэтому прямое сравнение работает.
+	q1 := `SELECT COALESCE(SUM(li.volume_m3), 0) FROM log_items li
+		   JOIN log_arrivals la ON li.arrival_id = la.id
+		   WHERE la.arrival_date >= $1 AND la.arrival_date <= $2`
+	if err := r.db.QueryRow(ctx, q1, startDate, endDate).Scan(&stats.TotalLogsArrivedVolume); err != nil {
+		return nil, err
+	}
+
+	// 2. Распил сырья (сколько кубов пустили в пиление). Тут тоже DATE.
+	q2 := `SELECT COALESCE(SUM(sl.volume_m3), 0) FROM sawed_logs sl
+		   JOIN sawing_operations so ON sl.sawing_id = so.id
+		   WHERE so.date >= $1 AND so.date <= $2`
+	if err := r.db.QueryRow(ctx, q2, startDate, endDate).Scan(&stats.TotalLogsSawedVolume); err != nil {
+		return nil, err
+	}
+
+	// 3. Выручка от продаж (колонка называется total_price, а дата created_at - TIMESTAMP)
+	q3 := `SELECT COALESCE(SUM(total_price), 0) FROM sales 
+		   WHERE created_at >= $1::timestamp AND created_at <= $2::timestamp + interval '23 hours 59 minutes 59 seconds'`
+	if err := r.db.QueryRow(ctx, q3, startDate, endDate).Scan(&stats.TotalSalesAmount); err != nil {
+		return nil, err
+	}
+
+	// 4. Отгруженный объем досок (таблица называется sale_boards)
+	q4 := `SELECT COALESCE(SUM(sb.volume_m3), 0) FROM sale_boards sb
+		   JOIN sales s ON sb.sale_id = s.id
+		   WHERE s.created_at >= $1::timestamp AND s.created_at <= $2::timestamp + interval '23 hours 59 minutes 59 seconds'`
+	if err := r.db.QueryRow(ctx, q4, startDate, endDate).Scan(&stats.TotalSalesVolume); err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
