@@ -38,7 +38,8 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	orderHandler := NewOrderHandler(repo)
 	tgAuthHandler := NewTelegramAuthHandler(repo, os.Getenv("TELEGRAM_BOT_TOKEN"))
 	boardHandler := NewBoardHandler(repo)
-	logHandler := NewLogHandler(repo) // Инициализируем новый хендлер
+	logHandler := NewLogHandler(repo)
+	statsHandler := NewStatsHandler(repo) // Инициализируем хендлер статистики
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(r.Context()); err != nil {
@@ -78,9 +79,8 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(AuthMiddleware)
 
-			// Доступно ВСЕМ авторизованным
 			r.Get("/boards", boardHandler.GetList)
-			r.Get("/logs", logHandler.GetList) // <-- Добавлен маршрут для сырья
+			r.Get("/logs", logHandler.GetList)
 			r.Get("/contractors", dictHandler.GetContractors)
 
 			r.Group(func(r chi.Router) {
@@ -95,6 +95,12 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleWorker))
 				r.Post("/sawing", sawingHandler.CreateSawing)
+			})
+
+			// Статистику видит ТОЛЬКО менеджер
+			r.Group(func(r chi.Router) {
+				r.Use(RequireRoles(domain.RoleManager))
+				r.Get("/statistics", statsHandler.GetSummary)
 			})
 		})
 	})
