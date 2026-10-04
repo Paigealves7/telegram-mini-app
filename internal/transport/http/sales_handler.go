@@ -4,23 +4,23 @@ import (
 	"encoding/json"
 	"net/http"
 	"telegram-mini-app/internal/domain"
-	"telegram-mini-app/internal/repository"
+	"telegram-mini-app/internal/service"
 )
 
 type SalesHandler struct {
-	repo *repository.Repository
+	service *service.SalesService
 }
 
-func NewSalesHandler(repo *repository.Repository) *SalesHandler {
-	return &SalesHandler{repo: repo}
+func NewSalesHandler(service *service.SalesService) *SalesHandler {
+	return &SalesHandler{service: service}
 }
 
 type CreateSaleRequest struct {
-	BuyerID     int64             `json:"buyer_id" validate:"required,gt=0"`
-	TotalAmount float64           `json:"total_amount" validate:"gte=0"`
-	SaleDate    string            `json:"sale_date" validate:"required"`
-	CreatedBy   int64             `json:"created_by" validate:"required,gt=0"`
-	Items       []domain.SaleItem `json:"items" validate:"required,min=1,dive"`
+	ContractorID  int64             `json:"contractor_id" validate:"required,gt=0"`
+	TruckNumber   string            `json:"truck_number" validate:"required"`
+	DeliveryPrice float64           `json:"delivery_price" validate:"gte=0"`
+	ExtraPrice    float64           `json:"extra_price" validate:"gte=0"`
+	Items         []domain.SaleItem `json:"items" validate:"required,min=1,dive"`
 }
 
 func (h *SalesHandler) CreateSale(w http.ResponseWriter, r *http.Request) {
@@ -35,14 +35,22 @@ func (h *SalesHandler) CreateSale(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sale := &domain.Sale{
-		BuyerID:     req.BuyerID,
-		TotalAmount: req.TotalAmount,
-		SaleDate:    req.SaleDate,
-		CreatedBy:   req.CreatedBy,
+	// Извлекаем ID пользователя из контекста (токен)
+	claims, ok := r.Context().Value(UserContextKey).(*Claims)
+	if !ok {
+		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
+		return
 	}
 
-	result, err := h.repo.CreateSale(r.Context(), sale, req.Items)
+	sale := &domain.Sale{
+		ContractorID:  req.ContractorID,
+		TruckNumber:   req.TruckNumber,
+		DeliveryPrice: req.DeliveryPrice,
+		ExtraPrice:    req.ExtraPrice,
+		CreatedBy:     claims.UserID,
+	}
+
+	result, err := h.service.CreateSale(r.Context(), sale, req.Items)
 	if err != nil {
 		http.Error(w, "ошибка проведения продажи: "+err.Error(), http.StatusInternalServerError)
 		return

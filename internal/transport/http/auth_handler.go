@@ -3,24 +3,13 @@ package http
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-
 	"golang.org/x/crypto/bcrypt"
 )
-
-// getJWTSecret безопасно получает ключ из ENV. Fail-fast если ключа нет.
-func getJWTSecret() []byte {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		panic("Критическая ошибка: JWT_SECRET не задан в переменных окружения")
-	}
-	return []byte(secret)
-}
 
 type Claims struct {
 	UserID int64  `json:"user_id"`
@@ -29,11 +18,16 @@ type Claims struct {
 }
 
 type AuthHandler struct {
-	repo *repository.Repository
+	repo      *repository.Repository
+	jwtSecret []byte
 }
 
-func NewAuthHandler(repo *repository.Repository) *AuthHandler {
-	return &AuthHandler{repo: repo}
+// Принимаем секрет в конструкторе
+func NewAuthHandler(repo *repository.Repository, secret string) *AuthHandler {
+	return &AuthHandler{
+		repo:      repo,
+		jwtSecret: []byte(secret),
+	}
 }
 
 type RegisterRequest struct {
@@ -42,7 +36,6 @@ type RegisterRequest struct {
 	Role     domain.Role `json:"role"`
 }
 
-// POST /api/v1/auth/register
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
@@ -76,7 +69,6 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-// POST /api/v1/auth/login
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -95,7 +87,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Role:   string(user.Role),
 	}
 
-	tokenString, err := generateToken(claims)
+	tokenString, err := generateToken(claims, h.jwtSecret)
 	if err != nil {
 		http.Error(w, "ошибка генерации токена", http.StatusInternalServerError)
 		return
@@ -107,11 +99,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// generateToken используется здесь и в telegram_auth.go
-func generateToken(claims *Claims) (string, error) {
+// Теперь функция требует передачи ключа
+func generateToken(claims *Claims, secret []byte) (string, error) {
 	claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(24 * time.Hour))
 	claims.IssuedAt = jwt.NewNumericDate(time.Now())
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(getJWTSecret())
+	return token.SignedString(secret)
 }

@@ -11,3 +11,6 @@ bin/
 .vscode/
 
 vendor/
+sawmill-backend
+bin/
+html.txt

@@ -6,14 +6,19 @@ import (
 	"strconv"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
+	"telegram-mini-app/internal/service"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type OrderHandler struct {
-	repo *repository.Repository
+	repo    *repository.Repository
+	service *service.OrderService
 }
 
-func NewOrderHandler(repo *repository.Repository) *OrderHandler {
-	return &OrderHandler{repo: repo}
+// Теперь хендлер принимает и репозиторий, и сервис
+func NewOrderHandler(repo *repository.Repository, svc *service.OrderService) *OrderHandler {
+	return &OrderHandler{repo: repo, service: svc}
 }
 
 type CreateOrderRequest struct {
@@ -46,7 +51,7 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		Status:        domain.OrderStatusNew,
 	}
 
-	result, err := h.repo.CreateOrder(r.Context(), order, req.Items)
+	result, err := h.service.CreateOrder(r.Context(), order, req.Items)
 	if err != nil {
 		http.Error(w, "ошибка создания заказа: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -76,4 +81,30 @@ func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(orders)
+}
+
+// НОВЫЙ МЕТОД: Завершение заказа
+func (h *OrderHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) {
+	orderIDStr := chi.URLParam(r, "id")
+	orderID, err := strconv.ParseInt(orderIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "неверный ID заказа", http.StatusBadRequest)
+		return
+	}
+
+	claims, ok := r.Context().Value(UserContextKey).(*Claims)
+	if !ok {
+		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
+	err = h.service.CompleteOrder(r.Context(), orderID, claims.UserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"success"}`))
 }

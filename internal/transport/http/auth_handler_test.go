@@ -8,7 +8,8 @@ import (
 )
 
 func TestLogin_InvalidRequestBody(t *testing.T) {
-	handler := NewAuthHandler(nil)
+	// Добавили второй аргумент - моковый секрет "test_secret"
+	handler := NewAuthHandler(nil, "test_secret")
 
 	// Отправляем некорректный JSON
 	invalidJSON := []byte(`{"username": "admin", "password":}`)
@@ -28,7 +29,9 @@ func TestAuthMiddleware_MissingToken(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	protectedHandler := AuthMiddleware(nextHandler)
+	// AuthMiddleware теперь функция-фабрика:
+	// сначала передаем моковый секрет, затем оборачиваем хендлер
+	protectedHandler := AuthMiddleware("test_secret")(nextHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/contractors", nil)
 	rec := httptest.NewRecorder()
