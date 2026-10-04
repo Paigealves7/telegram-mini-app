@@ -57,7 +57,7 @@ type Board struct {
 	WidthMM    int      `json:"width_mm" validate:"required,gt=0"`
 	LengthMM   int      `json:"length_mm" validate:"required,gt=0"`
 	Species    string   `json:"species" validate:"required"`
-	Grade      string   `json:"grade"` // Сорт может быть пустым по бизнес-логике
+	Grade      string   `json:"grade"`
 	Count      int      `json:"count" validate:"required,gt=0"`
 	VolumeM3   float64  `json:"volume_m3" validate:"required,gt=0"`
 	PricePerM3 *float64 `json:"price_per_m3,omitempty" validate:"omitempty,gt=0"`
@@ -77,18 +77,21 @@ type SaleItem struct {
 	SaleID   int64   `json:"sale_id"`
 	BoardID  int64   `json:"board_id" validate:"required,gt=0"`
 	Count    int     `json:"count" validate:"required,gt=0"`
-	Price    float64 `json:"price" validate:"gte=0"` // Цена может быть 0 (например, бонус/подарок), но не отрицательная
+	Price    float64 `json:"price" validate:"gte=0"`
 	VolumeM3 float64 `json:"volume_m3" validate:"required,gt=0"`
 }
 
 type Sale struct {
-	ID          int64      `json:"id"`
-	BuyerID     int64      `json:"buyer_id"`
-	TotalAmount float64    `json:"total_amount"`
-	SaleDate    string     `json:"sale_date"`
-	CreatedBy   int64      `json:"created_by"`
-	CreatedAt   time.Time  `json:"created_at"`
-	Items       []SaleItem `json:"items,omitempty"`
+	ID            int64      `json:"id"`
+	ContractorID  int64      `json:"contractor_id"`
+	TruckNumber   string     `json:"truck_number"`
+	DeliveryPrice float64    `json:"delivery_price"`
+	ExtraPrice    float64    `json:"extra_price"`
+	TotalVolume   float64    `json:"total_volume"`
+	TotalPrice    float64    `json:"total_price"`
+	CreatedBy     int64      `json:"created_by"`
+	CreatedAt     time.Time  `json:"created_at"`
+	Items         []SaleItem `json:"items,omitempty"`
 }
 
 type OrderStatus string
@@ -127,4 +130,18 @@ type StatisticsSummary struct {
 	TotalLogsSawedVolume   float64 `json:"total_logs_sawed_volume"`
 	TotalSalesVolume       float64 `json:"total_sales_volume"`
 	TotalSalesAmount       float64 `json:"total_sales_amount"`
+}
+
+type BoardFilter struct {
+	Species  string
+	Grade    string
+	HeightMM int
+	WidthMM  int
+	LengthMM int
+}
+
+type LogFilter struct {
+	Species    string
+	LengthMM   int
+	DiameterMM int
 }
