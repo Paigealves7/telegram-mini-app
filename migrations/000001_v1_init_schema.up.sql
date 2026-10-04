@@ -2,15 +2,12 @@ CREATE TYPE role AS ENUM ('manager', 'master', 'worker');
 CREATE TYPE warehouse_type AS ENUM ('logs', 'boards');
 CREATE TYPE order_status AS ENUM ('new', 'in_progress', 'completed', 'canceled');
 CREATE TYPE operation_type AS ENUM ('arrival', 'sawing', 'sale', 'order');
-CREATE TYPE user_role AS ENUM ('user', 'admin', 'worker');
-
-ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'::user_role;
 
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    role role NOT NULL,
+    role role NOT NULL DEFAULT 'worker',
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
