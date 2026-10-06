@@ -63,7 +63,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	logHandler := NewLogHandler(repo)
 	statsHandler := NewStatsHandler(repo)
 
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(r.Context()); err != nil {
 			http.Error(w, "База данных недоступна", http.StatusInternalServerError)
 			return
