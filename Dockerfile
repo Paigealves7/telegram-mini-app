@@ -9,7 +9,7 @@ COPY sawmill-backend .
 RUN chmod +x ./sawmill-backend
 
 # Копируем папку с фронтендом (index.html)
-COPY web ./web
+COPY --from=builder /app/web ./web
 
 ENV PORT=8080
 EXPOSE 8080
