@@ -286,12 +286,22 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ init_data: tg.initData })
             })
-            .then(res => res.json())
+            .then(async res => {
+                // Если сервер вернул не 200 OK, читаем текст ошибки и пробрасываем её
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(errText || `Ошибка сервера ${res.status}`);
+                }
+                return res.json();
+            })
             .then(data => {
                 if (data.token) finishAuth(data.token, tg.initDataUnsafe.user?.first_name || 'User');
-                else document.getElementById('status').innerText = "❌ Ошибка авторизации";
+                else document.getElementById('status').innerText = "❌ Токен не получен";
             })
-            .catch(err => document.getElementById('status').innerText = "Ошибка сети: " + err);
+            .catch(err => {
+                // Теперь мы увидим реальную ошибку от бэкенда!
+                document.getElementById('status').innerText = "❌ Ошибка: " + err.message;
+            });
         } else {
             showScreen('web-login-screen');
             tg.ready();
