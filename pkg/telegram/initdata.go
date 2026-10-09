@@ -46,10 +46,10 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 	}
 	dataCheckString := strings.Join(dataCheckArr, "\n")
 
-	// 1. Secret key = HMAC_SHA256("WebAppData", botToken)
-	secretMac := hmac.New(sha256.New, []byte("WebAppData"))
-	secretMac.Write([]byte(botToken))
-	secretKey := secretMac.Sum(nil)
+        // 1. Secret key = HMAC_SHA256(botToken, "WebAppData")
+        secretMac := hmac.New(sha256.New, []byte(botToken))
+        secretMac.Write([]byte("WebAppData"))
+        secretKey := secretMac.Sum(nil)
 
 	// 2. Calculated Hash = HMAC_SHA256(dataCheckString, secretKey)
 	dataMac := hmac.New(sha256.New, secretKey)
