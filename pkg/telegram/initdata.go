@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-        "log"
 )
 
 type TGUser struct {
@@ -20,8 +19,14 @@ type TGUser struct {
 	Username  string `json:"username,omitempty"`
 }
 
-// ValidateInitData проверяет HMAC подпись initData строки от Telegram
 func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
+	// 1. Очищаем токен от случайных пробелов, переносов строк и кавычек
+	// (Частейшая проблема при деплое через Docker и .env файлы)
+	cleanToken := strings.TrimSpace(botToken)
+	cleanToken = strings.Trim(cleanToken, "\"'")
+
+	// 2. Парсим строку. url.ParseQuery АВТОМАТИЧЕСКИ декодирует значения,
+	// что является обязательным требованием Telegram!
 	values, err := url.ParseQuery(initDataRaw)
 	if err != nil {
 		return nil, errors.New("invalid initData format")
@@ -32,41 +37,41 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 		return nil, errors.New("hash missing from initData")
 	}
 
-	// Удаляем hash из пар ключей для построения data_check_string
+	// 3. УДАЛЯЕМ поля, которые не участвуют в генерации подписи
 	values.Del("hash")
-        values.Del("signature")         
+	// КРИТИЧНЫЙ ФИКС: Удаляем signature (появилась в новых версиях Telegram)
+	values.Del("signature")
 
+	// 4. Сортируем ключи по алфавиту
 	var keys []string
 	for k := range values {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
+	// 5. Собираем data_check_string
 	var dataCheckArr []string
 	for _, k := range keys {
 		dataCheckArr = append(dataCheckArr, fmt.Sprintf("%s=%s", k, values.Get(k)))
 	}
 	dataCheckString := strings.Join(dataCheckArr, "\n")
 
-        // 1. Secret key = HMAC_SHA256(botToken, "WebAppData")
-        secretMac := hmac.New(sha256.New, []byte(botToken))
-        secretMac.Write([]byte("WebAppData"))
-        secretKey := secretMac.Sum(nil)
+	// 6. Secret key = HMAC_SHA256("WebAppData", botToken)
+	secretMac := hmac.New(sha256.New, []byte("WebAppData"))
+	secretMac.Write([]byte(cleanToken))
+	secretKey := secretMac.Sum(nil)
 
-	// 2. Calculated Hash = HMAC_SHA256(dataCheckString, secretKey)
+	// 7. Calculated Hash = HMAC_SHA256(dataCheckString, secretKey)
 	dataMac := hmac.New(sha256.New, secretKey)
 	dataMac.Write([]byte(dataCheckString))
 	calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
 
-        if calculatedHash != hash {
-            log.Printf("DEBUG dataCheckString: %q", dataCheckString)
-            log.Printf("DEBUG botToken: %q", botToken)
-            log.Printf("DEBUG calculatedHash: %s", calculatedHash)
-            log.Printf("DEBUG receivedHash: %s", hash)
-            return nil, errors.New("invalid hash signature")
-        }        
+	// 8. Сравниваем подписи
+	if calculatedHash != hash {
+		return nil, errors.New("invalid hash signature")
+	}
 
-	// Извлекаем объект user из initData
+	// 9. Парсим пользователя
 	userStr := values.Get("user")
 	if userStr == "" {
 		return nil, errors.New("user field missing in initData")
