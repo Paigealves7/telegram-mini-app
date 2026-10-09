@@ -22,7 +22,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    platform: linux/arm64
     container_name: sawmill_app
     restart: always
     ports:
