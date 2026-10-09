@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+        "log"
 )
 
 type TGUser struct {
@@ -56,9 +57,13 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 	dataMac.Write([]byte(dataCheckString))
 	calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
 
-	if calculatedHash != hash {
-		return nil, errors.New("invalid hash signature")
-	}
+        if calculatedHash != hash {
+            log.Printf("DEBUG dataCheckString: %q", dataCheckString)
+            log.Printf("DEBUG botToken: %q", botToken)
+            log.Printf("DEBUG calculatedHash: %s", calculatedHash)
+            log.Printf("DEBUG receivedHash: %s", hash)
+            return nil, errors.New("invalid hash signature")
+        }        
 
 	// Извлекаем объект user из initData
 	userStr := values.Get("user")
