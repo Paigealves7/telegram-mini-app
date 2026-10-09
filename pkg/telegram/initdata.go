@@ -34,6 +34,7 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 
 	// Удаляем hash из пар ключей для построения data_check_string
 	values.Del("hash")
+        values.Del("signature")         
 
 	var keys []string
 	for k := range values {
