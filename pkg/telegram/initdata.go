@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"sort"
 	"strings"
@@ -20,13 +21,20 @@ type TGUser struct {
 }
 
 func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
-	// 1. Очищаем токен от случайных пробелов, переносов строк и кавычек
-	// (Частейшая проблема при деплое через Docker и .env файлы)
 	cleanToken := strings.TrimSpace(botToken)
 	cleanToken = strings.Trim(cleanToken, "\"'")
+	// Удаляем возможные Windows-переносы, которые Docker иногда тянет из .env
+	cleanToken = strings.ReplaceAll(cleanToken, "\r", "")
+	cleanToken = strings.ReplaceAll(cleanToken, "\n", "")
 
-	// 2. Парсим строку. url.ParseQuery АВТОМАТИЧЕСКИ декодирует значения,
-	// что является обязательным требованием Telegram!
+	safePrefix := "---"
+	if len(cleanToken) > 5 {
+		safePrefix = cleanToken[:5]
+	}
+
+	log.Printf("=== TELEGRAM VALIDATION DEBUG ===")
+	log.Printf("1. Token length: %d (Starts with: %s...)", len(cleanToken), safePrefix)
+
 	values, err := url.ParseQuery(initDataRaw)
 	if err != nil {
 		return nil, errors.New("invalid initData format")
@@ -37,46 +45,40 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 		return nil, errors.New("hash missing from initData")
 	}
 
-	// 3. УДАЛЯЕМ поля, которые не участвуют в генерации подписи
 	values.Del("hash")
-	// КРИТИЧНЫЙ ФИКС: Удаляем signature (появилась в новых версиях Telegram)
 	values.Del("signature")
 
-	// 4. Сортируем ключи по алфавиту
 	var keys []string
 	for k := range values {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
-	// 5. Собираем data_check_string
 	var dataCheckArr []string
 	for _, k := range keys {
 		dataCheckArr = append(dataCheckArr, fmt.Sprintf("%s=%s", k, values.Get(k)))
 	}
 	dataCheckString := strings.Join(dataCheckArr, "\n")
 
-	// 6. Secret key = HMAC_SHA256("WebAppData", botToken)
+	log.Printf("2. DataCheckString:\n%s", dataCheckString)
+
 	secretMac := hmac.New(sha256.New, []byte("WebAppData"))
 	secretMac.Write([]byte(cleanToken))
 	secretKey := secretMac.Sum(nil)
 
-	// 7. Calculated Hash = HMAC_SHA256(dataCheckString, secretKey)
 	dataMac := hmac.New(sha256.New, secretKey)
 	dataMac.Write([]byte(dataCheckString))
 	calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
 
-	// 8. Сравниваем подписи
+	log.Printf("3. Expected Hash: %s", hash)
+	log.Printf("4. Calc'd Hash:   %s", calculatedHash)
+	log.Printf("=================================")
+
 	if calculatedHash != hash {
 		return nil, errors.New("invalid hash signature")
 	}
 
-	// 9. Парсим пользователя
 	userStr := values.Get("user")
-	if userStr == "" {
-		return nil, errors.New("user field missing in initData")
-	}
-
 	var user TGUser
 	if err := json.Unmarshal([]byte(userStr), &user); err != nil {
 		return nil, errors.New("failed to parse user json")
