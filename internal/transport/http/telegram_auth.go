@@ -8,6 +8,7 @@ import (
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 	"telegram-mini-app/pkg/telegram"
+	"log"
 )
 
 type TelegramAuthHandler struct {
@@ -42,6 +43,7 @@ func (h *TelegramAuthHandler) LoginViaTelegram(w http.ResponseWriter, r *http.Re
 	}
 
 	tgUser, err := telegram.ValidateInitData(rawInitData, h.botToken)
+	log.Printf("RAW initData: %s", req.InitData)
 	if err != nil {
 		http.Error(w, "ошибка авторизации Telegram: "+err.Error(), http.StatusUnauthorized)
 		return
