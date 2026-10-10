@@ -19,83 +19,51 @@ type TGUser struct {
 	Username  string `json:"username,omitempty"`
 }
 
-// Кастомный парсер: работает ТОЧНО как decodeURIComponent в браузере.
-// Не превращает знаки '+' в пробелы, в отличие от стандартного url.ParseQuery.
-func parseTelegramQuery(query string) map[string]string {
-	m := make(map[string]string)
-	for _, pair := range strings.Split(query, "&") {
-		if pair == "" {
-			continue
-		}
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key, err := url.PathUnescape(parts[0])
-		if err != nil {
-			key = parts[0]
-		}
-
-		val, err := url.PathUnescape(parts[1])
-		if err != nil {
-			val = parts[1]
-		}
-
-		m[key] = val
-	}
-	return m
-}
-
 func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
-	// 1. Очистка токена от мусора Docker
+	// 1. Убиваем любой невидимый мусор из Docker .env
 	cleanToken := strings.TrimSpace(botToken)
 	cleanToken = strings.Trim(cleanToken, "\"'")
-	cleanToken = strings.ReplaceAll(cleanToken, "\r", "")
-	cleanToken = strings.ReplaceAll(cleanToken, "\n", "")
 
-	// 2. Используем наш безопасный парсер
-	values := parseTelegramQuery(initDataRaw)
+	values, err := url.ParseQuery(initDataRaw)
+	if err != nil {
+		return nil, errors.New("invalid initData format")
+	}
 
-	hash, ok := values["hash"]
-	if !ok || hash == "" {
+	hash := values.Get("hash")
+	if hash == "" {
 		return nil, errors.New("hash missing from initData")
 	}
 
-	// 3. Удаляем мусор
-	delete(values, "hash")
-	delete(values, "signature") // Защита от нового API Телеграма
+	// 2. Очищаем данные от системных полей Телеграма (Спасение для iPhone)
+	values.Del("hash")
+	values.Del("signature")
 
-	// 4. Сортируем
 	var keys []string
 	for k := range values {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
-	// 5. Собираем строку
 	var dataCheckArr []string
 	for _, k := range keys {
-		dataCheckArr = append(dataCheckArr, fmt.Sprintf("%s=%s", k, values[k]))
+		dataCheckArr = append(dataCheckArr, fmt.Sprintf("%s=%s", k, values.Get(k)))
 	}
 	dataCheckString := strings.Join(dataCheckArr, "\n")
 
-	// 6. Хэшируем (КЛЮЧ - это токен, а СООБЩЕНИЕ - это "WebAppData")
-	secretMac := hmac.New(sha256.New, []byte(cleanToken))
-	secretMac.Write([]byte("WebAppData"))
+	// 3. ПРАВИЛЬНЫЙ ПОРЯДОК HMAC
+	secretMac := hmac.New(sha256.New, []byte("WebAppData"))
+	secretMac.Write([]byte(cleanToken))
 	secretKey := secretMac.Sum(nil)
 
 	dataMac := hmac.New(sha256.New, secretKey)
 	dataMac.Write([]byte(dataCheckString))
 	calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
 
-	// 7. Проверяем
 	if calculatedHash != hash {
 		return nil, errors.New("invalid hash signature")
 	}
 
-	// 8. Читаем юзера
-	userStr := values["user"]
+	userStr := values.Get("user")
 	var user TGUser
 	if err := json.Unmarshal([]byte(userStr), &user); err != nil {
 		return nil, errors.New("failed to parse user json")
