@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"sort"
 	"strings"
@@ -20,48 +19,68 @@ type TGUser struct {
 	Username  string `json:"username,omitempty"`
 }
 
+// Кастомный парсер: работает ТОЧНО как decodeURIComponent в браузере.
+// Не превращает знаки '+' в пробелы, в отличие от стандартного url.ParseQuery.
+func parseTelegramQuery(query string) map[string]string {
+	m := make(map[string]string)
+	for _, pair := range strings.Split(query, "&") {
+		if pair == "" {
+			continue
+		}
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key, err := url.PathUnescape(parts[0])
+		if err != nil {
+			key = parts[0]
+		}
+
+		val, err := url.PathUnescape(parts[1])
+		if err != nil {
+			val = parts[1]
+		}
+
+		m[key] = val
+	}
+	return m
+}
+
 func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
+	// 1. Очистка токена от мусора Docker
 	cleanToken := strings.TrimSpace(botToken)
 	cleanToken = strings.Trim(cleanToken, "\"'")
-	// Удаляем возможные Windows-переносы, которые Docker иногда тянет из .env
 	cleanToken = strings.ReplaceAll(cleanToken, "\r", "")
 	cleanToken = strings.ReplaceAll(cleanToken, "\n", "")
 
-	safePrefix := "---"
-	if len(cleanToken) > 5 {
-		safePrefix = cleanToken[:5]
-	}
+	// 2. Используем наш безопасный парсер
+	values := parseTelegramQuery(initDataRaw)
 
-	log.Printf("=== TELEGRAM VALIDATION DEBUG ===")
-	log.Printf("1. Token length: %d (Starts with: %s...)", len(cleanToken), safePrefix)
-
-	values, err := url.ParseQuery(initDataRaw)
-	if err != nil {
-		return nil, errors.New("invalid initData format")
-	}
-
-	hash := values.Get("hash")
-	if hash == "" {
+	hash, ok := values["hash"]
+	if !ok || hash == "" {
 		return nil, errors.New("hash missing from initData")
 	}
 
-	values.Del("hash")
-	values.Del("signature")
+	// 3. Удаляем мусор
+	delete(values, "hash")
+	delete(values, "signature") // Защита от нового API Телеграма
 
+	// 4. Сортируем
 	var keys []string
 	for k := range values {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
+	// 5. Собираем строку
 	var dataCheckArr []string
 	for _, k := range keys {
-		dataCheckArr = append(dataCheckArr, fmt.Sprintf("%s=%s", k, values.Get(k)))
+		dataCheckArr = append(dataCheckArr, fmt.Sprintf("%s=%s", k, values[k]))
 	}
 	dataCheckString := strings.Join(dataCheckArr, "\n")
 
-	log.Printf("2. DataCheckString:\n%s", dataCheckString)
-
+	// 6. Хэшируем
 	secretMac := hmac.New(sha256.New, []byte("WebAppData"))
 	secretMac.Write([]byte(cleanToken))
 	secretKey := secretMac.Sum(nil)
@@ -70,15 +89,13 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 	dataMac.Write([]byte(dataCheckString))
 	calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
 
-	log.Printf("3. Expected Hash: %s", hash)
-	log.Printf("4. Calc'd Hash:   %s", calculatedHash)
-	log.Printf("=================================")
-
+	// 7. Проверяем
 	if calculatedHash != hash {
 		return nil, errors.New("invalid hash signature")
 	}
 
-	userStr := values.Get("user")
+	// 8. Читаем юзера
+	userStr := values["user"]
 	var user TGUser
 	if err := json.Unmarshal([]byte(userStr), &user); err != nil {
 		return nil, errors.New("failed to parse user json")
