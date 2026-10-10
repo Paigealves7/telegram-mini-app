@@ -80,9 +80,9 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 	}
 	dataCheckString := strings.Join(dataCheckArr, "\n")
 
-	// 6. Хэшируем
-	secretMac := hmac.New(sha256.New, []byte("WebAppData"))
-	secretMac.Write([]byte(cleanToken))
+	// 6. Хэшируем (КЛЮЧ - это токен, а СООБЩЕНИЕ - это "WebAppData")
+	secretMac := hmac.New(sha256.New, []byte(cleanToken))
+	secretMac.Write([]byte("WebAppData"))
 	secretKey := secretMac.Sum(nil)
 
 	dataMac := hmac.New(sha256.New, secretKey)
