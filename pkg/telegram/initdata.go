@@ -1,73 +1,91 @@
 package telegram
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"net/url"
-	"sort"
-	"strings"
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+    "errors"
+    "net/url"
+    "sort"
+    "strings"
 )
 
 type TGUser struct {
-	ID        int64  `json:"id"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name,omitempty"`
-	Username  string `json:"username,omitempty"`
+    ID        int64  `json:"id"`
+    FirstName string `json:"first_name"`
+    LastName  string `json:"last_name,omitempty"`
+    Username  string `json:"username,omitempty"`
 }
 
 func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
-	// 1. Убиваем любой невидимый мусор из Docker .env
-	cleanToken := strings.TrimSpace(botToken)
-	cleanToken = strings.Trim(cleanToken, "\"'")
+    // 1. Чистим токен от мусора
+    cleanToken := strings.TrimSpace(botToken)
+    cleanToken = strings.Trim(cleanToken, "\"'")
 
-	values, err := url.ParseQuery(initDataRaw)
-	if err != nil {
-		return nil, errors.New("invalid initData format")
-	}
+    // 2. Парсим initData ВРУЧНУЮ — БЕЗ декодирования
+    pairs := strings.Split(initDataRaw, "&")
+    values := make(map[string]string)
+    for _, pair := range pairs {
+        idx := strings.Index(pair, "=")
+        if idx == -1 {
+            continue
+        }
+        key := pair[:idx]
+        value := pair[idx+1:]  // ← НЕ декодируем!
+        values[key] = value
+    }
 
-	hash := values.Get("hash")
-	if hash == "" {
-		return nil, errors.New("hash missing from initData")
-	}
+    // 3. Достаём hash
+    hash := values["hash"]
+    if hash == "" {
+        return nil, errors.New("hash missing from initData")
+    }
 
-	// 2. Очищаем данные от системных полей Телеграма (Спасение для iPhone)
-	values.Del("hash")
-	values.Del("signature")
+    // 4. Удаляем hash И signature
+    delete(values, "hash")
+    delete(values, "signature")
 
-	var keys []string
-	for k := range values {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+    // 5. Сортируем ключи
+    keys := make([]string, 0, len(values))
+    for k := range values {
+        keys = append(keys, k)
+    }
+    sort.Strings(keys)
 
-	var dataCheckArr []string
-	for _, k := range keys {
-		dataCheckArr = append(dataCheckArr, fmt.Sprintf("%s=%s", k, values.Get(k)))
-	}
-	dataCheckString := strings.Join(dataCheckArr, "\n")
+    // 6. Собираем data_check_string из СЫРЫХ (encoded) значений
+    var parts []string
+    for _, k := range keys {
+        parts = append(parts, k+"="+values[k])
+    }
+    dataCheckString := strings.Join(parts, "\n")
 
-	// 3. ПРАВИЛЬНЫЙ ПОРЯДОК HMAC
-	secretMac := hmac.New(sha256.New, []byte("WebAppData"))
-	secretMac.Write([]byte(cleanToken))
-	secretKey := secretMac.Sum(nil)
+    // 7. secret_key = HMAC_SHA256(botToken, "WebAppData")
+    secretMac := hmac.New(sha256.New, []byte(cleanToken))  // ← ключ = botToken
+    secretMac.Write([]byte("WebAppData"))                   // ← сообщение = "WebAppData"
+    secretKey := secretMac.Sum(nil)
 
-	dataMac := hmac.New(sha256.New, secretKey)
-	dataMac.Write([]byte(dataCheckString))
-	calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
+    // 8. calculatedHash = HMAC_SHA256(secretKey, dataCheckString)
+    dataMac := hmac.New(sha256.New, secretKey)
+    dataMac.Write([]byte(dataCheckString))
+    calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
 
-	if calculatedHash != hash {
-		return nil, errors.New("invalid hash signature")
-	}
+    // 9. Сравниваем
+    if calculatedHash != hash {
+        return nil, errors.New("invalid hash signature")
+    }
 
-	userStr := values.Get("user")
-	var user TGUser
-	if err := json.Unmarshal([]byte(userStr), &user); err != nil {
-		return nil, errors.New("failed to parse user json")
-	}
+    // 10. ТОЛЬКО ТЕПЕРЬ декодируем user
+    userEncoded := values["user"]
+    userDecoded, err := url.QueryUnescape(userEncoded)
+    if err != nil {
+        return nil, errors.New("failed to unescape user")
+    }
 
-	return &user, nil
+    var user TGUser
+    if err := json.Unmarshal([]byte(userDecoded), &user); err != nil {
+        return nil, errors.New("failed to parse user json")
+    }
+
+    return &user, nil
 }
