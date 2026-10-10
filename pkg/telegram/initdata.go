@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"sort"
 	"strings"
@@ -19,8 +20,21 @@ type TGUser struct {
 	Username  string `json:"username,omitempty"`
 }
 
-// ValidateInitData проверяет HMAC подпись initData строки от Telegram
 func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
+	cleanToken := strings.TrimSpace(botToken)
+	cleanToken = strings.Trim(cleanToken, "\"'")
+	// Удаляем возможные Windows-переносы, которые Docker иногда тянет из .env
+	cleanToken = strings.ReplaceAll(cleanToken, "\r", "")
+	cleanToken = strings.ReplaceAll(cleanToken, "\n", "")
+
+	safePrefix := "---"
+	if len(cleanToken) > 5 {
+		safePrefix = cleanToken[:5]
+	}
+
+	log.Printf("=== TELEGRAM VALIDATION DEBUG ===")
+	log.Printf("1. Token length: %d (Starts with: %s...)", len(cleanToken), safePrefix)
+
 	values, err := url.ParseQuery(initDataRaw)
 	if err != nil {
 		return nil, errors.New("invalid initData format")
@@ -31,8 +45,8 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 		return nil, errors.New("hash missing from initData")
 	}
 
-	// Удаляем hash из пар ключей для построения data_check_string
 	values.Del("hash")
+	values.Del("signature")
 
 	var keys []string
 	for k := range values {
@@ -46,26 +60,25 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 	}
 	dataCheckString := strings.Join(dataCheckArr, "\n")
 
-	// 1. Secret key = HMAC_SHA256("WebAppData", botToken)
+	log.Printf("2. DataCheckString:\n%s", dataCheckString)
+
 	secretMac := hmac.New(sha256.New, []byte("WebAppData"))
-	secretMac.Write([]byte(botToken))
+	secretMac.Write([]byte(cleanToken))
 	secretKey := secretMac.Sum(nil)
 
-	// 2. Calculated Hash = HMAC_SHA256(dataCheckString, secretKey)
 	dataMac := hmac.New(sha256.New, secretKey)
 	dataMac.Write([]byte(dataCheckString))
 	calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
+
+	log.Printf("3. Expected Hash: %s", hash)
+	log.Printf("4. Calc'd Hash:   %s", calculatedHash)
+	log.Printf("=================================")
 
 	if calculatedHash != hash {
 		return nil, errors.New("invalid hash signature")
 	}
 
-	// Извлекаем объект user из initData
 	userStr := values.Get("user")
-	if userStr == "" {
-		return nil, errors.New("user field missing in initData")
-	}
-
 	var user TGUser
 	if err := json.Unmarshal([]byte(userStr), &user); err != nil {
 		return nil, errors.New("failed to parse user json")
