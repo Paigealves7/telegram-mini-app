@@ -9,6 +9,7 @@ import (
     "net/url"
     "sort"
     "strings"
+    "log"
 )
 
 type TGUser struct {
@@ -19,11 +20,11 @@ type TGUser struct {
 }
 
 func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
-    // 1. Чистим токен от мусора
+    // 1. Чистим токен
     cleanToken := strings.TrimSpace(botToken)
     cleanToken = strings.Trim(cleanToken, "\"'")
 
-    // 2. Парсим initData ВРУЧНУЮ — БЕЗ декодирования
+    // 2. Парсим БЕЗ декодирования
     pairs := strings.Split(initDataRaw, "&")
     values := make(map[string]string)
     for _, pair := range pairs {
@@ -31,18 +32,16 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
         if idx == -1 {
             continue
         }
-        key := pair[:idx]
-        value := pair[idx+1:]  // ← НЕ декодируем!
-        values[key] = value
+        values[pair[:idx]] = pair[idx+1:]
     }
 
-    // 3. Достаём hash
+    // 3. hash
     hash := values["hash"]
     if hash == "" {
         return nil, errors.New("hash missing from initData")
     }
 
-    // 4. Удаляем hash И signature
+    // 4. Убираем hash И signature
     delete(values, "hash")
     delete(values, "signature")
 
@@ -53,38 +52,40 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
     }
     sort.Strings(keys)
 
-    // 6. Собираем data_check_string из СЫРЫХ (encoded) значений
+    // 6. data_check_string из СЫРЫХ значений
     var parts []string
     for _, k := range keys {
         parts = append(parts, k+"="+values[k])
     }
     dataCheckString := strings.Join(parts, "\n")
 
-    // 7. secret_key = HMAC_SHA256(botToken, "WebAppData")
-    secretMac := hmac.New(sha256.New, []byte(cleanToken))  // ← ключ = botToken
-    secretMac.Write([]byte("WebAppData"))                   // ← сообщение = "WebAppData"
+    // 7. secret_key = HMAC_SHA256("WebAppData", botToken)
+    secretMac := hmac.New(sha256.New, []byte("WebAppData"))
+    secretMac.Write([]byte(cleanToken))
     secretKey := secretMac.Sum(nil)
 
-    // 8. calculatedHash = HMAC_SHA256(secretKey, dataCheckString)
+    // 8. calculated = HMAC_SHA256(secretKey, dataCheckString)
     dataMac := hmac.New(sha256.New, secretKey)
     dataMac.Write([]byte(dataCheckString))
     calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
 
     // 9. Сравниваем
     if calculatedHash != hash {
+        log.Printf("DEBUG dataCheckString: %q", dataCheckString)
+        log.Printf("DEBUG calculatedHash: %s", calculatedHash)
+        log.Printf("DEBUG receivedHash: %s", hash)
         return nil, errors.New("invalid hash signature")
     }
 
-    // 10. ТОЛЬКО ТЕПЕРЬ декодируем user
-    userEncoded := values["user"]
-    userDecoded, err := url.QueryUnescape(userEncoded)
+    // 10. Декодируем user
+    userDecoded, err := url.QueryUnescape(values["user"])
     if err != nil {
         return nil, errors.New("failed to unescape user")
     }
 
     var user TGUser
     if err := json.Unmarshal([]byte(userDecoded), &user); err != nil {
-        return nil, errors.New("failed to parse user json")
+        return nil, errors.New("failed to parse user")
     }
 
     return &user, nil
