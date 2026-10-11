@@ -71,9 +71,10 @@ func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
 
     // 9. Сравниваем
     if calculatedHash != hash {
-        log.Printf("DEBUG dataCheckString: %q", dataCheckString)
-        log.Printf("DEBUG calculatedHash: %s", calculatedHash)
-        log.Printf("DEBUG receivedHash: %s", hash)
+	log.Printf("DEBUG dataCheckString HEX: %x", []byte(dataCheckString))
+	log.Printf("DEBUG dataCheckString LEN: %d", len(dataCheckString))
+	log.Printf("DEBUG calculatedHash: %s", calculatedHash)
+	log.Printf("DEBUG receivedHash: %s", hash)
         return nil, errors.New("invalid hash signature")
     }
 
