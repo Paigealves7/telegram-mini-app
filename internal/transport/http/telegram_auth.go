@@ -1,13 +1,13 @@
 package http
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 	"telegram-mini-app/pkg/telegram"
+	"log"
 )
 
 type TelegramAuthHandler struct {
@@ -36,12 +36,9 @@ func (h *TelegramAuthHandler) LoginViaTelegram(w http.ResponseWriter, r *http.Re
 	}
 
 	// Читаем Base64 (защита от искажений при передаче HTTP)
-	rawInitData := req.InitData
-	if decoded, err := base64.StdEncoding.DecodeString(req.InitData); err == nil {
-		rawInitData = string(decoded)
-	}
+	log.Printf("RAW initData: %s", req.InitData)
 
-	tgUser, err := telegram.ValidateInitData(rawInitData, h.botToken)
+	tgUser, err := telegram.ValidateInitData(req.InitData, h.botToken)
 	if err != nil {
 		http.Error(w, "ошибка авторизации Telegram: "+err.Error(), http.StatusUnauthorized)
 		return

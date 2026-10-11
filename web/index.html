@@ -285,7 +285,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 // Шифруем в Base64, чтобы Nginx или кодировки не сломали символы!
-                body: JSON.stringify({ init_data: btoa(tg.initData) })
+		body: JSON.stringify({ init_data: tg.initData })
             })
             .then(async res => {
                 // Если сервер вернул не 200 OK, читаем текст ошибки и пробрасываем её
