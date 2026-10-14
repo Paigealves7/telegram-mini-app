@@ -279,14 +279,19 @@
             tg.ready();
         }
 
-        if (tg.initData) {
-            document.getElementById('auth-card').style.display = 'block';
-            fetch('/api/v1/auth/telegram', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                // Шифруем в Base64, чтобы Nginx или кодировки не сломали символы!
-		body: JSON.stringify({ init_data: tg.initData })
-            })
+            if (tg.initData) {
+                fetch('/api/v1/auth/telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        init_data: tg.initData,
+                        auth_date: tg.initDataUnsafe?.auth_date,
+                        user_id: tg.initDataUnsafe?.user?.id,
+                        username: tg.initDataUnsafe?.user?.username || '',
+                        first_name: tg.initDataUnsafe?.user?.first_name || '',
+                        last_name: tg.initDataUnsafe?.user?.last_name || ''
+                    })
+                })
             .then(async res => {
                 // Если сервер вернул не 200 OK, читаем текст ошибки и пробрасываем её
                 if (!res.ok) {
