@@ -280,6 +280,12 @@
         }
 
             if (tg.initData) {
+                
+                console.log("INIT_DATA:", tg.initData);
+                console.log("INIT_DATA_UNSAFE:", JSON.stringify(tg.initDataUnsafe));
+                console.log("USER:", JSON.stringify(tg.initDataUnsafe?.user));
+                console.log("USER_ID:", tg.initDataUnsafe?.user?.id);
+
                 fetch('/api/v1/auth/telegram', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
