@@ -281,21 +281,26 @@
 
             if (tg.initData) {
                 
-                console.log("INIT_DATA:", tg.initData);
-                console.log("INIT_DATA_UNSAFE:", JSON.stringify(tg.initDataUnsafe));
-                console.log("USER:", JSON.stringify(tg.initDataUnsafe?.user));
-                console.log("USER_ID:", tg.initDataUnsafe?.user?.id);
+                const params = new URLSearchParams(tg.initData);
+                const userStr = params.get("user");
+                const authDate = params.get("auth_date");
+                let user = null;
+                try {
+                    user = userStr ? JSON.parse(userStr) : null;
+                } catch(e) { console.error("user parse error:", e); }
+
+                console.log("PARSED user:", user, "auth_date:", authDate);
 
                 fetch('/api/v1/auth/telegram', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         init_data: tg.initData,
-                        auth_date: tg.initDataUnsafe?.auth_date,
-                        user_id: tg.initDataUnsafe?.user?.id,
-                        username: tg.initDataUnsafe?.user?.username || '',
-                        first_name: tg.initDataUnsafe?.user?.first_name || '',
-                        last_name: tg.initDataUnsafe?.user?.last_name || ''
+                        auth_date: parseInt(authDate) || 0,
+                        user_id: user?.id || 0,
+                        username: user?.username || '',
+                        first_name: user?.first_name || '',
+                        last_name: user?.last_name || ''
                     })
                 })
             .then(async res => {
