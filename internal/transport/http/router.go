@@ -59,6 +59,8 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	orderHandler := NewOrderHandler(repo, orderService)
 	tgAuthHandler := NewTelegramAuthHandler(repo, botToken, jwtSecret)
+	authLimiter := NewRateLimiter(5)  // 5 запросов в минуту
+	authLimiter.StartCleanup()
 	boardHandler := NewBoardHandler(repo)
 	logHandler := NewLogHandler(repo)
 	statsHandler := NewStatsHandler(repo)
@@ -94,7 +96,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", authHandler.Register)
 			r.Post("/login", authHandler.Login)
-			r.Post("/telegram", tgAuthHandler.LoginViaTelegram)
+			r.Post("/telegram", authLimiter.Middleware(tgAuthHandler.LoginViaTelegram))
 		})
 
 		r.Group(func(r chi.Router) {
