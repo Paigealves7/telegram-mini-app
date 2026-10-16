@@ -41,8 +41,17 @@ func (h *TelegramAuthHandler) LoginViaTelegram(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	log.Printf("TG AUTH: user_id=%d, username=%s, auth_date=%d",
-		req.UserID, req.Username, req.AuthDate)
+	// Получаем реальный IP (учитываем nginx proxy)
+	clientIP := r.Header.Get("X-Real-IP")
+	if clientIP == "" {
+	    clientIP = r.Header.Get("X-Forwarded-For")
+	}
+	if clientIP == "" {
+	    clientIP = r.RemoteAddr
+	}
+
+	log.Printf("TG AUTH: user_id=%d, username=%s, auth_date=%d, ip=%s",
+	    req.UserID, req.Username, req.AuthDate, clientIP)
 
 	// === ПРОВЕРКА 1: user_id обязателен ===
 	if req.UserID == 0 {
