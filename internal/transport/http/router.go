@@ -1,13 +1,16 @@
 package http
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 	"telegram-mini-app/internal/service"
+	"telegram-mini-app/pkg/telegram"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,9 +25,16 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		log.Fatal("Критическая ошибка: JWT_SECRET не задан в переменных окружения")
 	}
 
-	botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	botToken := strings.Trim(strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN")), "\"'")
 	if botToken == "" {
 		log.Fatal("Критическая ошибка: TELEGRAM_BOT_TOKEN не задан в переменных окружения")
+	}
+
+	// Диагностика: какому боту принадлежит токен. Сравни с ботом, через который открываешь Mini App.
+	if username, err := telegram.BotUsername(context.Background(), botToken); err != nil {
+		log.Printf("ВНИМАНИЕ: токен бота не прошёл проверку getMe: %v", err)
+	} else {
+		log.Printf("Telegram: токен принадлежит боту @%s (длина токена: %d)", username, len(botToken))
 	}
 
 	r := chi.NewRouter()
@@ -95,7 +105,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", authHandler.Register)
 			r.Post("/login", authHandler.Login)
 			r.Post("/telegram", authLimiter.Middleware(tgAuthHandler.LoginViaTelegram))
 		})
@@ -127,6 +136,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager))
 				r.Get("/statistics", statsHandler.GetSummary)
+				r.Post("/users", authHandler.Register) // создание сотрудников: только менеджер
 			})
 		})
 	})

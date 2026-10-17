@@ -1,95 +1,107 @@
 package telegram
 
 import (
-    "crypto/hmac"
-    "crypto/sha256"
-    "encoding/hex"
-    "encoding/json"
-    "errors"
-    "net/url"
-    "sort"
-    "strings"
-    "log"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"net/url"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type TGUser struct {
-    ID        int64  `json:"id"`
-    FirstName string `json:"first_name"`
-    LastName  string `json:"last_name,omitempty"`
-    Username  string `json:"username,omitempty"`
+	ID        int64  `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name,omitempty"`
+	Username  string `json:"username,omitempty"`
 }
 
-func ValidateInitData(initDataRaw, botToken string) (*TGUser, error) {
-    // 1. Чистим токен
-    cleanToken := strings.TrimSpace(botToken)
-    cleanToken = strings.Trim(cleanToken, "\"'")
+// InitData — проверенные данные из Telegram.WebApp.initData.
+type InitData struct {
+	User     TGUser
+	AuthDate time.Time
+}
 
-    // 2. Парсим БЕЗ декодирования
-    pairs := strings.Split(initDataRaw, "&")
-    values := make(map[string]string)
-    for _, pair := range pairs {
-        idx := strings.Index(pair, "=")
-        if idx == -1 {
-            continue
-        }
-        values[pair[:idx]] = pair[idx+1:]
-    }
+var (
+	ErrEmptyToken       = errors.New("telegram: токен бота пустой")
+	ErrInvalidFormat    = errors.New("telegram: неверный формат initData")
+	ErrInvalidSignature = errors.New("telegram: неверная подпись initData")
+	ErrExpired          = errors.New("telegram: initData устарел")
+)
 
-    // 3. hash
-    hash := values["hash"]
-    if hash == "" {
-        return nil, errors.New("hash missing from initData")
-    }
+const clockSkew = time.Minute
 
-    // 4. Убираем hash И signature
-    delete(values, "hash")
-    delete(values, "signature")
+// ValidateInitData проверяет подпись initData и возраст auth_date.
+// Всё, что вернулось в InitData, подписано Telegram и ему можно доверять.
+//
+// Значения полей берутся ДЕКОДИРОВАННЫМИ (url.ParseQuery), как в документации Telegram.
+// Поле signature (Ed25519, для сторонних проверяющих) в разных источниках то входит
+// в data_check_string, то нет, поэтому проверяем оба варианта. Подделать HMAC
+// не получится ни в одном из них.
+func ValidateInitData(initDataRaw, botToken string, maxAge time.Duration, now time.Time) (*InitData, error) {
+	botToken = strings.TrimSpace(botToken)
+	if botToken == "" {
+		return nil, ErrEmptyToken
+	}
 
-    // 5. Сортируем ключи
-    keys := make([]string, 0, len(values))
-    for k := range values {
-        keys = append(keys, k)
-    }
-    sort.Strings(keys)
+	values, err := url.ParseQuery(initDataRaw)
+	if err != nil {
+		return nil, ErrInvalidFormat
+	}
 
-    // 6. data_check_string из СЫРЫХ значений
-    var parts []string
-    for _, k := range keys {
-        parts = append(parts, k+"="+values[k])
-    }
-    dataCheckString := strings.Join(parts, "\n")
+	receivedHash, err := hex.DecodeString(values.Get("hash"))
+	if err != nil || len(receivedHash) != sha256.Size {
+		return nil, ErrInvalidFormat
+	}
 
-    // 7. secret_key = HMAC_SHA256("WebAppData", botToken)
-    secretMac := hmac.New(sha256.New, []byte("WebAppData"))
-    secretMac.Write([]byte(cleanToken))
-    secretKey := secretMac.Sum(nil)
+	secretKey := hmacSHA256([]byte("WebAppData"), []byte(botToken))
+	if !signatureMatches(values, secretKey, receivedHash, true) &&
+		!signatureMatches(values, secretKey, receivedHash, false) {
+		return nil, ErrInvalidSignature
+	}
 
-    // 8. calculated = HMAC_SHA256(secretKey, dataCheckString)
-    dataMac := hmac.New(sha256.New, secretKey)
-    dataMac.Write([]byte(dataCheckString))
-    calculatedHash := hex.EncodeToString(dataMac.Sum(nil))
+	authUnix, err := strconv.ParseInt(values.Get("auth_date"), 10, 64)
+	if err != nil || authUnix <= 0 {
+		return nil, ErrInvalidFormat
+	}
+	authDate := time.Unix(authUnix, 0)
+	if authDate.After(now.Add(clockSkew)) || now.Sub(authDate) > maxAge {
+		return nil, ErrExpired
+	}
 
-    // 9. Сравниваем
-    if calculatedHash != hash {
-	log.Printf("DEBUG cleanToken LEN: %d", len(cleanToken))
-	log.Printf("DEBUG cleanToken HEX: %x", []byte(cleanToken))
-	log.Printf("DEBUG dataCheckString HEX: %x", []byte(dataCheckString))
-	log.Printf("DEBUG dataCheckString LEN: %d", len(dataCheckString))
-	log.Printf("DEBUG calculatedHash: %s", calculatedHash)
-	log.Printf("DEBUG receivedHash: %s", hash)
-        return nil, errors.New("invalid hash signature")
-    }
+	var user TGUser
+	if err := json.Unmarshal([]byte(values.Get("user")), &user); err != nil || user.ID == 0 {
+		return nil, ErrInvalidFormat
+	}
 
-    // 10. Декодируем user
-    userDecoded, err := url.QueryUnescape(values["user"])
-    if err != nil {
-        return nil, errors.New("failed to unescape user")
-    }
+	return &InitData{User: user, AuthDate: authDate}, nil
+}
 
-    var user TGUser
-    if err := json.Unmarshal([]byte(userDecoded), &user); err != nil {
-        return nil, errors.New("failed to parse user")
-    }
+func signatureMatches(values url.Values, secretKey, want []byte, includeSignature bool) bool {
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		if k == "hash" || (k == "signature" && !includeSignature) {
+			continue
+		}
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 
-    return &user, nil
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k + "=" + values.Get(k)
+	}
+
+	got := hmacSHA256(secretKey, []byte(strings.Join(parts, "\n")))
+	return hmac.Equal(got, want)
+}
+
+func hmacSHA256(key, data []byte) []byte {
+	m := hmac.New(sha256.New, key)
+	m.Write(data)
+	return m.Sum(nil)
 }

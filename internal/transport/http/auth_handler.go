@@ -2,12 +2,17 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
+	"regexp"
+	"strings"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -36,15 +41,42 @@ type RegisterRequest struct {
 	Role     domain.Role `json:"role"`
 }
 
+var usernameRe = regexp.MustCompile(`^[A-Za-z0-9._-]{3,32}$`)
+
+// Register создаёт сотрудника с паролем.
+// Маршрут POST /api/v1/users доступен только менеджеру (см. router.go).
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+
 	var req RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
-		http.Error(w, "некорректный тело запроса", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
 		return
 	}
 
-	if req.Role == "" {
+	req.Username = strings.TrimSpace(req.Username)
+	if !usernameRe.MatchString(req.Username) {
+		http.Error(w, "логин: 3-32 символа, латиница, цифры, точка, дефис, подчёркивание", http.StatusBadRequest)
+		return
+	}
+	// Префикс tg_ зарезервирован под аккаунты, созданные через Telegram.
+	if strings.HasPrefix(strings.ToLower(req.Username), "tg_") {
+		http.Error(w, "логин не может начинаться с tg_", http.StatusBadRequest)
+		return
+	}
+	// У bcrypt предел 72 байта.
+	if len(req.Password) < 8 || len(req.Password) > 72 {
+		http.Error(w, "пароль: от 8 до 72 символов", http.StatusBadRequest)
+		return
+	}
+
+	switch req.Role {
+	case "":
 		req.Role = domain.RoleWorker
+	case domain.RoleManager, domain.RoleMaster, domain.RoleWorker:
+	default:
+		http.Error(w, "неизвестная роль", http.StatusBadRequest)
+		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -55,7 +87,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.repo.CreateUser(r.Context(), req.Username, string(hashedPassword), req.Role)
 	if err != nil {
-		http.Error(w, "не удалось создать пользователя: "+err.Error(), http.StatusBadRequest)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			http.Error(w, "пользователь с таким логином уже существует", http.StatusConflict)
+			return
+		}
+		log.Printf("REGISTER: не удалось создать пользователя %q: %v", req.Username, err)
+		http.Error(w, "не удалось создать пользователя", http.StatusInternalServerError)
 		return
 	}
 
