@@ -442,7 +442,7 @@
                     html += `<div class="order-card">
                                 <div class="order-header"><span>Заказ #${o.id}</span><span class="badge">${o.status}</span></div>
                                 <div class="order-sub">Клиент ID: ${o.contractor_id || 1}</div>
-                                ${actionBtn}
+                                <div>${actionBtn} ${pdfBtn}</div>
                              </div>`;
                 });
                 container.innerHTML = html;
