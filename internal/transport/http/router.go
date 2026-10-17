@@ -59,7 +59,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	orderHandler := NewOrderHandler(repo, orderService)
 	tgAuthHandler := NewTelegramAuthHandler(repo, botToken, jwtSecret)
-	authLimiter := NewRateLimiter(5)  // 5 запросов в минуту
+	authLimiter := NewRateLimiter(5) // 5 запросов в минуту
 	authLimiter.StartCleanup()
 	boardHandler := NewBoardHandler(repo)
 	logHandler := NewLogHandler(repo)
