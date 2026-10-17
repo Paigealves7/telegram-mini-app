@@ -437,6 +437,7 @@
                     const actionBtn = o.status !== 'completed' 
                         ? `<button class="btn" style="padding: 6px 12px; font-size: 12px; width: auto; margin-top: 8px;" onclick="completeOrder(${o.id}, this)">✅ Завершить заказ</button>` 
                         : '';
+                    const pdfBtn = `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; width: auto; margin-top: 8px; margin-left: 4px;" onclick="downloadPDF(${o.id})">📄 PDF</button>`;
 
                     html += `<div class="order-card">
                                 <div class="order-header"><span>Заказ #${o.id}</span><span class="badge">${o.status}</span></div>
@@ -569,6 +570,29 @@
                 document.getElementById('stat-sold-vol').innerText = (data.total_sales_volume || 0).toFixed(2) + ' м³';
                 document.getElementById('stat-sold-sum').innerText = (data.total_sales_amount || 0).toLocaleString('ru-RU') + ' ₽';
             }).catch(err => tg.showAlert("Ошибка статистики: " + err.message));
+        }
+
+        function downloadPDF(id) {
+            tg.MainButton.showProgress();
+            fetch(`/api/v1/orders/${id}/pdf`, {
+                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Ошибка скачивания");
+                return res.blob();
+            })
+            .then(blob => {
+                tg.MainButton.hideProgress();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `Накладная_Заказ_${id}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(err => handleError(err.message));
         }
     </script>
 </body>

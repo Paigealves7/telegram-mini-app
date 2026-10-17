@@ -47,6 +47,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	botService := service.NewBotService(botToken, repo)
 	salesService := service.NewSalesService(repo)
 	orderService := service.NewOrderService(repo, salesService, botService)
+	pdfService := service.NewPDFService()
 
 	// 2. Прокидываем секреты и зависимости в хендлеры
 	dictHandler := NewDictHandler(repo)
@@ -57,7 +58,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	// В SalesHandler теперь передаем Service, а не Repo
 	salesHandler := NewSalesHandler(salesService)
 
-	orderHandler := NewOrderHandler(repo, orderService)
+	orderHandler := NewOrderHandler(repo, orderService, pdfService)
 	tgAuthHandler := NewTelegramAuthHandler(repo, botToken, jwtSecret)
 	authLimiter := NewRateLimiter(5) // 5 запросов в минуту
 	authLimiter.StartCleanup()
@@ -115,6 +116,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Get("/orders", orderHandler.GetOrders)
 				r.Post("/orders", orderHandler.CreateOrder)
 				r.Put("/orders/{id}/complete", orderHandler.CompleteOrder)
+				r.Get("/orders/{id}/pdf", orderHandler.DownloadPDF)
 			})
 
 			r.Group(func(r chi.Router) {
