@@ -26,7 +26,7 @@ func (s *SalesService) CreateSale(ctx context.Context, sale *domain.Sale, items 
 	// Пересчет объемов и сумм на сервере (защита от фейковых данных клиента)
 	for _, item := range items {
 		totalVolume += item.VolumeM3
-		totalPrice += item.Price // предполагается, что клиент присылает итоговую цену за эту позицию
+		totalPrice += item.Price * item.VolumeM3
 	}
 
 	sale.TotalVolume = totalVolume

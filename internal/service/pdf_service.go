@@ -68,7 +68,7 @@ func (s *PDFService) GenerateOrderPDF(w io.Writer, order *domain.Order, items []
 	// Строки таблицы
 	var totalSum float64
 	for _, item := range items {
-		sum := item.Price * float64(item.Count)
+		sum := item.Price * item.VolumeM3
 		totalSum += sum
 
 		pdf.CellFormat(30, 8, fmt.Sprintf("%d", item.BoardID), "1", 0, "C", false, 0, "")
