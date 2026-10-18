@@ -1,597 +1,481 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sawmill Mini App</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            padding: calc(var(--tg-safe-area-inset-top, 16px) + 16px) 16px calc(var(--tg-safe-area-inset-bottom, 16px) + 16px) 16px;
-            margin: 0;
-            background-color: var(--tg-theme-bg-color, #f4f4f5);
-            color: var(--tg-theme-text-color, #18181b);
-        }
-        .card {
-            background: var(--tg-theme-secondary-bg-color, #ffffff);
-            padding: 16px;
-            border-radius: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            margin-bottom: 16px;
-        }
-        .status { font-weight: 600; margin-bottom: 8px; font-size: 16px; }
-        .nav-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;
-        }
-        .btn {
-            background-color: var(--tg-theme-button-color, #2563eb);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            border: none; padding: 12px 10px; border-radius: 8px; font-weight: 600;
-            cursor: pointer; text-align: center; width: 100%; box-sizing: border-box;
-            font-size: 14px;
-        }
-        .btn:disabled { opacity: 0.7; cursor: not-allowed; }
-        .btn-secondary { background-color: var(--tg-theme-secondary-bg-color, #e4e4e7); color: var(--tg-theme-text-color, #18181b); border: 1px solid #d4d4d8;}
-        .form-group { margin-bottom: 12px; }
-        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--tg-theme-hint-color, #3f3f46); }
-        .form-control {
-            width: 100%; padding: 10px; border: 1px solid #d4d4d8; border-radius: 6px;
-            box-sizing: border-box; font-size: 14px; background-color: var(--tg-theme-bg-color, #ffffff); 
-            color: var(--tg-theme-text-color, #18181b);
-        }
-        .screen { display: none; }
-        .screen.active { display: block; }
-        .log-item, .order-card { 
-            background: var(--tg-theme-bg-color, #ffffff); border: 1px solid #e4e4e7; 
-            padding: 12px; border-radius: 8px; margin-bottom: 8px; 
-        }
-        .order-header { display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
-        .order-sub { font-size: 12px; color: var(--tg-theme-hint-color, #71717a); margin-bottom: 4px; }
-        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: 600; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Лесопилка</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:var(--tg-theme-secondary-bg-color,#f2f2f7);
+  --card:var(--tg-theme-bg-color,#fff);
+  --text:var(--tg-theme-text-color,#111);
+  --hint:var(--tg-theme-hint-color,#8e8e93);
+  --accent:var(--tg-theme-button-color,#2481cc);
+  --on-accent:var(--tg-theme-button-text-color,#fff);
+  --line:color-mix(in srgb,var(--hint) 28%,transparent);
+  --ok:#34c759;--warn:#ff9f0a;--err:#ff3b30;--r:18px;
+  --top:calc(var(--tg-content-safe-area-inset-top,0px) + var(--tg-safe-area-inset-top,0px) + env(safe-area-inset-top,0px));
+  --bot:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px));
+}
+@media(prefers-color-scheme:dark){:root{--bg:var(--tg-theme-secondary-bg-color,#000);--card:var(--tg-theme-bg-color,#1c1c1e);--text:var(--tg-theme-text-color,#fff)}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:calc(var(--top) + 12px) 16px calc(var(--bot) + 96px);min-height:100vh}
+h1{font-size:26px;margin:4px 0 2px;letter-spacing:-.4px}
+h3{font-size:18px;margin:0 0 14px}
+h4{font-size:13px;margin:18px 0 10px;color:var(--hint);text-transform:uppercase;letter-spacing:.6px}
+.sub{color:var(--hint);font-size:14px;margin:0 0 18px}
+.back{display:none;border:0;background:none;color:var(--accent);font-size:16px;font-weight:600;padding:8px 0;margin-bottom:4px}
+.noTg .back.show{display:block}
+.screen{display:none}
+.screen.active{display:block;animation:in .28s ease both}
+@keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border-radius:var(--r);padding:18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.05)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{display:flex;flex-direction:column;justify-content:space-between;gap:12px;min-height:112px;padding:16px;border:0;border-radius:var(--r);
+  background:var(--card);color:var(--text);text-align:left;font:inherit;box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.05);
+  cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.tile:active{transform:scale(.95)}
+.tile .ic{font-size:30px;line-height:1}
+.tile b{font-size:16px}
+.tile.wide{grid-column:span 2;min-height:76px;flex-direction:row;align-items:center;justify-content:flex-start}
+.tile[hidden]{display:none}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--hint);margin:0 0 6px 2px}
+.field input,.field select{width:100%;height:50px;padding:0 14px;font:inherit;color:var(--text);background:var(--bg);
+  border:2px solid transparent;border-radius:14px;outline:0;transition:border-color .15s,background .15s;appearance:none;-webkit-appearance:none}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field input:disabled{opacity:.6}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:54px;padding:0 18px;border:0;border-radius:16px;
+  background:var(--accent);color:var(--on-accent);font:inherit;font-weight:700;cursor:pointer;transition:transform .15s ease,opacity .15s ease}
+.btn:active{transform:scale(.97);opacity:.85}
+.btn:disabled{opacity:.55;pointer-events:none}
+.btn.sec{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+.btn.sm{min-height:44px;width:auto;flex:1;font-size:14px;border-radius:12px}
+.btn.busy::after{content:"";width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:var(--bg);border-radius:14px;margin-bottom:14px}
+.seg button{min-height:44px;border:0;border-radius:11px;background:none;color:var(--hint);font:inherit;font-weight:600;transition:background .2s,color .2s}
+.seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.item{background:var(--bg);border-radius:14px;padding:14px;margin-bottom:10px;animation:in .3s ease both}
+.item .top{display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:700}
+.item .meta{color:var(--hint);font-size:13px;margin-top:4px}
+.item .acts{display:flex;gap:8px;margin-top:12px}
+.badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+.badge.completed{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.badge.in_progress{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+.badge.canceled{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err)}
+.empty,.err{text-align:center;color:var(--hint);padding:28px 8px}
+.err{color:var(--err)}
+.sk{height:64px;border-radius:14px;margin-bottom:10px;background:linear-gradient(90deg,var(--bg) 25%,var(--line) 50%,var(--bg) 75%);background-size:200% 100%;animation:sh 1.2s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.stat{border-radius:16px;padding:14px;background:color-mix(in srgb,var(--c) 14%,transparent)}
+.stat span{display:block;font-size:13px;color:var(--hint)}
+.stat b{display:block;font-size:20px;margin-top:6px;color:var(--c)}
+.est{font-size:14px;color:var(--hint);margin:-4px 2px 14px}
+.est b{color:var(--text)}
+.bar{display:none;position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(var(--bot) + 12px);background:linear-gradient(transparent,var(--bg) 38%)}
+.noTg .bar.show{display:block}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body>
-    <h2>🪵 Цифровая Пилорама</h2>
+<button class="back" id="back">‹ Назад</button>
+<h1 id="title">🪵 Лесопилка</h1>
+<p class="sub" id="sub"></p>
 
-    <div id="web-login-screen" class="card screen">
-        <h3>Вход в систему (WEB)</h3>
-        <div class="form-group"><label>Логин</label><input type="text" id="web_username" class="form-control" placeholder="Например: admin"></div>
-        <div class="form-group"><label>Пароль</label><input type="password" id="web_password" class="form-control"></div>
-        <button class="btn" onclick="webLogin()">Войти</button>
-    </div>
+<section class="screen card" id="login">
+  <h3>Вход в систему</h3>
+  <div class="field"><label>Логин</label><input id="web_username" autocomplete="username" placeholder="Например: admin"></div>
+  <div class="field"><label>Пароль</label><input id="web_password" type="password" autocomplete="current-password"></div>
+  <button class="btn" id="loginBtn">Войти</button>
+</section>
 
-    <div class="card" id="auth-card" style="display: none;">
-        <div id="status" class="status">Авторизация...</div>
-        <div id="user-info">Проверка данных...</div>
-    </div>
+<section class="screen" id="home">
+  <div class="tiles">
+    <button class="tile" data-go="arrivals"><span class="ic">📥</span><b>Приход леса</b></button>
+    <button class="tile" data-go="sawing"><span class="ic">🪚</span><b>Распиловка</b></button>
+    <button class="tile" data-go="orders"><span class="ic">📋</span><b>Заказы</b></button>
+    <button class="tile" data-go="warehouse"><span class="ic">📦</span><b>Склад</b></button>
+    <button class="tile wide" id="statsTile" data-go="stats" hidden><span class="ic">📊</span><b>Статистика</b></button>
+  </div>
+</section>
 
-    <div id="main-nav" class="nav-grid screen">
-        <button class="btn" onclick="showScreen('arrivals-screen')">📥 Приход леса</button>
-        <button class="btn" onclick="showScreen('sawing-screen')">🪚 Распиловка</button>
-        <button class="btn" onclick="loadOrders(); showScreen('orders-screen')">📋 Заказы</button>
-        <button class="btn" onclick="loadWarehouse('boards'); showScreen('warehouse-screen')">📦 Склад</button>
-        
-        <button class="btn btn-secondary" id="btn-stats" style="display: none; grid-column: span 2;" onclick="showScreen('stats-screen'); loadStatistics();">📊 Статистика (Руководитель)</button>
-    </div>
+<section class="screen card" id="arrivals">
+  <h3>📥 Приход леса</h3>
+  <div class="row">
+    <div class="field"><label>Поставщик</label><select id="supplier_id"><option value="1">ID 1</option></select></div>
+    <div class="field"><label>Перевозчик</label><select id="carrier_id"><option value="1">ID 1</option></select></div>
+  </div>
+  <div class="field"><label>Номер машины</label><input id="truck_number" value="А777АА777"></div>
+  <h4>Бревна в партии</h4>
+  <div class="field"><label>Порода</label><input id="log_species" value="Сосна"></div>
+  <div class="row">
+    <div class="field"><label>Длина, мм</label><input id="log_length" type="number" inputmode="numeric" value="6000" data-calc="log"></div>
+    <div class="field"><label>Диаметр, мм</label><input id="log_diameter" type="number" inputmode="numeric" value="220" data-calc="log"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Количество, шт</label><input id="log_count" type="number" inputmode="numeric" value="15" data-calc="log"></div>
+    <div class="field"><label>Объём, м³</label><input id="log_volume" type="number" inputmode="decimal" step="0.001" value="3.421"></div>
+  </div>
+</section>
 
-    <div id="arrivals-screen" class="card screen">
-        <h3>📥 Оформление прихода леса</h3>
-        <div class="form-group"><label>ID Поставщика</label><input type="number" id="supplier_id" class="form-control" value="1"></div>
-        <div class="form-group"><label>ID Перевозчика</label><input type="number" id="carrier_id" class="form-control" value="1"></div>
-        <div class="form-group"><label>Номер машины</label><input type="text" id="truck_number" class="form-control" value="А777АА777"></div>
-        <hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 16px 0;">
-        <h4>Бревна в партии</h4>
-        <div id="logs-container">
-            <div class="log-item">
-                <div class="form-group"><label>Порода</label><input type="text" class="form-control log-species" value="Сосна"></div>
-                <div style="display: flex; gap: 8px;">
-                    <div class="form-group" style="flex: 1;"><label>Длина (мм)</label><input type="number" class="form-control log-length" value="6000" oninput="calcLogVolume(this)"></div>
-                    <div class="form-group" style="flex: 1;"><label>Диаметр (мм)</label><input type="number" class="form-control log-diameter" value="220" oninput="calcLogVolume(this)"></div>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <div class="form-group" style="flex: 1;"><label>Количество (шт)</label><input type="number" class="form-control log-count" value="15" oninput="calcLogVolume(this)"></div>
-                    <div class="form-group" style="flex: 1;"><label>Объем (м³)</label><input type="number" step="0.01" class="form-control log-volume" value="3.421"></div>
-                </div>
-            </div>
+<section class="screen card" id="sawing">
+  <h3>🪚 Распиловка</h3>
+  <div class="field"><label>Сырьё (позиция прихода)</label><select id="sawing_log_id"><option value="1">ID 1</option></select></div>
+  <div class="field"><label>Объём сырья, м³</label><input id="sawing_logs_volume" type="number" inputmode="decimal" step="0.01" value="1.5"></div>
+  <h4>Полученная продукция</h4>
+  <div class="field"><label>Порода</label><input id="lumber_type" value="Сосна"></div>
+  <div class="row">
+    <div class="field"><label>Толщина, мм</label><input id="lumber_thickness" type="number" inputmode="numeric" value="50" data-calc="board"></div>
+    <div class="field"><label>Ширина, мм</label><input id="lumber_width" type="number" inputmode="numeric" value="150" data-calc="board"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Длина, мм</label><input id="lumber_length" type="number" inputmode="numeric" value="6000" data-calc="board"></div>
+    <div class="field"><label>Количество, шт</label><input id="lumber_count" type="number" inputmode="numeric" value="40" data-calc="board"></div>
+  </div>
+  <div class="field"><label>Общий объём, м³</label><input id="lumber_volume" type="number" inputmode="decimal" step="0.001" value="1.800"></div>
+</section>
+
+<section class="screen card" id="orders">
+  <h3>📋 Заказы</h3>
+  <div id="orders-list"></div>
+</section>
+
+<section class="screen card" id="neworder">
+  <h3>Новый заказ</h3>
+  <div class="field"><label>Клиент</label><select id="order_customer_id"><option value="1">ID 1</option></select></div>
+  <div class="field"><label>Доска со склада</label><select id="order_board_id"><option value="1">ID 1</option></select></div>
+  <div class="row">
+    <div class="field"><label>Количество, шт</label><input id="order_quantity" type="number" inputmode="numeric" value="10"></div>
+    <div class="field"><label>Цена за 1 м³, ₽</label><input id="order_price" type="number" inputmode="decimal" value="9000"></div>
+  </div>
+  <div class="est" id="est"></div>
+</section>
+
+<section class="screen card" id="warehouse">
+  <h3>📦 Склад</h3>
+  <div class="seg"><button class="on" data-wh="boards">Пиломатериалы</button><button data-wh="logs">Сырьё</button></div>
+  <div id="warehouse-list"></div>
+</section>
+
+<section class="screen card" id="stats">
+  <h3>📊 Статистика</h3>
+  <div class="row">
+    <div class="field"><label>С даты</label><input id="stat_start" type="date"></div>
+    <div class="field"><label>По дату</label><input id="stat_end" type="date"></div>
+  </div>
+  <button class="btn sec" id="statsBtn">Обновить</button>
+  <div class="stats">
+    <div class="stat" style="--c:#34c759"><span>Пришло сырья</span><b id="stat-arrived">—</b></div>
+    <div class="stat" style="--c:#ff9f0a"><span>Распилено</span><b id="stat-sawed">—</b></div>
+    <div class="stat" style="--c:#0a84ff"><span>Продано</span><b id="stat-sold-vol">—</b></div>
+    <div class="stat" style="--c:#bf5af2"><span>Выручка</span><b id="stat-sold-sum">—</b></div>
+  </div>
+</section>
+
+<div class="bar" id="bar"><button class="btn" id="barBtn"></button></div>
+
+<script>
+const tg = window.Telegram.WebApp, inTg = !!tg.initData;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = id => parseFloat($(id).value);
+const int = id => parseInt($(id).value, 10);
+const STATUS = {new:'Новый', in_progress:'В работе', completed:'Завершён', canceled:'Отменён'};
+const fmt = (n, d = 2) => (n || 0).toLocaleString('ru-RU', {maximumFractionDigits: d});
+
+tg.ready(); tg.expand();
+try { tg.setHeaderColor('secondary_bg_color'); tg.setBackgroundColor('secondary_bg_color'); } catch (e) {}
+if (!inTg) document.body.classList.add('noTg');
+
+/* ---------- утилиты ---------- */
+const hap = t => { try { tg.HapticFeedback.impactOccurred(t || 'light'); } catch (e) {} };
+const notify = t => { try { tg.HapticFeedback.notificationOccurred(t); } catch (e) {} };
+const info = m => inTg ? tg.showAlert(m) : alert(m);
+const ask = (m, cb) => inTg ? tg.showConfirm(m, cb) : cb(confirm(m));
+const token = () => localStorage.getItem('jwt_token');
+const jwt = () => { try { return JSON.parse(decodeURIComponent(atob(token().split('.')[1].replace(/-/g,'+').replace(/_/g,'/')).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''))); } catch (e) { return null; } };
+const uid = () => jwt()?.user_id || 1;
+
+async function api(path, opts = {}) {
+  const headers = {'Content-Type': 'application/json'};
+  if (token()) headers.Authorization = 'Bearer ' + token();
+  const r = await fetch('/api/v1' + path, {...opts, headers});
+  if (!r.ok) throw new Error((await r.text()).trim() || 'Ошибка ' + r.status);
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+
+const skeleton = () => '<div class="sk"></div><div class="sk"></div><div class="sk"></div>';
+
+/* ---------- экраны ---------- */
+let current = 'home', whType = 'boards';
+const SCREENS = {
+  home:      {title: '🪵 Лесопилка'},
+  login:     {title: '🪵 Лесопилка'},
+  arrivals:  {title: 'Приход леса', action: 'Сохранить приход', run: submitArrival, back: 'home', load: () => fillContractors(['supplier_id', 'carrier_id'])},
+  sawing:    {title: 'Распиловка', action: 'Сохранить распиловку', run: submitSawing, back: 'home', load: () => fill('sawing_log_id', '/logs', l => `${l.species || 'Бревно'} Ø${l.diameter_mm} · ${l.count} шт · ${fmt(l.volume_m3, 3)} м³ (№${l.id})`)},
+  orders:    {title: 'Заказы', action: 'Создать заказ', run: () => go('neworder'), back: 'home', load: loadOrders},
+  neworder:  {title: 'Новый заказ', action: 'Сохранить заказ', run: submitOrder, back: 'orders', load: loadOrderForm},
+  warehouse: {title: 'Склад', back: 'home', load: () => loadWarehouse(whType)},
+  stats:     {title: 'Статистика', back: 'home', load: loadStats}
+};
+
+function go(name) {
+  const s = SCREENS[name];
+  document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
+  $(name).classList.add('active');
+  current = name;
+  $('title').textContent = s.title;
+  $('sub').textContent = name === 'home' ? ($('sub').dataset.user || '') : '';
+  $('back').classList.toggle('show', !!s.back);
+  if (s.back) tg.BackButton.show(); else tg.BackButton.hide();
+  if (s.action) {
+    tg.MainButton.setParams({text: s.action.toUpperCase(), is_visible: true, is_active: true});
+    $('barBtn').textContent = s.action;
+  } else tg.MainButton.hide();
+  $('bar').classList.toggle('show', !!s.action);
+  window.scrollTo({top: 0});
+  if (s.load) s.load();
+}
+
+const back = () => { hap(); go(SCREENS[current].back || 'home'); };
+tg.BackButton.onClick(back);
+$('back').onclick = back;
+const act = () => { hap('medium'); SCREENS[current].run?.(); };
+tg.onEvent('mainButtonClicked', act);
+$('barBtn').onclick = act;
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-go]'); if (t) { hap(); go(t.dataset.go); return; }
+  const w = e.target.closest('[data-wh]');
+  if (w) {
+    hap(); whType = w.dataset.wh;
+    document.querySelectorAll('[data-wh]').forEach(b => b.classList.toggle('on', b === w));
+    loadWarehouse(whType);
+  }
+});
+
+function busy(on) {
+  try { on ? tg.MainButton.showProgress() : tg.MainButton.hideProgress(); on ? tg.MainButton.disable() : tg.MainButton.enable(); } catch (e) {}
+  $('barBtn').disabled = on; $('barBtn').classList.toggle('busy', on);
+}
+
+async function submit(path, method, payload, okMsg, after) {
+  busy(true);
+  try {
+    await api(path, {method, body: payload ? JSON.stringify(payload) : undefined});
+    notify('success'); info(okMsg); if (after) after();
+  } catch (e) { notify('error'); info('Ошибка: ' + e.message); }
+  finally { busy(false); }
+}
+
+/* ---------- авторасчёт объёмов ---------- */
+document.addEventListener('input', e => {
+  const k = e.target.dataset.calc;
+  if (k === 'log') {
+    const r = num('log_diameter') / 2000;
+    $('log_volume').value = (Math.PI * r * r * num('log_length') / 1000 * num('log_count') || 0).toFixed(3);
+  } else if (k === 'board') {
+    $('lumber_volume').value = ((num('lumber_thickness') * num('lumber_width') * num('lumber_length') * num('lumber_count')) / 1e9 || 0).toFixed(3);
+  }
+  if (e.target.closest('#neworder')) updateEstimate();
+});
+$('neworder').addEventListener('change', updateEstimate);
+
+/* ---------- справочники ---------- */
+let CON = {}, BOARDS = {};
+async function fill(id, url, label) {
+  const el = $(id);
+  try {
+    const list = await api(url);
+    if (list && list.length) el.innerHTML = list.map(x => `<option value="${esc(x.id)}">${esc(label(x))}</option>`).join('');
+    else el.innerHTML = '<option value="">Нет данных</option>';
+    return list || [];
+  } catch (e) { return []; }
+}
+async function fillContractors(ids) {
+  try {
+    const list = await api('/contractors');
+    CON = {}; (list || []).forEach(c => CON[c.id] = c.name);
+    const html = (list || []).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    if (html) ids.forEach(id => $(id).innerHTML = html);
+  } catch (e) {}
+}
+
+/* ---------- авторизация ---------- */
+function finishAuth(tkn, name) {
+  localStorage.setItem('jwt_token', tkn);
+  $('sub').dataset.user = 'Сотрудник: ' + name;
+  $('statsTile').hidden = jwt()?.role !== 'manager';
+  go('home');
+}
+
+async function authTelegram() {
+  $('sub').textContent = 'Входим через Telegram…';
+  try {
+    const d = await api('/auth/telegram', {method: 'POST', body: JSON.stringify({init_data: tg.initData})});
+    if (!d?.token) throw new Error('Токен не получен');
+    finishAuth(d.token, tg.initDataUnsafe?.user?.first_name || 'User');
+  } catch (e) { $('sub').textContent = '❌ ' + e.message; }
+}
+
+$('loginBtn').onclick = async () => {
+  const btn = $('loginBtn'), u = $('web_username').value.trim();
+  btn.disabled = true; btn.classList.add('busy');
+  try {
+    const d = await api('/auth/login', {method: 'POST', body: JSON.stringify({username: u, password: $('web_password').value})});
+    if (d?.token) finishAuth(d.token, u);
+  } catch (e) { notify('error'); info('Ошибка входа: ' + e.message); }
+  finally { btn.disabled = false; btn.classList.remove('busy'); }
+};
+$('web_password').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginBtn').click(); });
+
+/* ---------- отправка форм ---------- */
+function submitArrival() {
+  if (!(int('log_count') > 0) || !(num('log_volume') > 0)) return info('Проверьте количество и объём бревен');
+  ask('Сохранить приход леса?', ok => {
+    if (!ok) return;
+    submit('/arrivals', 'POST', {
+      supplier_id: int('supplier_id') || 1,
+      carrier_id: int('carrier_id') || 1,
+      truck_number: $('truck_number').value,
+      arrival_date: new Date().toISOString().split('T')[0],
+      created_by: uid(),
+      items: [{species: $('log_species').value, length_mm: int('log_length'), diameter_mm: int('log_diameter'), count: int('log_count'), volume_m3: num('log_volume')}]
+    }, '✅ Приход леса зарегистрирован', () => go('home'));
+  });
+}
+
+function submitSawing() {
+  if (!(int('lumber_count') > 0) || !(num('lumber_volume') > 0)) return info('Проверьте количество и объём досок');
+  ask('Зафиксировать результаты распиловки?', ok => {
+    if (!ok) return;
+    submit('/sawing', 'POST', {
+      worker_id: uid(),
+      date: new Date().toISOString().split('T')[0],
+      logs: [{log_id: int('sawing_log_id'), volume_m3: num('sawing_logs_volume')}],
+      boards: [{species: $('lumber_type').value, grade: '1', height_mm: int('lumber_thickness'), width_mm: int('lumber_width'),
+                length_mm: int('lumber_length'), count: int('lumber_count'), volume_m3: num('lumber_volume')}]
+    }, '✅ Распиловка сохранена', () => go('home'));
+  });
+}
+
+function submitOrder() {
+  if (!(int('order_quantity') > 0)) return info('Укажите количество досок');
+  ask('Создать новый заказ?', ok => {
+    if (!ok) return;
+    submit('/orders', 'POST', {
+      master_id: uid(),
+      contractor_id: int('order_customer_id') || 1,
+      status: 'new', delivery_price: 0, extra_price: 0,
+      items: [{board_id: int('order_board_id') || 1, count: int('order_quantity') || 1, price: num('order_price') || 0}]
+    }, '✅ Заказ создан', () => go('orders'));
+  });
+}
+
+/* ---------- заказы ---------- */
+async function loadOrderForm() {
+  await fillContractors(['order_customer_id']);
+  const list = await fill('order_board_id', '/boards', b => `${b.species || 'Доска'} ${b.height_mm}×${b.width_mm}×${b.length_mm} · ${b.count} шт (№${b.id})`);
+  BOARDS = {}; list.forEach(b => BOARDS[b.id] = b);
+  updateEstimate();
+}
+
+function updateEstimate() {
+  const b = BOARDS[$('order_board_id').value], q = int('order_quantity');
+  if (!b || !(q > 0) || !(b.count > 0)) { $('est').innerHTML = ''; return; }
+  const vol = q === b.count ? b.volume_m3 : b.volume_m3 / b.count * q;
+  $('est').innerHTML = `Ориентировочно: <b>${fmt(vol, 3)} м³</b> · <b>${fmt(vol * (num('order_price') || 0))} ₽</b>` + (q > b.count ? ' · ⚠️ больше остатка' : '');
+}
+
+async function loadOrders() {
+  const box = $('orders-list'); box.innerHTML = skeleton();
+  try {
+    if (!Object.keys(CON).length) await fillContractors([]);
+    const orders = await api('/orders');
+    if (!orders || !orders.length) { box.innerHTML = '<div class="empty">Заказов пока нет</div>'; return; }
+    box.innerHTML = orders.map(o => `
+      <div class="item">
+        <div class="top"><span>Заказ №${esc(o.id)}</span><span class="badge ${esc(o.status)}">${esc(STATUS[o.status] || o.status)}</span></div>
+        <div class="meta">Клиент: ${esc(CON[o.contractor_id] || '№' + o.contractor_id)}</div>
+        <div class="acts">
+          ${o.status !== 'completed' && o.status !== 'canceled' ? `<button class="btn sm" data-complete="${esc(o.id)}">✅ Завершить</button>` : ''}
+          <button class="btn sm sec" data-pdf="${esc(o.id)}">📄 PDF</button>
         </div>
-    </div>
+      </div>`).join('');
+  } catch (e) { box.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
 
-    <div id="sawing-screen" class="card screen">
-        <h3>🪚 Учет распиловки</h3>
-        <div class="form-group"><label>ID партии прихода (Сырье)</label><input type="number" id="sawing_arrival_item_id" class="form-control" value="1"></div>
-        <div style="display: flex; gap: 8px;">
-            <div class="form-group" style="flex: 1;"><label>Распилено бревен (шт)</label><input type="number" id="sawing_logs_processed" class="form-control" value="5"></div>
-            <div class="form-group" style="flex: 1;"><label>Объем сырья (м³)</label><input type="number" step="0.01" id="sawing_logs_volume" class="form-control" value="1.5"></div>
-        </div>
-        <hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 16px 0;">
-        <h4>Полученная продукция</h4>
-        <div class="log-item">
-            <div class="form-group"><label>Тип / Порода</label><input type="text" id="lumber_type" class="form-control" value="Сосна"></div>
-            <div style="display: flex; gap: 8px;">
-                <div class="form-group" style="flex: 1;"><label>Толщина (мм)</label><input type="number" id="lumber_thickness" class="form-control" value="50" oninput="calcBoardVolume(this)"></div>
-                <div class="form-group" style="flex: 1;"><label>Ширина (мм)</label><input type="number" id="lumber_width" class="form-control" value="150" oninput="calcBoardVolume(this)"></div>
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <div class="form-group" style="flex: 1;"><label>Длина (мм)</label><input type="number" id="lumber_length" class="form-control" value="6000" oninput="calcBoardVolume(this)"></div>
-                <div class="form-group" style="flex: 1;"><label>Кол-во (шт)</label><input type="number" id="lumber_count" class="form-control" value="40" oninput="calcBoardVolume(this)"></div>
-            </div>
-            <div class="form-group"><label>Общий объем (м³)</label><input type="number" step="0.01" id="lumber_volume" class="form-control" value="1.800"></div>
-        </div>
-    </div>
+$('orders-list').addEventListener('click', e => {
+  const c = e.target.closest('[data-complete]'), p = e.target.closest('[data-pdf]');
+  if (c) completeOrder(c.dataset.complete, c);
+  if (p) downloadPDF(p.dataset.pdf, p);
+});
 
-    <div id="orders-screen" class="card screen">
-        <h3>📋 Заказы</h3>
-        <div id="orders-list">Загрузка заказов...</div>
-    </div>
+function completeOrder(id, btn) {
+  hap('medium');
+  ask('Завершить заказ и списать товары со склада в продажу?', ok => {
+    if (!ok) return;
+    btn.disabled = true; btn.classList.add('busy');
+    api(`/orders/${id}/complete`, {method: 'PUT'})
+      .then(() => { notify('success'); info('✅ Заказ завершён, продажа проведена'); })
+      .catch(e => { notify('error'); info('Ошибка: ' + e.message); })
+      .finally(loadOrders);
+  });
+}
 
-    <div id="create-order-screen" class="card screen">
-        <h3>Создание нового заказа</h3>
-        <div class="form-group"><label>ID Клиента</label><input type="number" id="order_customer_id" class="form-control" value="1"></div>
-        <div class="form-group"><label>Статус</label><input type="text" id="order_status" class="form-control" value="new" disabled></div>
-        <hr style="border: 0; border-top: 1px solid #e4e4e7; margin: 16px 0;">
-        <h4>Позиции заказа (Доска)</h4>
-        <div class="log-item">
-            <div class="form-group"><label>ID Доски на складе</label><input type="number" id="order_board_id" class="form-control" value="1"></div>
-            <div style="display: flex; gap: 8px;">
-                <div class="form-group" style="flex: 1;"><label>Кол-во (шт)</label><input type="number" id="order_quantity" class="form-control" value="10"></div>
-            </div>
-            <div class="form-group"><label>Цена за 1 м³ (руб)</label><input type="number" id="order_price" class="form-control" value="9000"></div>
-        </div>
-    </div>
+async function downloadPDF(id, btn) {
+  hap(); btn.disabled = true; btn.classList.add('busy');
+  try {
+    const r = await fetch(`/api/v1/orders/${id}/pdf`, {headers: {Authorization: 'Bearer ' + token()}});
+    if (!r.ok) throw new Error('Не удалось получить PDF');
+    const url = URL.createObjectURL(await r.blob());
+    const a = Object.assign(document.createElement('a'), {href: url, download: `Накладная_Заказ_${id}.pdf`});
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } catch (e) { notify('error'); info('Ошибка: ' + e.message); }
+  finally { btn.disabled = false; btn.classList.remove('busy'); }
+}
 
-    <div id="warehouse-screen" class="card screen">
-        <h3>📦 Остатки на складе</h3>
-        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <button class="btn" style="flex: 1;" onclick="loadWarehouse('boards')">Пиломатериалы</button>
-            <button class="btn btn-secondary" style="flex: 1;" onclick="loadWarehouse('logs')">Сырье</button>
-        </div>
-        <div id="warehouse-list">Загрузка данных...</div>
-    </div>
+/* ---------- склад ---------- */
+async function loadWarehouse(type) {
+  const box = $('warehouse-list'); box.innerHTML = skeleton();
+  try {
+    const items = await api(type === 'boards' ? '/boards' : '/logs');
+    if (!items || !items.length) { box.innerHTML = '<div class="empty">На складе нет позиций</div>'; return; }
+    box.innerHTML = items.map(i => type === 'boards'
+      ? `<div class="item"><div class="top"><span>${esc(i.species || 'Доска')} ${esc(i.height_mm)}×${esc(i.width_mm)}×${esc(i.length_mm)}</span><span class="badge">${esc(i.count)} шт</span></div>
+         <div class="meta">№${esc(i.id)} · сорт ${esc(i.grade || '1')} · ${fmt(i.volume_m3, 3)} м³</div></div>`
+      : `<div class="item"><div class="top"><span>${esc(i.species || 'Бревно')} Ø${esc(i.diameter_mm)} · ${esc(i.length_mm)} мм</span><span class="badge">${esc(i.count)} шт</span></div>
+         <div class="meta">№${esc(i.id)} · партия №${esc(i.arrival_id)} · ${fmt(i.volume_m3, 3)} м³</div></div>`).join('');
+  } catch (e) { box.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
 
-    <div id="stats-screen" class="card screen">
-        <h3>📊 Статистика предприятия</h3>
-        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <div class="form-group" style="flex: 1;">
-                <label>С даты</label>
-                <input type="date" id="stat_start" class="form-control">
-            </div>
-            <div class="form-group" style="flex: 1;">
-                <label>По дату</label>
-                <input type="date" id="stat_end" class="form-control">
-            </div>
-        </div>
-        <button class="btn" style="margin-bottom: 16px;" onclick="loadStatistics()">Обновить данные</button>
+/* ---------- статистика ---------- */
+const now = new Date();
+$('stat_end').value = now.toISOString().split('T')[0];
+$('stat_start').value = new Date(now.getFullYear(), now.getMonth(), 2).toISOString().split('T')[0];
+$('statsBtn').onclick = () => { hap(); loadStats(); };
 
-        <div class="nav-grid">
-            <!-- Жестко задаем темные цвета текста для контраста со светлым фоном -->
-            <div class="order-card" style="background: #f0fdf4; border-color: #bbf7d0; color: #14532d;">
-                <div class="order-sub" style="color: #166534;">Пришло сырья</div>
-                <div class="status" id="stat-arrived">0 м³</div>
-            </div>
-            <div class="order-card" style="background: #fffbeb; border-color: #fde68a; color: #713f12;">
-                <div class="order-sub" style="color: #854d0e;">Распилено сырья</div>
-                <div class="status" id="stat-sawed">0 м³</div>
-            </div>
-            <div class="order-card" style="background: #eff6ff; border-color: #bfdbfe; color: #1e3a8a;">
-                <div class="order-sub" style="color: #1d4ed8;">Продано (объем)</div>
-                <div class="status" id="stat-sold-vol">0 м³</div>
-            </div>
-            <div class="order-card" style="background: #fdf2f8; border-color: #fbcfe8; color: #831843;">
-                <div class="order-sub" style="color: #be185d;">Выручка</div>
-                <div class="status" id="stat-sold-sum">0 ₽</div>
-            </div>
-        </div>
-    </div>
+async function loadStats() {
+  ['arrived', 'sawed', 'sold-vol', 'sold-sum'].forEach(k => $('stat-' + k).textContent = '…');
+  try {
+    const d = await api(`/statistics?start_date=${encodeURIComponent($('stat_start').value)}&end_date=${encodeURIComponent($('stat_end').value)}`);
+    $('stat-arrived').textContent = fmt(d.total_logs_arrived_volume) + ' м³';
+    $('stat-sawed').textContent = fmt(d.total_logs_sawed_volume) + ' м³';
+    $('stat-sold-vol').textContent = fmt(d.total_sales_volume) + ' м³';
+    $('stat-sold-sum').textContent = fmt(d.total_sales_amount, 0) + ' ₽';
+  } catch (e) { info('Ошибка статистики: ' + e.message); }
+}
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand(); 
-        
-        let currentScreen = '';
-
-        // Авторасчет объема для круглого леса (Сырья)
-        function calcLogVolume(element) {
-            const container = element.closest('.log-item');
-            const length = parseFloat(container.querySelector('.log-length').value) || 0;
-            const diameter = parseFloat(container.querySelector('.log-diameter').value) || 0;
-            const count = parseFloat(container.querySelector('.log-count').value) || 0;
-
-            // Переводим мм в метры
-            const lengthM = length / 1000;
-            const radiusM = (diameter / 1000) / 2;
-            
-            // π * r² * h * количество
-            const volume = Math.PI * Math.pow(radiusM, 2) * lengthM * count;
-            container.querySelector('.log-volume').value = volume.toFixed(3);
-        }
-
-        // Авторасчет объема для досок (Пиломатериалов)
-        function calcBoardVolume(element) {
-            const container = element.closest('.log-item');
-            const thickness = parseFloat(container.querySelector('#lumber_thickness').value) || 0;
-            const width = parseFloat(container.querySelector('#lumber_width').value) || 0;
-            const length = parseFloat(container.querySelector('#lumber_length').value) || 0;
-            const count = parseFloat(container.querySelector('#lumber_count').value) || 0;
-
-            // Переводим мм в метры: (Т/1000) * (Ш/1000) * (Д/1000) * количество
-            const volume = (thickness / 1000) * (width / 1000) * (length / 1000) * count;
-            container.querySelector('#lumber_volume').value = volume.toFixed(3);
-        } 
-
-        const dateNow = new Date();
-        document.getElementById('stat_end').value = dateNow.toISOString().split('T')[0];
-        document.getElementById('stat_start').value = new Date(dateNow.getFullYear(), dateNow.getMonth(), 2).toISOString().split('T')[0];
-
-        function parseJwt(token) {
-            try { return JSON.parse(decodeURIComponent(atob(token.split('.')[1]).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''))); } catch (e) { return null; }
-        }
-
-        tg.BackButton.onClick(() => {
-            if (currentScreen === 'create-order-screen') showScreen('orders-screen');
-            else showScreen('main-nav');
-        });
-
-        tg.onEvent('mainButtonClicked', () => {
-            if (currentScreen === 'arrivals-screen') submitArrival();
-            else if (currentScreen === 'sawing-screen') submitSawing();
-            else if (currentScreen === 'orders-screen') showScreen('create-order-screen');
-            else if (currentScreen === 'create-order-screen') submitOrder();
-        });
-
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-            currentScreen = screenId;
-
-            if (screenId === 'main-nav' || screenId === 'web-login-screen') {
-                tg.BackButton.hide();
-                if(screenId === 'main-nav') document.getElementById('auth-card').style.display = 'block';
-            } else {
-                tg.BackButton.show();
-                document.getElementById('auth-card').style.display = 'none';
-            }
-
-            if (['main-nav', 'warehouse-screen', 'stats-screen', 'web-login-screen'].includes(screenId)) {
-                tg.MainButton.hide();
-            } else {
-                let btnText = "";
-                if (screenId === 'arrivals-screen') btnText = "СОХРАНИТЬ ПРИХОД";
-                else if (screenId === 'sawing-screen') btnText = "СОХРАНИТЬ РАСПИЛОВКУ";
-                else if (screenId === 'orders-screen') btnText = "СОЗДАТЬ ЗАКАЗ";
-                else if (screenId === 'create-order-screen') btnText = "СОХРАНИТЬ ЗАКАЗ";
-
-                tg.MainButton.setParams({ text: btnText, is_visible: true, is_active: true });
-            }
-        }
-
-        function finishAuth(token, username) {
-            document.getElementById('status').innerText = "✅ Успешный вход";
-            document.getElementById('user-info').innerText = `Сотрудник: ${username}`;
-            localStorage.setItem('jwt_token', token);
-            
-            const jwtPayload = parseJwt(token);
-            if (jwtPayload && jwtPayload.role === 'manager') {
-                document.getElementById('btn-stats').style.display = 'block';
-            }
-            showScreen('main-nav');
-            tg.ready();
-        }
-
-            if (tg.initData) {
-                
-                const params = new URLSearchParams(tg.initData);
-                const userStr = params.get("user");
-                const authDate = params.get("auth_date");
-                let user = null;
-                try {
-                    user = userStr ? JSON.parse(userStr) : null;
-                } catch(e) { console.error("user parse error:", e); }
-
-                console.log("PARSED user:", user, "auth_date:", authDate);
-
-                fetch('/api/v1/auth/telegram', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        init_data: tg.initData,
-                        auth_date: parseInt(authDate) || 0,
-                        user_id: user?.id || 0,
-                        username: user?.username || '',
-                        first_name: user?.first_name || '',
-                        last_name: user?.last_name || ''
-                    })
-                })
-            .then(async res => {
-                // Если сервер вернул не 200 OK, читаем текст ошибки и пробрасываем её
-                if (!res.ok) {
-                    const errText = await res.text();
-                    throw new Error(errText || `Ошибка сервера ${res.status}`);
-                }
-                return res.json();
-            })
-            .then(data => {
-                if (data.token) finishAuth(data.token, tg.initDataUnsafe.user?.first_name || 'User');
-                else document.getElementById('status').innerText = "❌ Токен не получен";
-            })
-            .catch(err => {
-                // Теперь мы увидим реальную ошибку от бэкенда!
-                document.getElementById('status').innerText = "❌ Ошибка: " + err.message;
-            });
-        } else {
-            showScreen('web-login-screen');
-            tg.ready();
-        }
-
-        function webLogin() {
-            const user = document.getElementById('web_username').value;
-            const pass = document.getElementById('web_password').value;
-            fetch('/api/v1/auth/login', {
-                method: 'POST',
-                headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({username: user, password: pass})
-            }).then(async res => {
-                if (!res.ok) throw new Error(await res.text());
-                return res.json();
-            }).then(data => {
-                if (data.token) finishAuth(data.token, user);
-            }).catch(err => alert("Ошибка входа: " + err.message));
-        }
-
-        function handleError(errText) {
-            tg.HapticFeedback.notificationOccurred('error');
-            tg.showAlert("Ошибка: " + errText);
-            tg.MainButton.hideProgress();
-            tg.MainButton.enable(); // Разблокируем кнопку при ошибке
-        }
-
-        function handleSuccess(msg) {
-            tg.HapticFeedback.notificationOccurred('success');
-            tg.showAlert(msg);
-            tg.MainButton.hideProgress();
-            tg.MainButton.enable();
-            showScreen('main-nav');
-        }
-
-        function submitArrival() {
-            tg.showConfirm("Сохранить приход леса в базу?", function(confirm) {
-                if(!confirm) return;
-                
-                tg.MainButton.showProgress();
-                tg.MainButton.disable(); // Явная блокировка кнопки (фикс для Mac)
-                const payload = {
-                    supplier_id: parseInt(document.getElementById('supplier_id').value) || 1,
-                    carrier_id: parseInt(document.getElementById('carrier_id').value) || 1,
-                    truck_number: document.getElementById('truck_number').value,
-                    arrival_date: new Date().toISOString().split('T')[0],
-                    created_by: parseJwt(localStorage.getItem('jwt_token'))?.user_id || 1,
-                    items: [{
-                        species: document.querySelector('.log-species').value,
-                        length_mm: parseInt(document.querySelector('.log-length').value),
-                        diameter_mm: parseInt(document.querySelector('.log-diameter').value),
-                        count: parseInt(document.querySelector('.log-count').value),
-                        volume_m3: parseFloat(document.querySelector('.log-volume').value)
-                    }]
-                };
-
-                fetch('/api/v1/arrivals', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') },
-                    body: JSON.stringify(payload)
-                }).then(async res => {
-                    if (res.ok) handleSuccess("✅ Приход леса успешно зарегистрирован!");
-                    else handleError(await res.text());
-                }).catch(err => handleError(err.message));
-            });
-        }
-
-        function submitSawing() {
-            tg.showConfirm("Зафиксировать результаты распиловки?", function(confirm) {
-                if(!confirm) return;
-
-                tg.MainButton.showProgress();
-                tg.MainButton.disable();
-                const payload = {
-                    worker_id: parseJwt(localStorage.getItem('jwt_token'))?.user_id || 1,
-                    date: new Date().toISOString().split('T')[0],
-                    logs: [{
-                        log_id: parseInt(document.getElementById('sawing_arrival_item_id').value),
-                        volume_m3: parseFloat(document.getElementById('sawing_logs_volume').value)
-                    }],
-                    boards: [{
-                        species: document.getElementById('lumber_type').value,
-                        grade: "1",
-                        height_mm: parseInt(document.getElementById('lumber_thickness').value),
-                        width_mm: parseInt(document.getElementById('lumber_width').value),
-                        length_mm: parseInt(document.getElementById('lumber_length').value),
-                        count: parseInt(document.getElementById('lumber_count').value),
-                        volume_m3: parseFloat(document.getElementById('lumber_volume').value)
-                    }]
-                };
-
-                fetch('/api/v1/sawing', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') },
-                    body: JSON.stringify(payload)
-                }).then(async res => {
-                    if (res.ok) handleSuccess("✅ Операция распиловки сохранена!");
-                    else handleError(await res.text());
-                }).catch(err => handleError(err.message));
-            });
-        }
-
-        function loadOrders() {
-            const container = document.getElementById('orders-list');
-            container.innerHTML = "Загрузка...";
-            fetch('/api/v1/orders', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') } })
-            .then(res => res.json())
-            .then(orders => {
-                if (!orders || orders.length === 0) {
-                    container.innerHTML = "<p style='color: var(--tg-theme-hint-color);'>Список заказов пуст</p>";
-                    return;
-                }
-                let html = "";
-                orders.forEach(o => {
-                    // Прокидываем this (саму кнопку), чтобы заблокировать её от двойного нажатия
-                    const actionBtn = o.status !== 'completed' 
-                        ? `<button class="btn" style="padding: 6px 12px; font-size: 12px; width: auto; margin-top: 8px;" onclick="completeOrder(${o.id}, this)">✅ Завершить заказ</button>` 
-                        : '';
-                    const pdfBtn = `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; width: auto; margin-top: 8px; margin-left: 4px;" onclick="downloadPDF(${o.id})">📄 PDF</button>`;
-
-                    html += `<div class="order-card">
-                                <div class="order-header"><span>Заказ #${o.id}</span><span class="badge">${o.status}</span></div>
-                                <div class="order-sub">Клиент ID: ${o.contractor_id || 1}</div>
-                                <div>${actionBtn} ${pdfBtn}</div>
-                             </div>`;
-                });
-                container.innerHTML = html;
-            }).catch(err => container.innerHTML = "<p style='color: #ef4444;'>Ошибка загрузки заказов</p>");
-        }
-
-        function submitOrder() {
-            tg.showConfirm("Создать новый заказ?", function(confirm) {
-                if(!confirm) return;
-
-                tg.MainButton.showProgress();
-                tg.MainButton.disable();
-                const payload = {
-                    master_id: parseJwt(localStorage.getItem('jwt_token'))?.user_id || 1,
-                    contractor_id: parseInt(document.getElementById('order_customer_id').value) || 1,
-                    status: document.getElementById('order_status').value || "new",
-                    delivery_price: 0, extra_price: 0,
-                    items: [{
-                        board_id: parseInt(document.getElementById('order_board_id').value) || 1, 
-                        count: parseInt(document.getElementById('order_quantity').value) || 1,
-                        price: parseFloat(document.getElementById('order_price').value) || 0
-                    }]
-                };
-
-                fetch('/api/v1/orders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') },
-                    body: JSON.stringify(payload)
-                }).then(async res => {
-                    if (res.ok) {
-                        tg.HapticFeedback.notificationOccurred('success');
-                        tg.showAlert("✅ Заказ успешно создан!");
-                        tg.MainButton.hideProgress();
-                        tg.MainButton.enable();
-                        loadOrders();
-                        showScreen('orders-screen');
-                    } else handleError(await res.text());
-                }).catch(err => handleError(err.message));
-            });
-        }
-
-        function completeOrder(id, btnElement) {
-            tg.showConfirm("Завершить заказ и списать товары со склада в продажу?", function(confirm) {
-                if(!confirm) return;
-                
-                // Блокируем кнопку визуально, чтобы пользователь не спамил
-                if (btnElement) {
-                    btnElement.disabled = true;
-                    btnElement.innerText = "⏳ Обработка...";
-                }
-
-                fetch(`/api/v1/orders/${id}/complete`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') }
-                }).then(async res => {
-                    if (res.ok) {
-                        tg.HapticFeedback.notificationOccurred('success');
-                        tg.showAlert("✅ Заказ успешно завершен! Продажа проведена.");
-                        loadOrders(); 
-                    } else {
-                        throw new Error(await res.text());
-                    }
-                }).catch(err => {
-                    handleError(err.message);
-                    if (btnElement) {
-                        btnElement.disabled = false;
-                        btnElement.innerText = "✅ Завершить заказ";
-                    }
-                });
-            });
-        }
-
-        function loadWarehouse(type = 'boards') {
-            const container = document.getElementById('warehouse-list');
-            container.innerHTML = "Загрузка...";
-            const endpoint = type === 'boards' ? '/api/v1/boards' : '/api/v1/logs';
-
-            fetch(endpoint, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') } })
-            .then(async res => {
-                if (!res.ok) throw new Error(await res.text() || res.statusText);
-                return res.json();
-            }).then(items => {
-                if (!items || items.length === 0) {
-                    container.innerHTML = "<p style='color: var(--tg-theme-hint-color);'>На складе нет позиций</p>";
-                    return;
-                }
-                let html = "";
-                items.forEach(item => {
-                    if (type === 'boards') {
-                        html += `<div class="order-card">
-                                    <div class="order-header"><span>${item.species || 'Доска'} (${item.height_mm}x${item.width_mm}x${item.length_mm} мм)</span>
-                                    <span class="badge">${item.count} шт</span></div>
-                                    <div class="order-sub">ID: ${item.id} | Сорт: ${item.grade || '1'} | Объем: ${item.volume_m3} м³</div>
-                                 </div>`;
-                    } else {
-                        html += `<div class="order-card">
-                                    <div class="order-header"><span>${item.species || 'Бревно'} (Ø${item.diameter_mm} мм, L:${item.length_mm} мм)</span>
-                                    <span class="badge">${item.count} шт</span></div>
-                                    <div class="order-sub">ID: ${item.id} | Партия ID: ${item.arrival_id} | Объем: ${item.volume_m3} м³</div>
-                                 </div>`;
-                    }
-                });
-                container.innerHTML = html;
-            }).catch(err => container.innerHTML = `<p style='color: #ef4444;'>${err.message}</p>`);
-        }
-
-        function loadStatistics() {
-            const start = document.getElementById('stat_start').value;
-            const end = document.getElementById('stat_end').value;
-
-            document.getElementById('stat-arrived').innerText = '...';
-            document.getElementById('stat-sawed').innerText = '...';
-            document.getElementById('stat-sold-vol').innerText = '...';
-            document.getElementById('stat-sold-sum').innerText = '...';
-
-            fetch(`/api/v1/statistics?start_date=${start}&end_date=${end}`, {
-                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') }
-            }).then(async res => {
-                if (!res.ok) throw new Error(await res.text());
-                return res.json();
-            }).then(data => {
-                document.getElementById('stat-arrived').innerText = (data.total_logs_arrived_volume || 0).toFixed(2) + ' м³';
-                document.getElementById('stat-sawed').innerText = (data.total_logs_sawed_volume || 0).toFixed(2) + ' м³';
-                document.getElementById('stat-sold-vol').innerText = (data.total_sales_volume || 0).toFixed(2) + ' м³';
-                document.getElementById('stat-sold-sum').innerText = (data.total_sales_amount || 0).toLocaleString('ru-RU') + ' ₽';
-            }).catch(err => tg.showAlert("Ошибка статистики: " + err.message));
-        }
-
-        function downloadPDF(id) {
-            tg.MainButton.showProgress();
-            fetch(`/api/v1/orders/${id}/pdf`, {
-                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') }
-            })
-            .then(res => {
-                if (!res.ok) throw new Error("Ошибка скачивания");
-                return res.blob();
-            })
-            .then(blob => {
-                tg.MainButton.hideProgress();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `Накладная_Заказ_${id}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-            })
-            .catch(err => handleError(err.message));
-        }
-    </script>
+/* ---------- старт ---------- */
+if (inTg) authTelegram(); else go('login');
+</script>
 </body>
 </html>
