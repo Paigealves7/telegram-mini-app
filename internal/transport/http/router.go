@@ -93,6 +93,9 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	fileServer := http.FileServer(http.Dir(webDir))
 
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		// Telegram WebView агрессивно кеширует страницу. no-cache заставляет его сверяться
+		// с сервером (ETag/Last-Modified) при каждом открытии, а не показывать старую версию.
+		w.Header().Set("Cache-Control", "no-cache")
 		filePath := filepath.Join(webDir, filepath.Clean(r.URL.Path))
 		info, err := os.Stat(filePath)
 
