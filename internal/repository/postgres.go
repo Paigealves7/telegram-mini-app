@@ -160,13 +160,16 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 
 		newCount := currentCount - items[i].Count
 		newVolume := currentVolume - items[i].VolumeM3
-
-		// 2. Избегаем нулевого мусора на складе
-		if newCount == 0 {
-			_, err = tx.Exec(ctx, `DELETE FROM boards WHERE id = $1`, items[i].BoardID)
-		} else {
-			_, err = tx.Exec(ctx, `UPDATE boards SET count = $1, volume_m3 = $2 WHERE id = $3`, newCount, newVolume, items[i].BoardID)
+		// Объём приходит от клиента и может не сойтись с остатком: в минус не уходим,
+		// а при нулевом остатке по штукам объём тоже ноль.
+		if newCount == 0 || newVolume < 0 {
+			newVolume = 0
 		}
+
+		// 2. Строку НЕ удаляем: на неё ссылаются sale_boards и order_boards (внешние ключи),
+		// из-за DELETE продажа всей позиции падала. Нулевые позиции скрывает фильтр
+		// count > 0 в GetAllBoards.
+		_, err = tx.Exec(ctx, `UPDATE boards SET count = $1, volume_m3 = $2 WHERE id = $3`, newCount, newVolume, items[i].BoardID)
 		if err != nil {
 			return nil, err
 		}
@@ -234,7 +237,7 @@ func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain
 }
 
 func (r *Repository) GetAllBoards(ctx context.Context, filter domain.BoardFilter, limit, offset int) ([]domain.Board, error) {
-	query := `SELECT id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3 FROM boards WHERE 1=1`
+	query := `SELECT id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3 FROM boards WHERE count > 0`
 
 	args := []interface{}{}
 	argID := 1
