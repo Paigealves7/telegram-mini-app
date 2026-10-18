@@ -142,6 +142,7 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id`
 
+	var totalVolume, totalPrice float64
 	for i := range items {
 		// 1. FOR UPDATE Блокирует строку для других транзакций
 		var currentCount int
@@ -159,6 +160,10 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 		}
 
 		newCount := currentCount - items[i].Count
+		// Объём считаем по складу, а не доверяем клиенту. Цена у позиции = за 1 м³.
+		items[i].VolumeM3 = domain.ItemVolume(currentCount, currentVolume, items[i].Count)
+		totalVolume += items[i].VolumeM3
+		totalPrice += domain.LineTotal(items[i].Price, items[i].VolumeM3)
 		newVolume := currentVolume - items[i].VolumeM3
 		// Объём приходит от клиента и может не сойтись с остатком: в минус не уходим,
 		// а при нулевом остатке по штукам объём тоже ноль.
@@ -180,6 +185,12 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	sale.TotalVolume = totalVolume
+	sale.TotalPrice = domain.Round2(totalPrice + sale.DeliveryPrice + sale.ExtraPrice)
+	if _, err := tx.Exec(ctx, `UPDATE sales SET total_volume = $1, total_price = $2 WHERE id = $3`, sale.TotalVolume, sale.TotalPrice, sale.ID); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -204,8 +215,23 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 
 	itemQuery := `INSERT INTO order_boards (order_id, board_id, count, volume_m3, price) VALUES ($1, $2, $3, $4, $5) RETURNING id`
 	for i := range items {
+		// Объём считаем по складу, а не доверяем клиенту.
+		var boardCount int
+		var boardVolume float64
+		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE id = $1`, items[i].BoardID).Scan(&boardCount, &boardVolume)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, errors.New("доска не найдена на складе")
+			}
+			return nil, err
+		}
+		if boardCount <= 0 {
+			return nil, errors.New("этой позиции нет на складе")
+		}
+		items[i].VolumeM3 = domain.ItemVolume(boardCount, boardVolume, items[i].Count)
+
 		items[i].OrderID = order.ID
-		err := tx.QueryRow(ctx, itemQuery, order.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID)
+		err = tx.QueryRow(ctx, itemQuery, order.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID)
 		if err != nil {
 			return nil, err
 		}

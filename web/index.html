@@ -135,9 +135,8 @@
             <div class="form-group"><label>ID Доски на складе</label><input type="number" id="order_board_id" class="form-control" value="1"></div>
             <div style="display: flex; gap: 8px;">
                 <div class="form-group" style="flex: 1;"><label>Кол-во (шт)</label><input type="number" id="order_quantity" class="form-control" value="10"></div>
-                <div class="form-group" style="flex: 1;"><label>Объем (м³)</label><input type="number" step="0.01" id="order_volume" class="form-control" value="0.5"></div>
             </div>
-            <div class="form-group"><label>Цена за 1 м³ (руб)</label><input type="number" id="order_price" class="form-control" value="15000"></div>
+            <div class="form-group"><label>Цена за 1 м³ (руб)</label><input type="number" id="order_price" class="form-control" value="9000"></div>
         </div>
     </div>
 
@@ -463,8 +462,7 @@
                     items: [{
                         board_id: parseInt(document.getElementById('order_board_id').value) || 1, 
                         count: parseInt(document.getElementById('order_quantity').value) || 1,
-                        price: parseFloat(document.getElementById('order_price').value) || 0,
-                        volume_m3: parseFloat(document.getElementById('order_volume').value) || 0.1
+                        price: parseFloat(document.getElementById('order_price').value) || 0
                     }]
                 };
 

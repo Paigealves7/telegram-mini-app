@@ -20,17 +20,8 @@ func (s *SalesService) CreateSale(ctx context.Context, sale *domain.Sale, items 
 		return nil, errors.New("позиции продажи не могут быть пустыми")
 	}
 
-	var totalVolume float64
-	var totalPrice float64
-
-	// Пересчет объемов и сумм на сервере (защита от фейковых данных клиента)
-	for _, item := range items {
-		totalVolume += item.VolumeM3
-		totalPrice += item.Price * item.VolumeM3
-	}
-
-	sale.TotalVolume = totalVolume
-	sale.TotalPrice = totalPrice + sale.DeliveryPrice + sale.ExtraPrice
+	// Объём и суммы считает репозиторий внутри транзакции по данным склада
+	// (цена позиции = за 1 м³), значения от клиента не используются.
 
 	return s.repo.CreateSale(ctx, sale, items)
 }

@@ -78,7 +78,7 @@ type SaleItem struct {
 	BoardID  int64   `json:"board_id" validate:"required,gt=0"`
 	Count    int     `json:"count" validate:"required,gt=0"`
 	Price    float64 `json:"price" validate:"gte=0"`
-	VolumeM3 float64 `json:"volume_m3" validate:"required,gt=0"`
+	VolumeM3 float64 `json:"volume_m3"` // считает сервер по складу; значение от клиента игнорируется
 }
 
 type Sale struct {
@@ -108,7 +108,7 @@ type OrderItem struct {
 	OrderID  int64   `json:"order_id"`
 	BoardID  int64   `json:"board_id" validate:"required,gt=0"`
 	Count    int     `json:"count" validate:"required,gt=0"`
-	VolumeM3 float64 `json:"volume_m3" validate:"required,gt=0"`
+	VolumeM3 float64 `json:"volume_m3"` // считает сервер по складу; значение от клиента игнорируется
 	Price    float64 `json:"price" validate:"gte=0"`
 }
 

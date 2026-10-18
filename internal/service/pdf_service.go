@@ -62,13 +62,13 @@ func (s *PDFService) GenerateOrderPDF(w io.Writer, order *domain.Order, items []
 	pdf.CellFormat(30, 8, "ID Доски", "1", 0, "C", false, 0, "")
 	pdf.CellFormat(40, 8, "Кол-во (шт)", "1", 0, "C", false, 0, "")
 	pdf.CellFormat(40, 8, "Объем (м3)", "1", 0, "C", false, 0, "")
-	pdf.CellFormat(40, 8, "Цена (руб)", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(40, 8, "Цена за м3 (руб)", "1", 0, "C", false, 0, "")
 	pdf.CellFormat(40, 8, "Сумма (руб)", "1", 1, "C", false, 0, "")
 
 	// Строки таблицы
 	var totalSum float64
 	for _, item := range items {
-		sum := item.Price * item.VolumeM3
+		sum := domain.LineTotal(item.Price, item.VolumeM3)
 		totalSum += sum
 
 		pdf.CellFormat(30, 8, fmt.Sprintf("%d", item.BoardID), "1", 0, "C", false, 0, "")
@@ -83,7 +83,7 @@ func (s *PDFService) GenerateOrderPDF(w io.Writer, order *domain.Order, items []
 	// Итого
 	pdf.SetFont("Roboto", "", 12)
 	pdf.CellFormat(190, 8, fmt.Sprintf("Доставка: %.2f руб. | Наценка: %.2f руб.", order.DeliveryPrice, order.ExtraPrice), "0", 1, "R", false, 0, "")
-	totalSum += order.DeliveryPrice + order.ExtraPrice
+	totalSum = domain.Round2(totalSum + order.DeliveryPrice + order.ExtraPrice)
 	pdf.CellFormat(190, 8, fmt.Sprintf("ИТОГО К ОПЛАТЕ: %.2f руб.", totalSum), "0", 1, "R", false, 0, "")
 
 	// Пишем готовый PDF прямо в HTTP-ответ
