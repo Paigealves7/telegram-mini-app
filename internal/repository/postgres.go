@@ -120,6 +120,14 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.Sawin
 	return op, nil
 }
 
+var (
+	ErrInsufficientStock = errors.New("недостаточно товара на складе")
+	ErrBoardNotFound     = errors.New("доска не найдена на складе")
+	ErrOrderNotFound     = errors.New("заказ не найден")
+	ErrOrderClosed       = errors.New("заказ уже завершен или отменен")
+	ErrOrderEmpty        = errors.New("невозможно завершить пустой заказ")
+)
+
 func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []domain.SaleItem) (*domain.Sale, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -127,14 +135,26 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 	}
 	defer tx.Rollback(ctx)
 
+	if err := r.createSaleTx(ctx, tx, sale, items); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return sale, nil
+}
+
+// createSaleTx проводит продажу внутри уже открытой транзакции (без Commit),
+// чтобы её можно было объединить с другими действиями, например с завершением заказа.
+func (r *Repository) createSaleTx(ctx context.Context, tx pgx.Tx, sale *domain.Sale, items []domain.SaleItem) error {
 	saleQuery := `
 		INSERT INTO sales (contractor_id, truck_number, delivery_price, extra_price, total_volume, total_price, created_by)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at`
 
-	err = tx.QueryRow(ctx, saleQuery, sale.ContractorID, sale.TruckNumber, sale.DeliveryPrice, sale.ExtraPrice, sale.TotalVolume, sale.TotalPrice, sale.CreatedBy).Scan(&sale.ID, &sale.CreatedAt)
+	err := tx.QueryRow(ctx, saleQuery, sale.ContractorID, sale.TruckNumber, sale.DeliveryPrice, sale.ExtraPrice, sale.TotalVolume, sale.TotalPrice, sale.CreatedBy).Scan(&sale.ID, &sale.CreatedAt)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	itemQuery := `
@@ -150,13 +170,13 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE id = $1 FOR UPDATE`, items[i].BoardID).Scan(&currentCount, &currentVolume)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, errors.New("доска не найдена на складе")
+				return ErrBoardNotFound
 			}
-			return nil, err
+			return err
 		}
 
 		if currentCount < items[i].Count {
-			return nil, errors.New("недостаточно товара на складе")
+			return ErrInsufficientStock
 		}
 
 		newCount := currentCount - items[i].Count
@@ -176,28 +196,90 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 		// count > 0 в GetAllBoards.
 		_, err = tx.Exec(ctx, `UPDATE boards SET count = $1, volume_m3 = $2 WHERE id = $3`, newCount, newVolume, items[i].BoardID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// 3. Записываем позицию чека
 		items[i].SaleID = sale.ID
 		err = tx.QueryRow(ctx, itemQuery, sale.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	sale.TotalVolume = totalVolume
 	sale.TotalPrice = domain.Round2(totalPrice + sale.DeliveryPrice + sale.ExtraPrice)
 	if _, err := tx.Exec(ctx, `UPDATE sales SET total_volume = $1, total_price = $2 WHERE id = $3`, sale.TotalVolume, sale.TotalPrice, sale.ID); err != nil {
+		return err
+	}
+
+	sale.Items = items
+	return nil
+}
+
+// CompleteOrder в ОДНОЙ транзакции: блокирует заказ, проводит продажу по его позициям
+// и ставит статус completed. Двойной клик или параллельный запрос второй раз не спишут склад,
+// а при любой ошибке не остаётся ни продажи, ни смены статуса.
+func (r *Repository) CompleteOrder(ctx context.Context, orderID, userID int64) (*domain.Order, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var o domain.Order
+	err = tx.QueryRow(ctx, `SELECT id, master_id, contractor_id, notes, delivery_price, extra_price, status, created_at, updated_at FROM orders WHERE id = $1 FOR UPDATE`, orderID).
+		Scan(&o.ID, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, err
+	}
+	if o.Status == domain.OrderStatusCompleted || o.Status == domain.OrderStatusCanceled {
+		return nil, ErrOrderClosed
+	}
+
+	rows, err := tx.Query(ctx, `SELECT board_id, count, volume_m3, price FROM order_boards WHERE order_id = $1 ORDER BY id`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	var saleItems []domain.SaleItem
+	for rows.Next() {
+		var it domain.SaleItem
+		if err := rows.Scan(&it.BoardID, &it.Count, &it.VolumeM3, &it.Price); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		saleItems = append(saleItems, it)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(saleItems) == 0 {
+		return nil, ErrOrderEmpty
+	}
+
+	sale := &domain.Sale{
+		ContractorID:  o.ContractorID,
+		TruckNumber:   "Доставка по заявке",
+		DeliveryPrice: o.DeliveryPrice,
+		ExtraPrice:    o.ExtraPrice,
+		CreatedBy:     userID,
+	}
+	if err := r.createSaleTx(ctx, tx, sale, saleItems); err != nil {
 		return nil, err
 	}
 
+	if _, err := tx.Exec(ctx, `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`, domain.OrderStatusCompleted, orderID); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
-	sale.Items = items
-	return sale, nil
+	o.Status = domain.OrderStatusCompleted
+	return &o, nil
 }
 
 func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items []domain.OrderItem) (*domain.Order, error) {
@@ -221,7 +303,7 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE id = $1`, items[i].BoardID).Scan(&boardCount, &boardVolume)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, errors.New("доска не найдена на складе")
+				return nil, ErrBoardNotFound
 			}
 			return nil, err
 		}

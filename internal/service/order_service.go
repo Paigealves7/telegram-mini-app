@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 )
@@ -34,54 +35,27 @@ func (s *OrderService) CreateOrder(ctx context.Context, order *domain.Order, ite
 }
 
 func (s *OrderService) CompleteOrder(ctx context.Context, orderID int64, userID int64) error {
-	order, err := s.repo.GetOrderByID(ctx, orderID)
+	// Вся работа (проверка статуса, продажа, смена статуса) выполняется одной транзакцией в репозитории.
+	order, err := s.repo.CompleteOrder(ctx, orderID, userID)
 	if err != nil {
-		return err
-	}
-	if order.Status == domain.OrderStatusCompleted || order.Status == domain.OrderStatusCanceled {
-		return errors.New("заказ уже завершен или отменен")
-	}
-
-	items, err := s.repo.GetOrderItems(ctx, orderID)
-	if err != nil {
-		return err
-	}
-	if len(items) == 0 {
-		return errors.New("невозможно завершить пустой заказ")
-	}
-
-	sale := &domain.Sale{
-		ContractorID:  order.ContractorID,
-		TruckNumber:   "Доставка по заявке",
-		DeliveryPrice: order.DeliveryPrice,
-		ExtraPrice:    order.ExtraPrice,
-		CreatedBy:     userID,
-	}
-
-	saleItems := make([]domain.SaleItem, len(items))
-	for i, item := range items {
-		saleItems[i] = domain.SaleItem{
-			BoardID:  item.BoardID,
-			Count:    item.Count,
-			Price:    item.Price,
-			VolumeM3: item.VolumeM3,
+		switch {
+		case errors.Is(err, repository.ErrOrderNotFound),
+			errors.Is(err, repository.ErrOrderClosed),
+			errors.Is(err, repository.ErrOrderEmpty),
+			errors.Is(err, repository.ErrInsufficientStock),
+			errors.Is(err, repository.ErrBoardNotFound):
+			return err
+		default:
+			log.Printf("COMPLETE ORDER #%d: %v", orderID, err)
+			return errors.New("не удалось завершить заказ, попробуйте ещё раз")
 		}
 	}
 
-	_, err = s.salesService.CreateSale(ctx, sale, saleItems)
-	if err != nil {
-		return errors.New("ошибка конвертации заявки в продажу: " + err.Error())
-	}
-
-	err = s.repo.UpdateOrderStatus(ctx, orderID, domain.OrderStatusCompleted)
-
 	// Уведомляем мастера об успешном завершении
-	if err == nil {
-		go func() {
-			msg := fmt.Sprintf("✅ <b>Заявка #%d завершена</b>\n\nМатериалы списаны, продажа проведена.", orderID)
-			_ = s.botService.NotifyUser(context.Background(), order.MasterID, msg)
-		}()
-	}
+	go func() {
+		msg := fmt.Sprintf("✅ <b>Заявка #%d завершена</b>\n\nМатериалы списаны, продажа проведена.", orderID)
+		_ = s.botService.NotifyUser(context.Background(), order.MasterID, msg)
+	}()
 
-	return err
+	return nil
 }
