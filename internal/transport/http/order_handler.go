@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"telegram-mini-app/internal/domain"
@@ -16,11 +15,12 @@ type OrderHandler struct {
 	repo       *repository.Repository
 	service    *service.OrderService
 	pdfService *service.PDFService
+	botService *service.BotService
 }
 
 // Теперь хендлер принимает и репозиторий, и сервис
-func NewOrderHandler(repo *repository.Repository, svc *service.OrderService, pdfSvc *service.PDFService) *OrderHandler {
-	return &OrderHandler{repo: repo, service: svc, pdfService: pdfSvc}
+func NewOrderHandler(repo *repository.Repository, svc *service.OrderService, pdfSvc *service.PDFService, botSvc *service.BotService) *OrderHandler {
+	return &OrderHandler{repo: repo, service: svc, pdfService: pdfSvc, botService: botSvc}
 }
 
 type CreateOrderRequest struct {
@@ -114,33 +114,4 @@ func (h *OrderHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"success"}`))
-}
-
-func (h *OrderHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
-	orderIDStr := chi.URLParam(r, "id")
-	orderID, err := strconv.ParseInt(orderIDStr, 10, 64)
-	if err != nil {
-		http.Error(w, "неверный ID заказа", http.StatusBadRequest)
-		return
-	}
-
-	order, err := h.repo.GetOrderByID(r.Context(), orderID)
-	if err != nil {
-		http.Error(w, "заказ не найден", http.StatusNotFound)
-		return
-	}
-
-	items, err := h.repo.GetOrderItems(r.Context(), orderID)
-	if err != nil {
-		http.Error(w, "ошибка получения позиций", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=order_%d.pdf", orderID))
-
-	err = h.pdfService.GenerateOrderPDF(w, order, items)
-	if err != nil {
-		http.Error(w, "ошибка генерации PDF: "+err.Error(), http.StatusInternalServerError)
-	}
 }

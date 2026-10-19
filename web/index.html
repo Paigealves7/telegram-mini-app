@@ -146,6 +146,7 @@ body.form .act{display:block}
 .ctr{text-align:center;padding:6px 0 4px}.ctr .e{font-size:48px}
 .srow{display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;margin-bottom:10px;border-radius:22px;text-align:left;transition:transform .15s}
 .srow .e{font-size:30px}.srow span:nth-child(2){flex:1}.srow b{display:block}.srow small{color:var(--hint)}
+.srow:disabled{opacity:.55;pointer-events:none}
 .dl{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gb)}.dl:last-of-type{border:0}
 #toast{position:fixed;top:calc(var(--top) + 8px);left:50%;z-index:99;max-width:90vw;padding:12px 20px;border-radius:999px;font-size:14px;font-weight:700;transform:translate(-50%,-160%);transition:transform .45s cubic-bezier(.2,.9,.3,1.2)}
 #toast.on{transform:translate(-50%,0)}
@@ -381,17 +382,33 @@ async function doComplete(id, btn) {
   catch (e) { notify('error'); toast(e.message, 'err'); }
   show(S.cur);
 }
-async function pdf(id, btn) {
-  btn.disabled = true; btn.classList.add('busy');
+function pdfSheet(id) {
+  const row = (a, e, t, d) => `<button class="srow glass rip" data-a="${a}" data-v="${esc(id)}"><span class="e">${e}</span><span><b>${t}</b><small>${d}</small></span>${ic('chev')}</button>`;
+  sheet(`<div class="ctr" style="margin-bottom:14px"><div class="e">📄</div><h3>Накладная №${esc(id)}</h3><p class="hint sm">Как получить файл?</p></div>
+    ${inTg ? row('pdfsend', '📨', 'Отправить в чат', 'Бот пришлёт PDF сообщением: его можно открыть, переслать и сохранить') : ''}
+    ${row('pdfdl', '⬇️', 'Скачать файл', 'Сохранить PDF на устройство')}
+    ${row('pdfview', '👁', 'Открыть', 'Просмотр в браузере')}`);
+}
+async function pdfDo(kind, id, btn) {
+  btn.disabled = true;
   try {
-    const r = await fetch(`/api/v1/orders/${id}/pdf`, {headers: {Authorization: 'Bearer ' + token()}});
-    if (!r.ok) throw new Error('Не удалось получить PDF');
-    const url = URL.createObjectURL(await r.blob());
-    const a = Object.assign(document.createElement('a'), {href: url, download: `Накладная_Заказ_${id}.pdf`});
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    if (kind === 'send') {
+      await api(`/orders/${id}/pdf/send`, {method: 'POST'});
+      closeSheet(); notify('success'); toast('Накладная отправлена в чат с ботом');
+      return;
+    }
+    const l = await api(`/orders/${id}/pdf/link`, {method: 'POST'});
+    closeSheet();
+    const open = u => { if (inTg) tg.openLink(u); else if (!window.open(u, '_blank')) location.assign(u); };
+    if (kind === 'dl' && inTg && tg.downloadFile && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0')) {
+      tg.downloadFile({url: l.download_url, file_name: l.file_name});
+    } else if (kind === 'dl' && !inTg) {
+      location.assign(l.download_url);
+    } else {
+      open(l.view_url);
+    }
   } catch (e) { notify('error'); toast(e.message, 'err'); }
-  btn.disabled = false; btn.classList.remove('busy');
+  btn.disabled = false;
 }
 
 /* ---------- отчёты ---------- */
@@ -595,7 +612,7 @@ const ACT = {
   },
   mk: v => { const [f, k, id] = v.split(':'); closeSheet(); go(f, {[k]: id}); },
   done: (v, el) => ask('✅', 'Завершить заказ №' + v, 'Товары будут списаны со склада и проведены как продажа.', 'Завершить').then(ok => ok && doComplete(v, el)),
-  pdf: (v, el) => pdf(v, el),
+  pdf: v => pdfSheet(v), pdfsend: (v, el) => pdfDo('send', v, el), pdfdl: (v, el) => pdfDo('dl', v, el), pdfview: (v, el) => pdfDo('view', v, el),
   chip: (v, el) => { fe(el.dataset.k).value = v; calcForm(); },
   size: v => { const [a, b] = v.split('×'); fe('th').value = a; fe('wd').value = b; calcForm(); },
   st: (v, el) => {

@@ -57,7 +57,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	botService := service.NewBotService(botToken, repo)
 	salesService := service.NewSalesService(repo)
 	orderService := service.NewOrderService(repo, salesService, botService)
-	pdfService := service.NewPDFService()
+	pdfService := service.NewPDFService(repo, jwtSecret)
 
 	// 2. Прокидываем секреты и зависимости в хендлеры
 	dictHandler := NewDictHandler(repo)
@@ -68,7 +68,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	// В SalesHandler теперь передаем Service, а не Repo
 	salesHandler := NewSalesHandler(salesService)
 
-	orderHandler := NewOrderHandler(repo, orderService, pdfService)
+	orderHandler := NewOrderHandler(repo, orderService, pdfService, botService)
 	tgAuthHandler := NewTelegramAuthHandler(repo, botToken, jwtSecret)
 	authLimiter := NewRateLimiter(5) // 5 запросов в минуту
 	authLimiter.StartCleanup()
@@ -91,6 +91,10 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	}
 	webDir := filepath.Join(workDir, "web")
 	fileServer := http.FileServer(http.Dir(webDir))
+
+	// Публичные ссылки на накладные (подписанные, живут 10 минут): без них файл не скачать в Telegram.
+	r.Get("/files/pdf/{token}/{name}", orderHandler.ServePDF)
+	r.Head("/files/pdf/{token}/{name}", orderHandler.ServePDF)
 
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 		// Telegram WebView агрессивно кеширует страницу. no-cache заставляет его сверяться
@@ -129,6 +133,8 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Post("/orders", orderHandler.CreateOrder)
 				r.Put("/orders/{id}/complete", orderHandler.CompleteOrder)
 				r.Get("/orders/{id}/pdf", orderHandler.DownloadPDF)
+				r.Post("/orders/{id}/pdf/link", orderHandler.PDFLink)
+				r.Post("/orders/{id}/pdf/send", orderHandler.PDFSend)
 			})
 
 			r.Group(func(r chi.Router) {
