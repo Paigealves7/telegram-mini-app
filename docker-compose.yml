@@ -32,6 +32,13 @@ services:
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан в .env}@postgres:5432/telegram-mini-app_db?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET не задан в .env}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN не задан в .env}
+      # Адрес сайта для ссылок на PDF, например https://sawmill.example.com (без слэша в конце)
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      # Часовой пояс для дат в накладных, например Europe/Moscow или Europe/Tallinn
+      TZ: ${TZ:-UTC}
+      # Шапка накладной
+      COMPANY_NAME: ${COMPANY_NAME:-Лесопилка}
+      COMPANY_INFO: ${COMPANY_INFO:-}
     depends_on:
       postgres:
         condition: service_healthy
