@@ -20,11 +20,16 @@ type CreateArrivalRequest struct {
 	CarrierID   int64            `json:"carrier_id" validate:"required,gt=0"`
 	TruckNumber string           `json:"truck_number" validate:"required"`
 	ArrivalDate string           `json:"arrival_date" validate:"required"`
-	CreatedBy   int64            `json:"created_by" validate:"required,gt=0"`
 	Items       []domain.LogItem `json:"items" validate:"required,min=1,dive"` // dive валидирует элементы массива!
 }
 
 func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUser(r)
+	if !ok {
+		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
 	var req CreateArrivalRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "некорректный JSON", http.StatusBadRequest)
@@ -41,7 +46,7 @@ func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
 		CarrierID:   req.CarrierID,
 		TruckNumber: req.TruckNumber,
 		ArrivalDate: req.ArrivalDate,
-		CreatedBy:   req.CreatedBy,
+		CreatedBy:   user.UserID, // из JWT, а не из тела запроса
 	}
 
 	result, err := h.repo.CreateLogArrival(r.Context(), arrival, req.Items)

@@ -24,7 +24,6 @@ func NewOrderHandler(repo *repository.Repository, svc *service.OrderService, pdf
 }
 
 type CreateOrderRequest struct {
-	MasterID      int64              `json:"master_id" validate:"required,gt=0"`
 	ContractorID  int64              `json:"contractor_id" validate:"required,gt=0"`
 	Notes         string             `json:"notes"`
 	DeliveryPrice float64            `json:"delivery_price" validate:"gte=0"`
@@ -33,6 +32,12 @@ type CreateOrderRequest struct {
 }
 
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUser(r)
+	if !ok {
+		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
 	var req CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "некорректный JSON", http.StatusBadRequest)
@@ -45,7 +50,7 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	order := &domain.Order{
-		MasterID:      req.MasterID,
+		MasterID:      user.UserID, // из JWT; мастер заказа = тот, кто его создал
 		ContractorID:  req.ContractorID,
 		Notes:         req.Notes,
 		DeliveryPrice: req.DeliveryPrice,

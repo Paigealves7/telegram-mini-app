@@ -75,7 +75,7 @@ body.form #av,body.noauth #av{display:none}
 .it{border-radius:22px;padding:14px 16px;margin-bottom:10px;animation:up .45s both;animation-delay:calc(var(--i,0)*45ms);transition:transform .15s}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .it .pb{margin-top:10px;height:6px}
-.bd{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap;background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
+.bd{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap;background:rgba(127,127,127,.18);background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
 .bd.completed{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
 .bd.in_progress{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
 .bd.canceled{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err)}
@@ -94,7 +94,7 @@ body.form #av,body.noauth #av{display:none}
 @keyframes sh{to{background-position:-200% 0}}
 /* кнопки */
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:56px;width:100%;padding:0 20px;border:0;border-radius:20px;font-weight:700;color:var(--on);
-  background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 74%,#fff),var(--acc) 55%,color-mix(in srgb,var(--acc) 82%,#000));
+  background:var(--acc);background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 74%,#fff),var(--acc) 55%,color-mix(in srgb,var(--acc) 82%,#000));
   box-shadow:0 10px 28px color-mix(in srgb,var(--acc) 40%,transparent),inset 0 1px 0 rgba(255,255,255,.45);transition:transform .15s,filter .15s,opacity .2s}
 .btn:active{transform:scale(.96);filter:brightness(1.08)}
 .btn:disabled{opacity:.6;pointer-events:none}
@@ -109,10 +109,10 @@ body.form #av,body.noauth #av{display:none}
 body.form .tabs,body.noauth .tabs{display:none}
 .tab{flex:1;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:0;border-radius:22px;background:none;color:var(--hint);font-size:11px;font-weight:700;transition:color .2s,background .2s}
 .tab svg{transition:transform .3s cubic-bezier(.2,.9,.3,1.4)}
-.tab.on{color:var(--acc);background:color-mix(in srgb,var(--acc) 15%,transparent)}
+.tab.on{color:var(--acc);background:rgba(127,127,127,.16);background:color-mix(in srgb,var(--acc) 15%,transparent)}
 .tab.on svg{transform:translateY(-2px) scale(1.15)}
 .fab{width:62px;height:62px;flex:none;margin:0 6px;transform:translateY(-16px);border:0;border-radius:50%;display:grid;place-items:center;color:var(--on);
-  background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 68%,#fff),var(--acc));
+  background:var(--acc);background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 68%,#fff),var(--acc));
   box-shadow:0 14px 32px color-mix(in srgb,var(--acc) 55%,transparent),inset 0 1px 0 rgba(255,255,255,.55);transition:transform .2s}
 .fab svg{width:28px;height:28px;stroke-width:2.6;transition:transform .35s}
 .fab:active{transform:translateY(-14px) scale(.92)}.fab:active svg{transform:rotate(90deg)}
@@ -483,7 +483,7 @@ const FORMS = {
     req: v => !v.truck ? 'Укажите номер машины' : v.cnt <= 0 ? 'Укажите количество бревен' : v.vol <= 0 ? 'Объём должен быть больше нуля' : null,
     sum: v => `${v.species}: ${fmt(v.cnt, 0)} шт, ${fmt(v.vol, 3)} м³, машина ${v.truck}`,
     mem: ['supplier', 'carrier', 'truck', 'species'],
-    body: v => ({supplier_id: +v.supplier || 1, carrier_id: +v.carrier || 1, truck_number: v.truck, arrival_date: ymd(new Date()), created_by: uid(),
+    body: v => ({supplier_id: +v.supplier || 1, carrier_id: +v.carrier || 1, truck_number: v.truck, arrival_date: ymd(new Date()),
       items: [{species: v.species, length_mm: Math.round(v.len), diameter_mm: Math.round(v.dia), count: Math.round(v.cnt), volume_m3: v.vol}]})
   },
   sawing: {
@@ -499,7 +499,7 @@ const FORMS = {
     req: v => !v.log ? 'Выберите сырьё' : v.lvol <= 0 ? 'Укажите объём сырья' : v.cnt <= 0 ? 'Укажите количество досок' : v.vol <= 0 ? 'Объём досок должен быть больше нуля' : null,
     sum: v => `${v.species} ${v.th}×${v.wd}×${v.len}: ${fmt(v.cnt, 0)} шт, ${fmt(v.vol, 3)} м³ из ${fmt(v.lvol, 2)} м³ сырья`,
     mem: ['species'],
-    body: v => ({worker_id: uid(), date: ymd(new Date()), logs: [{log_id: +v.log, volume_m3: v.lvol}],
+    body: v => ({date: ymd(new Date()), logs: [{log_id: +v.log, volume_m3: v.lvol}],
       boards: [{species: v.species, grade: v.grade, height_mm: Math.round(v.th), width_mm: Math.round(v.wd), length_mm: Math.round(v.len), count: Math.round(v.cnt), volume_m3: v.vol}]})
   },
   order: {
@@ -515,7 +515,7 @@ const FORMS = {
     req: v => !v.board ? 'Выберите доску' : v.cnt <= 0 ? 'Укажите количество' : null,
     sum: v => `${fmt(v.cnt, 0)} шт по ${fmt(v.price, 0)} ₽ за м³, клиент: ${D.con[v.con] || '№' + v.con}`,
     mem: ['con', 'price'],
-    body: v => ({master_id: uid(), contractor_id: +v.con || 1, status: 'new', delivery_price: 0, extra_price: 0, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
+    body: v => ({contractor_id: +v.con || 1, status: 'new', delivery_price: 0, extra_price: 0, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
   }
 };
 let FK = null;
