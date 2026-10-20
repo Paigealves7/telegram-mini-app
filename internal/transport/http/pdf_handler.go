@@ -17,7 +17,6 @@ import (
 	"telegram-mini-app/internal/service"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5"
 )
 
 // Срок действия ссылки на скачивание. Клиенты Telegram не умеют передавать заголовок
@@ -42,8 +41,13 @@ func writePDFError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrPDFFonts):
 		http.Error(w, "на сервере не установлены шрифты для PDF", http.StatusServiceUnavailable)
 	default:
+		// Подробности (этап и причина) показываем сотруднику: приложение внутреннее, секретов в тексте нет.
 		log.Printf("PDF: %v", err)
-		http.Error(w, "не удалось сформировать PDF", http.StatusInternalServerError)
+		msg := err.Error()
+		if r := []rune(msg); len(r) > 240 {
+			msg = string(r[:240]) + "…"
+		}
+		http.Error(w, "не удалось сформировать PDF: "+msg, http.StatusInternalServerError)
 	}
 }
 
@@ -111,13 +115,10 @@ func (h *OrderHandler) PDFLink(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "некорректный ID заказа", http.StatusBadRequest)
 		return
 	}
-	if _, err := h.repo.GetOrderByID(r.Context(), id); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "заказ не найден", http.StatusNotFound)
-			return
-		}
-		log.Printf("PDF link: %v", err)
-		http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
+	// Сначала реально собираем накладную: если не получилось, ссылку не выдаём.
+	// Иначе Telegram «скачает» текст ошибки под видом файла .pdf, который потом не открыть.
+	if _, err := h.pdfService.BuildOrderPDF(r.Context(), id); err != nil {
+		writePDFError(w, err)
 		return
 	}
 

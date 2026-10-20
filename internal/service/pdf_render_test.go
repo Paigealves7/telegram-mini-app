@@ -16,7 +16,12 @@ func TestRenderPDF(t *testing.T) {
 	if dir == "" {
 		t.Skip("шрифты DejaVu не найдены (задайте PDF_FONT_DIR)")
 	}
-	s := &PDFService{fontDir: dir, company: "Лесопилка Тест", info: "г. Пример, ул. Лесная, 1 · тел. +7 000 000-00-00"}
+	s := &PDFService{company: "Лесопилка Тест", info: "г. Пример, ул. Лесная, 1 · тел. +7 000 000-00-00"}
+	s.initFonts(dir)
+	if s.active == nil {
+		t.Fatalf("ни один шрифт не подошёл: %v", s.fontErr)
+	}
+	t.Logf("шрифт: %s", s.active.name)
 
 	for _, n := range []int{0, 3, 60} {
 		order := &domain.Order{ID: 5, ContractorID: 1, Status: domain.OrderStatusNew, CreatedAt: time.Now(),

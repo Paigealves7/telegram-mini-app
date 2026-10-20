@@ -31,12 +31,29 @@ type OrderPDF struct {
 func PDFFileName(orderID int64) string      { return fmt.Sprintf("Накладная_%d.pdf", orderID) }
 func PDFFileNameASCII(orderID int64) string { return fmt.Sprintf("nakladnaya_%d.pdf", orderID) }
 
+// PDFError — ошибка сборки накладной с названием этапа: по нему сразу видно, что именно сломалось.
+type PDFError struct {
+	Stage string
+	Err   error
+}
+
+func (e *PDFError) Error() string { return e.Stage + ": " + e.Err.Error() }
+func (e *PDFError) Unwrap() error { return e.Err }
+
+// fontPair — пара шрифтов (обычный + жирный), прочитанных в память один раз при старте.
+type fontPair struct {
+	name    string
+	regular []byte
+	bold    []byte
+}
+
 type PDFService struct {
 	repo    *repository.Repository
 	linkKey []byte
-	fontDir string
 	company string
 	info    string
+	active  *fontPair // шрифт, прошедший самопроверку при старте
+	fontErr error     // почему ни один шрифт не подошёл
 }
 
 // NewPDFService: шрифты ищутся на диске один раз при старте (в образе их ставит apk add font-dejavu),
@@ -48,14 +65,51 @@ func NewPDFService(repo *repository.Repository, secret string) *PDFService {
 		linkKey: key[:],
 		company: envOr("COMPANY_NAME", "Лесопилка"),
 		info:    strings.TrimSpace(os.Getenv("COMPANY_INFO")),
-		fontDir: findFontDir(),
 	}
-	if s.fontDir == "" {
-		log.Printf("PDF: ВНИМАНИЕ: не найдены DejaVuSans.ttf и DejaVuSans-Bold.ttf, накладные работать не будут (установите font-dejavu или задайте PDF_FONT_DIR)")
-	} else {
-		log.Printf("PDF: шрифты найдены в %s", s.fontDir)
-	}
+	s.initFonts(findFontDir())
 	return s
+}
+
+func sampleOrder() *domain.Order {
+	return &domain.Order{ID: 1, ContractorID: 1, Status: domain.OrderStatusNew, CreatedAt: time.Now(), DeliveryPrice: 100, Notes: "проверка"}
+}
+
+func sampleLines() []domain.OrderLine {
+	return []domain.OrderLine{{BoardID: 1, Species: "Сосна", Grade: "1", HeightMM: 50, WidthMM: 150, LengthMM: 6000, Count: 10, VolumeM3: 0.45, Price: 9000}}
+}
+
+// initFonts читает шрифты в память и ПРОБНО собирает накладную каждым вариантом.
+// Берётся первый, который реально работает с библиотекой; причина отказа попадает в лог.
+// Сначала DejaVuSansCondensed: именно им проверяются примеры самой библиотеки fpdf.
+func (s *PDFService) initFonts(dir string) {
+	s.active, s.fontErr = nil, nil
+	if dir == "" {
+		s.fontErr = ErrPDFFonts
+		log.Printf("PDF: ВНИМАНИЕ: не найдены шрифты DejaVu (установите font-dejavu или задайте PDF_FONT_DIR): накладные работать не будут")
+		return
+	}
+	var lastErr error
+	for _, base := range []string{"DejaVuSansCondensed", "DejaVuSans"} {
+		reg, errR := os.ReadFile(filepath.Join(dir, base+".ttf"))
+		bold, errB := os.ReadFile(filepath.Join(dir, base+"-Bold.ttf"))
+		if errR != nil || errB != nil {
+			continue
+		}
+		fp := &fontPair{name: base, regular: reg, bold: bold}
+		if _, err := s.renderWith(fp, sampleOrder(), sampleLines(), "Проверка", "Проверка"); err != nil {
+			lastErr = fmt.Errorf("шрифт %s: %w", base, err)
+			log.Printf("PDF: шрифт %s не подошёл: %v", base, err)
+			continue
+		}
+		s.active = fp
+		log.Printf("PDF: самопроверка пройдена, шрифт %s (%s)", base, dir)
+		return
+	}
+	if lastErr == nil {
+		lastErr = ErrPDFFonts
+	}
+	s.fontErr = lastErr
+	log.Printf("PDF: ВНИМАНИЕ: накладные работать не будут: %v", lastErr)
 }
 
 func envOr(key, def string) string {
@@ -76,7 +130,8 @@ func findFontDir() string {
 		if d == "" {
 			continue
 		}
-		if fileExists(filepath.Join(d, "DejaVuSans.ttf")) && fileExists(filepath.Join(d, "DejaVuSans-Bold.ttf")) {
+		if (fileExists(filepath.Join(d, "DejaVuSans.ttf")) && fileExists(filepath.Join(d, "DejaVuSans-Bold.ttf"))) ||
+			(fileExists(filepath.Join(d, "DejaVuSansCondensed.ttf")) && fileExists(filepath.Join(d, "DejaVuSansCondensed-Bold.ttf"))) {
 			return d
 		}
 	}
@@ -85,7 +140,10 @@ func findFontDir() string {
 
 // BuildOrderPDF собирает накладную целиком в памяти. Клиент получает файл только если всё удалось.
 func (s *PDFService) BuildOrderPDF(ctx context.Context, orderID int64) (*OrderPDF, error) {
-	if s.fontDir == "" {
+	if s.active == nil {
+		if s.fontErr != nil && !errors.Is(s.fontErr, ErrPDFFonts) {
+			return nil, &PDFError{Stage: "шрифты", Err: s.fontErr}
+		}
 		return nil, ErrPDFFonts
 	}
 
@@ -94,11 +152,11 @@ func (s *PDFService) BuildOrderPDF(ctx context.Context, orderID int64) (*OrderPD
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrOrderNotFound
 		}
-		return nil, fmt.Errorf("заказ: %w", err)
+		return nil, &PDFError{Stage: "заказ", Err: err}
 	}
 	lines, err := s.repo.GetOrderLines(ctx, orderID)
 	if err != nil {
-		return nil, fmt.Errorf("позиции заказа: %w", err)
+		return nil, &PDFError{Stage: "позиции заказа", Err: err}
 	}
 
 	client, err := s.repo.GetContractorName(ctx, order.ContractorID)
@@ -116,7 +174,7 @@ func (s *PDFService) BuildOrderPDF(ctx context.Context, orderID int64) (*OrderPD
 
 	data, err := s.render(order, lines, client, author)
 	if err != nil {
-		return nil, fmt.Errorf("генерация PDF: %w", err)
+		return nil, &PDFError{Stage: "вёрстка", Err: err}
 	}
 	return &OrderPDF{Data: data, Filename: PDFFileName(orderID)}, nil
 }
@@ -163,15 +221,29 @@ func fitText(pdf *fpdf.Fpdf, style, text string, maxW, size float64) string {
 }
 
 func (s *PDFService) render(order *domain.Order, lines []domain.OrderLine, client, author string) ([]byte, error) {
+	return s.renderWith(s.active, order, lines, client, author)
+}
+
+func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domain.OrderLine, client, author string) (data []byte, err error) {
+	// Библиотека может паниковать на «неудобных» шрифтах: превращаем панику в обычную ошибку.
+	defer func() {
+		if rec := recover(); rec != nil {
+			data, err = nil, fmt.Errorf("паника библиотеки PDF: %v", rec)
+		}
+	}()
+
 	pdf := fpdf.New("P", "mm", "A4", "")
-	pdf.AddUTF8Font(fontName, "", filepath.Join(s.fontDir, "DejaVuSans.ttf"))
-	pdf.AddUTF8Font(fontName, "B", filepath.Join(s.fontDir, "DejaVuSans-Bold.ttf"))
+	pdf.AliasNbPages("") // до добавления шрифтов: так задумано в библиотеке для UTF-8 шрифтов
+	pdf.AddUTF8FontFromBytes(fontName, "", fp.regular)
+	pdf.AddUTF8FontFromBytes(fontName, "B", fp.bold)
+	if e := pdf.Error(); e != nil {
+		return nil, fmt.Errorf("загрузка шрифта: %w", e)
+	}
 	pdf.SetMargins(marginX, 15, marginX)
 	pdf.SetAutoPageBreak(false, 0)
 	pdf.SetTitle(fmt.Sprintf("Накладная № %d", order.ID), true)
 	pdf.SetAuthor(s.company, true)
 	pdf.SetCreator("Лесопилка", true)
-	pdf.AliasNbPages("")
 
 	footerLeft := fmt.Sprintf("Накладная № %d · %s", order.ID, s.company)
 	pdf.SetFooterFunc(func() {
@@ -347,9 +419,12 @@ func (s *PDFService) render(order *domain.Order, lines []domain.OrderLine, clien
 	pdf.SetXY(pageW-marginX-75, ys+1)
 	pdf.CellFormat(75, 4, "Получил: подпись / расшифровка", "", 0, "L", false, 0, "")
 
+	if e := pdf.Error(); e != nil {
+		return nil, fmt.Errorf("построение страницы: %w", e)
+	}
 	var buf bytes.Buffer
-	if err := pdf.Output(&buf); err != nil {
-		return nil, err
+	if e := pdf.Output(&buf); e != nil {
+		return nil, fmt.Errorf("вывод файла: %w", e)
 	}
 	return buf.Bytes(), nil
 }
