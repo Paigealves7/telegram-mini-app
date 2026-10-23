@@ -70,8 +70,11 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	orderHandler := NewOrderHandler(repo, orderService, pdfService, botService)
 	tgAuthHandler := NewTelegramAuthHandler(repo, botToken, jwtSecret)
-	authLimiter := NewRateLimiter(5) // 5 запросов в минуту
-	authLimiter.StartCleanup()
+	// Лимиты по IP клиента (см. client_ip.go). Значения подобраны так, чтобы бригада за одним IP не мешала друг другу.
+	loginLimiter := NewRateLimiter(5, 5)    // вход по паролю: 5 попыток подряд, затем 1 в 12 секунд (защита от подбора)
+	tgLimiter := NewRateLimiter(60, 30)     // вход через Telegram: сотрудники за одним Wi-Fi
+	pdfLimiter := NewRateLimiter(30, 15)    // сборка накладных нагружает процессор
+	apiLimiter := NewRateLimiter(1200, 300) // общий потолок на один IP
 	boardHandler := NewBoardHandler(repo)
 	logHandler := NewLogHandler(repo)
 	statsHandler := NewStatsHandler(repo)
@@ -93,8 +96,8 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	fileServer := http.FileServer(http.Dir(webDir))
 
 	// Публичные ссылки на накладные (подписанные, живут 10 минут): без них файл не скачать в Telegram.
-	r.Get("/files/pdf/{token}/{name}", orderHandler.ServePDF)
-	r.Head("/files/pdf/{token}/{name}", orderHandler.ServePDF)
+	r.Get("/files/pdf/{token}/{name}", pdfLimiter.Middleware(orderHandler.ServePDF))
+	r.Head("/files/pdf/{token}/{name}", pdfLimiter.Middleware(orderHandler.ServePDF))
 
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 		// Telegram WebView агрессивно кеширует страницу. no-cache заставляет его сверяться
@@ -111,9 +114,11 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(apiLimiter.Wrap)
+
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/login", authHandler.Login)
-			r.Post("/telegram", authLimiter.Middleware(tgAuthHandler.LoginViaTelegram))
+			r.Post("/login", loginLimiter.Middleware(authHandler.Login))
+			r.Post("/telegram", tgLimiter.Middleware(tgAuthHandler.LoginViaTelegram))
 		})
 
 		r.Group(func(r chi.Router) {
@@ -132,9 +137,9 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Get("/orders", orderHandler.GetOrders)
 				r.Post("/orders", orderHandler.CreateOrder)
 				r.Put("/orders/{id}/complete", orderHandler.CompleteOrder)
-				r.Get("/orders/{id}/pdf", orderHandler.DownloadPDF)
-				r.Post("/orders/{id}/pdf/link", orderHandler.PDFLink)
-				r.Post("/orders/{id}/pdf/send", orderHandler.PDFSend)
+				r.Get("/orders/{id}/pdf", pdfLimiter.Middleware(orderHandler.DownloadPDF))
+				r.Post("/orders/{id}/pdf/link", pdfLimiter.Middleware(orderHandler.PDFLink))
+				r.Post("/orders/{id}/pdf/send", pdfLimiter.Middleware(orderHandler.PDFSend))
 			})
 
 			r.Group(func(r chi.Router) {

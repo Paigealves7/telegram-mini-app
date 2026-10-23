@@ -26,10 +26,8 @@ func (s *OrderService) CreateOrder(ctx context.Context, order *domain.Order, ite
 	}
 
 	// Асинхронно отправляем уведомление мастеру, чтобы не тормозить HTTP ответ
-	go func() {
-		msg := fmt.Sprintf("🔔 <b>Новая заявка #%d</b>\n\nНа вас назначен новый заказ. Пожалуйста, подготовьте материалы к отгрузке.", createdOrder.ID)
-		_ = s.botService.NotifyUser(context.Background(), createdOrder.MasterID, msg)
-	}()
+	msg := fmt.Sprintf("🔔 <b>Новая заявка #%d</b>\n\nНа вас назначен новый заказ. Пожалуйста, подготовьте материалы к отгрузке.", createdOrder.ID)
+	s.botService.NotifyAsync(createdOrder.MasterID, msg)
 
 	return createdOrder, nil
 }
@@ -52,10 +50,8 @@ func (s *OrderService) CompleteOrder(ctx context.Context, orderID int64, userID 
 	}
 
 	// Уведомляем мастера об успешном завершении
-	go func() {
-		msg := fmt.Sprintf("✅ <b>Заявка #%d завершена</b>\n\nМатериалы списаны, продажа проведена.", orderID)
-		_ = s.botService.NotifyUser(context.Background(), order.MasterID, msg)
-	}()
+	msg := fmt.Sprintf("✅ <b>Заявка #%d завершена</b>\n\nМатериалы списаны, продажа проведена.", orderID)
+	s.botService.NotifyAsync(order.MasterID, msg)
 
 	return nil
 }

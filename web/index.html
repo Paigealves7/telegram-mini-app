@@ -7,9 +7,6 @@
 <meta name="color-scheme" content="dark">
 <title>Лесопилка</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
    Лесопилка — Midnight product-launch
@@ -47,14 +44,14 @@
   --err:var(--color-ember-glow);
 
   /* --- Типографика --- */
-  --font-ui:'Inter',-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
-  --font-display:'Space Grotesk','Inter',-apple-system,BlinkMacSystemFont,sans-serif;
-  --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+  --font-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
 
   /* --- Тени: elevation через inset-frost + тёмный halo --- */
   --shadow-hairline:inset 0 0 0 1px var(--glass-edge);
-  --shadow-card:inset 0 1px 1px rgba(199,211,234,.12),inset 0 24px 48px rgba(199,211,234,.05),0 24px 32px rgba(6,6,14,.7);
-  --shadow-modal:inset 0 1px 1px rgba(216,236,248,.2),inset 0 24px 48px rgba(168,216,245,.06),0 16px 32px rgba(0,0,0,.3);
+  --shadow-card:inset 0 1px 0 rgba(199,211,234,.10),0 10px 20px rgba(6,6,14,.45);
+  --shadow-modal:inset 0 1px 0 rgba(216,236,248,.2),0 -10px 24px rgba(0,0,0,.35);
   --shadow-focus:inset 0 0 0 1px rgba(186,215,247,.24),0 0 0 4px rgba(182,217,252,.08);
 
   /* --- Безопасные зоны Telegram --- */
@@ -78,8 +75,14 @@ button{cursor:pointer}
 svg{width:22px;height:22px;flex:none}
 ::selection{background:rgba(102,58,243,.45)}
 
-/* ---------- фон: blueprint-сетка + прожектор + дрейфующие свечения ---------- */
-.bg{position:fixed;inset:0;overflow:hidden;z-index:-1;background:var(--color-midnight-canvas)}
+/* ---------- фон: blueprint-сетка + прожектор + статичные свечения ---------- */
+/* Раньше: три слоя 75vmax с filter:blur(70px) и бесконечной анимацией. Это главная причина нагрева iPhone. */
+.bg{position:fixed;inset:0;overflow:hidden;z-index:-1;contain:paint;
+  background:
+    radial-gradient(60vmax 60vmax at -10% -8%,rgba(102,58,243,.30),transparent 70%),
+    radial-gradient(60vmax 60vmax at 110% 38%,rgba(2,125,234,.24),transparent 70%),
+    radial-gradient(60vmax 60vmax at -5% 108%,rgba(38,150,132,.18),transparent 70%),
+    var(--color-midnight-canvas)}
 .bg::before{
   content:"";position:absolute;inset:0;
   background-image:
@@ -93,25 +96,26 @@ svg{width:22px;height:22px;flex:none}
   content:"";position:absolute;inset:0;pointer-events:none;
   background:conic-gradient(at 50% -5%,transparent 45%,rgba(124,145,182,.28) 49%,rgba(124,145,182,.48) 50%,rgba(124,145,182,.28) 51%,transparent 55%);
 }
-.bg i{position:absolute;width:75vmax;height:75vmax;border-radius:50%;filter:blur(70px);opacity:.5;will-change:transform;animation:drift 24s ease-in-out infinite alternate}
-.bg i:nth-child(1){left:-30vmax;top:-26vmax;background:radial-gradient(circle,rgba(102,58,243,.32),transparent 68%)}
-.bg i:nth-child(2){right:-36vmax;top:24vh;background:radial-gradient(circle,rgba(2,125,234,.26),transparent 68%);animation-delay:-9s}
-.bg i:nth-child(3){left:-16vmax;bottom:-42vmax;background:radial-gradient(circle,rgba(38,150,132,.2),transparent 68%);animation-delay:-16s}
+.bg i{display:none}
+/* живой фон только на настольных устройствах (мышь): на телефонах он статичен */
+@media (hover:hover) and (pointer:fine){
+  .bg i{display:block;position:absolute;width:75vmax;height:75vmax;border-radius:50%;filter:blur(70px);opacity:.5;will-change:transform;animation:drift 24s ease-in-out infinite alternate}
+  .bg i:nth-child(1){left:-30vmax;top:-26vmax;background:radial-gradient(circle,rgba(102,58,243,.32),transparent 68%)}
+  .bg i:nth-child(2){right:-36vmax;top:24vh;background:radial-gradient(circle,rgba(2,125,234,.26),transparent 68%);animation-delay:-9s}
+  .bg i:nth-child(3){left:-16vmax;bottom:-42vmax;background:radial-gradient(circle,rgba(38,150,132,.2),transparent 68%);animation-delay:-16s}
+}
 @keyframes drift{to{transform:translate(12vmax,-8vmax) scale(1.16)}}
 
-/* ---------- стекло: парящие матовые пластины ---------- */
+/* ---------- стекло ---------- */
+/* Карточки лежат на гладком тёмном фоне: backdrop-filter там ничего не добавлял, но пересчитывался на каждый кадр.
+   Размытие оставлено только у панелей, под которыми прокручивается контент. */
 .glass{
   background-color:var(--glass-plate);
-  backdrop-filter:blur(26px) saturate(150%);
-  -webkit-backdrop-filter:blur(26px) saturate(150%);
+  background-image:linear-gradient(180deg,rgba(199,211,234,.06),rgba(199,211,234,0) 45%);
   box-shadow:var(--shadow-hairline),var(--shadow-card);
 }
-.glass-deep{
-  background-color:var(--deep-glass);
-  backdrop-filter:blur(34px) saturate(160%);
-  -webkit-backdrop-filter:blur(34px) saturate(160%);
-  box-shadow:inset 0 0 0 1px rgba(199,211,234,.08),var(--shadow-modal);
-}
+.glass-deep{background-color:var(--deep-glass);box-shadow:inset 0 0 0 1px rgba(199,211,234,.08),var(--shadow-modal)}
+.tabs,.act,.panel{backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%)}
 
 /* ---------- мягкий отклик при нажатии (ripple) ---------- */
 .rip{position:relative;overflow:hidden}
@@ -161,18 +165,19 @@ body.form #av,body.noauth #av{display:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .tile{border:0;border-radius:16px;padding:18px 8px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--color-frost-glow);text-align:center;transition:transform .15s}
 .tile:active,.it:active,.srow:active,.chip:active{transform:scale(.96)}
-.tile .e{font-size:30px;filter:drop-shadow(0 2px 8px rgba(182,217,252,.25))}
+.tile .e{font-size:30px}
 
 /* прогресс-бары */
 .bar{margin:14px 0}
 .bar .l{display:flex;justify-content:space-between;font-size:14px;margin-bottom:7px;color:var(--color-moon-mist)}
 .bar .l b{color:var(--color-frost-glow);font-weight:600}
 .pb{height:8px;border-radius:999px;background:rgba(199,211,234,.08);box-shadow:inset 0 1px 2px rgba(0,0,0,.35);overflow:hidden}
-.pb i{display:block;height:100%;width:var(--w);border-radius:inherit;background:var(--c,var(--gradient-ice-highlight));box-shadow:0 0 8px rgba(182,217,252,.35);animation:grow 1s cubic-bezier(.2,.8,.2,1)}
-@keyframes grow{from{width:0}}
+.pb i{display:block;height:100%;width:var(--w);border-radius:inherit;background:var(--c,var(--gradient-ice-highlight));transform-origin:0 50%;animation:grow 1s cubic-bezier(.2,.8,.2,1)}
+@keyframes grow{from{transform:scaleX(0)}}
 
 /* ---------- списки ---------- */
-.it{border-radius:16px;padding:16px;margin-bottom:10px;animation:up .45s both;animation-delay:calc(var(--i,0)*45ms);transition:transform .15s}
+.it{border-radius:16px;padding:16px;margin-bottom:10px;animation:up .45s both;animation-delay:calc(var(--i,0)*45ms);transition:transform .15s;content-visibility:auto;contain-intrinsic-size:auto 88px}
+.noanim .it{animation:none}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .row b{color:var(--color-pure-white);font-weight:600}
 .it .pb{margin-top:12px;height:6px}
@@ -199,9 +204,9 @@ body.form #av,body.noauth #av{display:none}
 
 /* пустые состояния и скелетоны */
 .empty{text-align:center;color:var(--color-fog-veil);padding:44px 12px;font-size:15px}
-.empty .e{font-size:44px;display:block;margin-bottom:10px;filter:drop-shadow(0 4px 14px rgba(182,217,252,.2))}
-.sk{height:78px;border-radius:16px;margin-bottom:10px;background:linear-gradient(90deg,rgba(186,214,247,.04) 25%,rgba(186,214,247,.1) 50%,rgba(186,214,247,.04) 75%);background-size:200% 100%;animation:sh 1.3s infinite;box-shadow:var(--shadow-hairline)}
-@keyframes sh{to{background-position:-200% 0}}
+.empty .e{font-size:44px;display:block;margin-bottom:10px}
+.sk{height:78px;border-radius:16px;margin-bottom:10px;background:rgba(186,214,247,.07);animation:pulse 1.4s ease-in-out infinite;box-shadow:var(--shadow-hairline)}
+@keyframes pulse{50%{opacity:.45}}
 
 /* ---------- кнопки ---------- */
 .btn{
@@ -276,20 +281,19 @@ body.form .act{display:block}
 /* ---------- шторка и тост ---------- */
 .sheet{position:fixed;inset:0;z-index:60;visibility:hidden;transition:visibility 0s .4s}
 .sheet.on{visibility:visible;transition-delay:0s}
-.scrim{position:absolute;inset:0;background:rgba(3,4,10,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;transition:opacity .3s}
+.scrim{position:absolute;inset:0;background:rgba(3,4,10,.62);opacity:0;transition:opacity .3s}
 .sheet.on .scrim{opacity:1}
 .panel{
   position:absolute;left:0;right:0;bottom:0;max-height:88vh;overflow:auto;
   border-radius:16px 16px 0 0;padding:12px 20px calc(var(--bot) + 24px);
   transform:translateY(105%);transition:transform .4s cubic-bezier(.2,.9,.3,1);
   background-color:var(--deep-glass);
-  backdrop-filter:blur(36px) saturate(160%);-webkit-backdrop-filter:blur(36px) saturate(160%);
-  box-shadow:inset 0 1px 1px rgba(216,236,248,.2),inset 0 24px 48px rgba(168,216,245,.06),0 -16px 48px rgba(0,0,0,.4);
+  box-shadow:inset 0 1px 1px rgba(216,236,248,.2),0 -10px 28px rgba(0,0,0,.4);
 }
 .sheet.on .panel{transform:none}
 .grab{width:42px;height:5px;border-radius:999px;background:var(--color-fog-veil);opacity:.35;margin:2px auto 18px}
 .ctr{text-align:center;padding:6px 0 4px}
-.ctr .e{font-size:48px;filter:drop-shadow(0 4px 16px rgba(182,217,252,.25))}
+.ctr .e{font-size:48px}
 .ctr p{color:var(--color-fog-veil)}
 .srow{display:flex;align-items:center;gap:14px;width:100%;padding:16px;border:0;margin-bottom:10px;border-radius:16px;text-align:left;color:var(--color-frost-glow);transition:transform .15s}
 .srow .e{font-size:30px}
@@ -328,6 +332,13 @@ body.form .act{display:block}
 .login .fld{text-align:left}
 .av{width:88px;height:88px;margin:4px auto 14px;font-size:36px;font-family:var(--font-display);font-weight:500;color:var(--color-ice-highlight)}
 
+/* ---------- экономный режим: включается вручную в профиле или автоматически на слабых устройствах ---------- */
+html.lite *,html.lite *::before,html.lite *::after{animation:none!important;transition:none!important}
+html.lite .tabs,html.lite .act,html.lite .panel{backdrop-filter:none;-webkit-backdrop-filter:none}
+html.lite .tabs,html.lite .act{background-color:rgba(14,17,28,.97)}
+html.lite .panel{background-color:#0b0e1a}
+html.lite .bg::after,html.lite .bg i{display:none}
+
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -348,7 +359,8 @@ body.form .act{display:block}
 const tg = window.Telegram.WebApp, inTg = !!tg.initData;
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt = (n, d = 1) => (+n || 0).toLocaleString('ru-RU', {maximumFractionDigits: d});
+const NF = {};
+const fmt = (n, d = 1) => (NF[d] || (NF[d] = new Intl.NumberFormat('ru-RU', {maximumFractionDigits: d}))).format(+n || 0);
 const sum = (a, k) => a.reduce((s, x) => s + (+x[k] || 0), 0);
 const pad = n => String(n).padStart(2, '0'), ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? 0 : n; };
@@ -374,6 +386,28 @@ function theme() {
 }
 theme(); tg.onEvent('themeChanged', theme);
 try { tg.MainButton.hide(); } catch (e) {}
+
+
+/* ---------- экономный режим ---------- */
+let LITE = null; try { LITE = localStorage.getItem('lite'); } catch (e) {}
+document.documentElement.classList.toggle('lite', LITE === 'on');
+const isLite = () => document.documentElement.classList.contains('lite');
+function setLite(on, auto) {
+  document.documentElement.classList.toggle('lite', on);
+  if (!auto) { LITE = on ? 'on' : 'off'; try { localStorage.setItem('lite', LITE); } catch (e) {} }
+}
+/* Автоопределение: если сразу после входа большинство кадров медленнее ~30 к/с, включаем экономный режим на этот сеанс. */
+function perfProbe() {
+  if (LITE !== null || isLite()) return;
+  let n = 0, last = 0, slow = 0;
+  const step = t => {
+    if (last) { n++; if (t - last > 36) slow++; }
+    last = t;
+    if (n < 45) requestAnimationFrame(step);
+    else if (slow > 20) { setLite(true, true); toast('Включён экономный режим для плавной работы'); }
+  };
+  setTimeout(() => requestAnimationFrame(step), 1500);
+}
 
 /* ---------- состояние и утилиты ---------- */
 const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month'};
@@ -511,10 +545,14 @@ async function vStock(fetchNew = true) {
     <div class="hint sm" id="ssum" style="margin:0 4px 10px"></div><div id="sl"></div>`;
   stockList();
 }
-function stockList() {
+const KEYS = new WeakMap();
+const skey = x => { let k = KEYS.get(x); if (k === undefined) { k = JSON.stringify(x).toLowerCase(); KEYS.set(x, k); } return k; };
+let DEB;
+function stockList(animate = true) {
   const t = S.wt, q = S.wq.toLowerCase();
-  const list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || JSON.stringify(x).toLowerCase().includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
+  const list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
   const mx = Math.max(...list.map(x => +x.volume_m3 || 0), 0.0001);
+  $('#sl').classList.toggle('noanim', !animate);
   $('#ssum').textContent = `${list.length} поз. · ${fmt(sum(list, 'count'), 0)} шт · ${fmt(sum(list, 'volume_m3'), 2)} м³`;
   $('#sl').innerHTML = list.length ? list.map((x, i) => `
     <div class="it glass rip" data-a="item" data-v="${t}:${x.id}" style="--i:${Math.min(i, 12)}">
@@ -544,8 +582,9 @@ async function vOrders(fetchNew = true) {
     <div id="ol"></div>`;
   orderList();
 }
-function orderList() {
+function orderList(animate = true) {
   const q = S.oq.toLowerCase();
+  $('#ol').classList.toggle('noanim', !animate);
   const l = D.orders.filter(o => (S.of === 'all' || (S.of === 'open') === isOpen(o)) && (!q || `${o.id} ${D.con[o.contractor_id] || ''}`.toLowerCase().includes(q)));
   $('#ol').innerHTML = l.length ? l.map(oCard).join('') : '<div class="empty"><span class="e">🧾</span>Заказов нет</div>';
 }
@@ -613,7 +652,8 @@ function vProfile() {
   $('#view').innerHTML = `<div class="card glass" style="text-align:center"><div class="icb glass av">${esc((S.name || '?')[0].toUpperCase())}</div>
     <h3>${esc(S.name)}</h3><span class="bd">${ROLE[S.role] || S.role}</span>
     <div style="margin-top:16px;text-align:left"><div class="dl"><span class="hint">ID сотрудника</span><b>${esc(j.user_id || '—')}</b></div>
-    <div class="dl"><span class="hint">Тема</span><b>Midnight</b></div></div></div>
+    <div class="dl"><span class="hint">Тема</span><b>Midnight</b></div>
+    <div class="dl"><span class="hint">Экономный режим<br><small>меньше эффектов, холоднее телефон</small></span><button class="chip rip ${isLite() ? 'on' : ''}" data-a="lite">${isLite() ? 'Вкл' : 'Выкл'}</button></div></div></div>
     ${inTg ? '' : '<button class="btn ghost rip" data-a="logout">Выйти</button>'}`;
 }
 function vLogin(msg) {
@@ -643,7 +683,7 @@ function finish(tkn, name) {
   localStorage.setItem('jwt_token', tkn);
   S.role = jwt()?.role || 'worker'; S.name = name || localStorage.getItem('uname') || 'Сотрудник';
   $('#av').textContent = S.name[0].toUpperCase();
-  document.body.classList.remove('noauth'); buildTabs(); go('home');
+  document.body.classList.remove('noauth'); buildTabs(); go('home'); perfProbe();
 }
 async function tgAuth() {
   document.body.classList.add('noauth'); $('#view').innerHTML = sk(2);
@@ -765,7 +805,7 @@ async function submitForm() {
 /* ---------- события ---------- */
 const find = (t, id) => (t === 'boards' ? D.boards : D.logs).find(x => x.id == id);
 const ACT = {
-  go: v => go(v), back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth,
+  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth,
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
   new: v => { closeSheet(); go(v); },
   fab: () => sheet(`<div class="ctr" style="margin-bottom:14px"><h3>Что оформить?</h3></div>
@@ -805,8 +845,8 @@ document.addEventListener('pointerdown', e => {
 });
 document.addEventListener('input', e => {
   const t = e.target;
-  if (t.id === 'q') { S.wq = t.value; stockList(); }
-  else if (t.id === 'oq') { S.oq = t.value; orderList(); }
+  if (t.id === 'q') { S.wq = t.value; clearTimeout(DEB); DEB = setTimeout(() => stockList(false), 120); }
+  else if (t.id === 'oq') { S.oq = t.value; clearTimeout(DEB); DEB = setTimeout(() => orderList(false), 120); }
   else if (t.id === 'd1' || t.id === 'd2') { S.range = 'custom'; $$('[data-a="range"]').forEach(b => b.classList.remove('on')); loadStats(); }
   else if (t.dataset.k && FK) calcForm(t.dataset.k === FORMS[FK].auto);
 });
