@@ -18,6 +18,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m" # без ограничения логи Docker со временем забивают диск
+        max-file: "3"
 
   app:
     build:
@@ -42,6 +47,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      # /readyz проверяет и приложение, и связь с базой
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/readyz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m" # без ограничения логи Docker со временем забивают диск
+        max-file: "3"
 
 volumes:
   pgdata:

@@ -95,6 +95,14 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	webDir := filepath.Join(workDir, "web")
 	fileServer := http.FileServer(http.Dir(webDir))
 
+	// Проверки состояния для Docker, nginx и мониторинга (без авторизации, ответ «ok»).
+	healthHandler := NewHealthHandler(repo)
+	healthLimiter := NewRateLimiter(120, 60)
+	r.Get("/healthz", healthHandler.Live)
+	r.Head("/healthz", healthHandler.Live)
+	r.Get("/readyz", healthLimiter.Middleware(healthHandler.Ready))
+	r.Head("/readyz", healthLimiter.Middleware(healthHandler.Ready))
+
 	// Публичные ссылки на накладные (подписанные, живут 10 минут): без них файл не скачать в Telegram.
 	r.Get("/files/pdf/{token}/{name}", pdfLimiter.Middleware(orderHandler.ServePDF))
 	r.Head("/files/pdf/{token}/{name}", pdfLimiter.Middleware(orderHandler.ServePDF))
