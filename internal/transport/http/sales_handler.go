@@ -17,7 +17,7 @@ func NewSalesHandler(service *service.SalesService) *SalesHandler {
 
 type CreateSaleRequest struct {
 	ContractorID  int64             `json:"contractor_id" validate:"required,gt=0"`
-	TruckNumber   string            `json:"truck_number" validate:"required"`
+	TruckNumber   string            `json:"truck_number" validate:"required,max=20"`
 	DeliveryPrice float64           `json:"delivery_price" validate:"gte=0"`
 	ExtraPrice    float64           `json:"extra_price" validate:"gte=0"`
 	Items         []domain.SaleItem `json:"items" validate:"required,min=1,dive"`
@@ -31,7 +31,7 @@ func (h *SalesHandler) CreateSale(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := Validate.Struct(req); err != nil {
-		http.Error(w, "ошибка валидации данных: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, validationMessage(err), http.StatusBadRequest)
 		return
 	}
 
@@ -52,7 +52,7 @@ func (h *SalesHandler) CreateSale(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.CreateSale(r.Context(), sale, req.Items)
 	if err != nil {
-		http.Error(w, "ошибка проведения продажи: "+err.Error(), http.StatusInternalServerError)
+		respondError(w, r, "не удалось провести продажу", err)
 		return
 	}
 

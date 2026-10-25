@@ -28,7 +28,7 @@ type LogItem struct {
 	ArrivalID  int64   `json:"arrival_id"`
 	LengthMM   int     `json:"length_mm" validate:"required,gt=0"`
 	DiameterMM int     `json:"diameter_mm" validate:"required,gt=0"`
-	Species    string  `json:"species" validate:"required"`
+	Species    string  `json:"species" validate:"required,max=64"`
 	Count      int     `json:"count" validate:"required,gt=0"`
 	VolumeM3   float64 `json:"volume_m3" validate:"required,gt=0"`
 }
@@ -56,7 +56,7 @@ type Board struct {
 	HeightMM   int      `json:"height_mm" validate:"required,gt=0"`
 	WidthMM    int      `json:"width_mm" validate:"required,gt=0"`
 	LengthMM   int      `json:"length_mm" validate:"required,gt=0"`
-	Species    string   `json:"species" validate:"required"`
+	Species    string   `json:"species" validate:"required,max=64"`
 	Grade      string   `json:"grade"`
 	Count      int      `json:"count" validate:"required,gt=0"`
 	VolumeM3   float64  `json:"volume_m3" validate:"required,gt=0"`

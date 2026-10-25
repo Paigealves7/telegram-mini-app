@@ -39,17 +39,23 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)
+	r.Use(accessLog)
+	r.Use(securityHeaders)
 	r.Use(middleware.Recoverer)
 
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"POST", "GET", "DELETE", "PUT", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
+	// Приложение и API живут на одном адресе, поэтому CORS нужен только для явно разрешённых сайтов.
+	// Токен передаётся заголовком, куки не используются, поэтому AllowCredentials выключен.
+	corsOpts := cors.Options{
+		AllowedMethods: []string{"POST", "GET", "PUT", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
+		MaxAge:         300,
+	}
+	if origins := corsOrigins(); len(origins) > 0 {
+		corsOpts.AllowedOrigins = origins
+	} else {
+		corsOpts.AllowedOrigins = []string{"https://cors-disabled.invalid"} // пустой список библиотека трактует как «разрешить всем»
+	}
+	r.Use(cors.Handler(corsOpts))
 
 	repo := repository.NewRepository(db)
 
@@ -111,6 +117,10 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		// Telegram WebView агрессивно кеширует страницу. no-cache заставляет его сверяться
 		// с сервером (ETag/Last-Modified) при каждом открытии, а не показывать старую версию.
 		w.Header().Set("Cache-Control", "no-cache")
+		if r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
+			http.Error(w, "маршрут не найден", http.StatusNotFound) // неизвестный адрес API не должен отдавать страницу приложения
+			return
+		}
 		filePath := filepath.Join(webDir, filepath.Clean(r.URL.Path))
 		info, err := os.Stat(filePath)
 
@@ -123,6 +133,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(apiLimiter.Wrap)
+		r.Use(limitBody)
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/login", loginLimiter.Middleware(authHandler.Login))
@@ -164,4 +175,20 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	})
 
 	return r
+}
+
+// corsOrigins: список сайтов, которым разрешён доступ к API из браузера (CORS_ORIGINS через запятую, иначе PUBLIC_URL).
+func corsOrigins() []string {
+	var out []string
+	for _, v := range strings.Split(os.Getenv("CORS_ORIGINS"), ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		if u := strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_URL")), "/"); u != "" {
+			out = append(out, u)
+		}
+	}
+	return out
 }

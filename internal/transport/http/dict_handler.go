@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"telegram-mini-app/internal/repository"
 )
 
@@ -17,7 +18,7 @@ func NewDictHandler(repo *repository.Repository) *DictHandler {
 func (h *DictHandler) GetContractors(w http.ResponseWriter, r *http.Request) {
 	contractors, err := h.repo.GetContractors(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, r, "не удалось получить список клиентов", err)
 		return
 	}
 
@@ -30,14 +31,19 @@ func (h *DictHandler) CreateContractor(w http.ResponseWriter, r *http.Request) {
 		Name string `json:"name"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректный JSON", http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" || len([]rune(name)) > 100 {
+		http.Error(w, "название клиента: от 1 до 100 символов", http.StatusBadRequest)
 		return
 	}
 
-	contractor, err := h.repo.CreateContractor(r.Context(), req.Name)
+	contractor, err := h.repo.CreateContractor(r.Context(), name)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondError(w, r, "не удалось добавить клиента", err)
 		return
 	}
 

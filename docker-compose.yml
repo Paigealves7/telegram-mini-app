@@ -30,6 +30,7 @@ services:
       dockerfile: Dockerfile
     container_name: sawmill_app
     restart: always
+    stop_grace_period: 30s # время на дозавершение запросов при остановке
     ports:
       - "8080:8080"
     environment:

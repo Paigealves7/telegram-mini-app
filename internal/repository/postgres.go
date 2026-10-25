@@ -123,6 +123,7 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.Sawin
 var (
 	ErrInsufficientStock = errors.New("недостаточно товара на складе")
 	ErrBoardNotFound     = errors.New("доска не найдена на складе")
+	ErrBoardEmpty        = errors.New("этой позиции нет на складе")
 	ErrOrderNotFound     = errors.New("заказ не найден")
 	ErrOrderClosed       = errors.New("заказ уже завершен или отменен")
 	ErrOrderEmpty        = errors.New("невозможно завершить пустой заказ")
@@ -308,7 +309,7 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 			return nil, err
 		}
 		if boardCount <= 0 {
-			return nil, errors.New("этой позиции нет на складе")
+			return nil, ErrBoardEmpty
 		}
 		items[i].VolumeM3 = domain.ItemVolume(boardCount, boardVolume, items[i].Count)
 
@@ -333,13 +334,16 @@ func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain
 	}
 	defer rows.Close()
 
-	var orders []domain.Order
+	orders := make([]domain.Order, 0)
 	for rows.Next() {
 		var o domain.Order
 		if err := rows.Scan(&o.ID, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt); err != nil {
 			return nil, err
 		}
 		orders = append(orders, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return orders, nil
 }
@@ -481,13 +485,16 @@ func (r *Repository) GetOrderItems(ctx context.Context, orderID int64) ([]domain
 	}
 	defer rows.Close()
 
-	var items []domain.OrderItem
+	items := make([]domain.OrderItem, 0)
 	for rows.Next() {
 		var i domain.OrderItem
 		if err := rows.Scan(&i.ID, &i.OrderID, &i.BoardID, &i.Count, &i.VolumeM3, &i.Price); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return items, nil
 }

@@ -35,7 +35,12 @@ func (h *SawingHandler) CreateSawing(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := Validate.Struct(req); err != nil {
-		http.Error(w, "ошибка валидации данных: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, validationMessage(err), http.StatusBadRequest)
+		return
+	}
+
+	if _, err := parseDate(req.Date); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -46,7 +51,7 @@ func (h *SawingHandler) CreateSawing(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.repo.CreateSawingOperation(r.Context(), operation, req.Logs, req.Boards)
 	if err != nil {
-		http.Error(w, "ошибка сохранения распила: "+err.Error(), http.StatusInternalServerError)
+		respondError(w, r, "не удалось сохранить распил", err)
 		return
 	}
 

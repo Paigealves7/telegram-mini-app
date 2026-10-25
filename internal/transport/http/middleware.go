@@ -34,7 +34,7 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 			claims := &Claims{}
 			token, err := jwt.ParseWithClaims(parts[1], claims, func(token *jwt.Token) (interface{}, error) {
 				return jwtSecret, nil
-			})
+			}, jwt.WithValidMethods([]string{"HS256"})) // другие алгоритмы подписи не принимаем
 
 			if err != nil || !token.Valid {
 				http.Error(w, "невалидный или просроченный токен", http.StatusUnauthorized)
