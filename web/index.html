@@ -165,7 +165,8 @@ body.form #av,body.noauth #av{display:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .tile{border:0;border-radius:16px;padding:18px 8px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--color-frost-glow);text-align:center;transition:transform .15s}
 .tile:active,.it:active,.srow:active,.chip:active{transform:scale(.96)}
-.tile .e{font-size:30px}
+.tile .e{display:grid;place-items:center;width:46px;height:46px;border-radius:14px;background:var(--frost-wash-hi);color:var(--color-ice-highlight)}
+.tile .e svg{width:24px;height:24px}
 
 /* прогресс-бары */
 .bar{margin:14px 0}
@@ -204,7 +205,8 @@ body.form #av,body.noauth #av{display:none}
 
 /* пустые состояния и скелетоны */
 .empty{text-align:center;color:var(--color-fog-veil);padding:44px 12px;font-size:15px}
-.empty .e{font-size:44px;display:block;margin-bottom:10px}
+.empty .e{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 12px;border-radius:50%;background:var(--frost-wash);color:var(--color-fog-veil)}
+.empty .e svg{width:30px;height:30px}
 .sk{height:78px;border-radius:16px;margin-bottom:10px;background:rgba(186,214,247,.07);animation:pulse 1.4s ease-in-out infinite;box-shadow:var(--shadow-hairline)}
 @keyframes pulse{50%{opacity:.45}}
 
@@ -267,10 +269,11 @@ body.form .act{display:block}
 .sel{position:relative}
 .sel::after{content:"";position:absolute;right:18px;top:50%;width:8px;height:8px;border:solid var(--color-fog-veil);border-width:0 2px 2px 0;transform:translateY(-75%) rotate(45deg);pointer-events:none}
 .sel select{padding-right:40px;text-overflow:ellipsis}
-.num{display:flex;gap:8px}
-.num input{text-align:center;font-weight:600;font-size:18px;min-width:0;padding:0 4px}
-.num button{width:52px;height:56px;flex:none;border:0;border-radius:999px;box-shadow:var(--shadow-hairline);background:var(--frost-wash);color:var(--color-frost-glow);font-size:22px;font-weight:500;transition:background .15s}
+.num{display:flex;gap:6px}
+.num input{flex:1;min-width:0;text-align:center;font-weight:600;font-size:18px;padding:0 2px;font-variant-numeric:tabular-nums}
+.num button{width:42px;height:56px;flex:none;border:0;border-radius:16px;box-shadow:var(--shadow-hairline);background:var(--frost-wash);color:var(--color-frost-glow);font-size:22px;font-weight:500;transition:background .15s}
 .num button:active{background:var(--frost-wash-hi)}
+@media(max-width:359px){.fld.half{grid-column:span 2}} /* на очень узких экранах поля идут в одну колонку */
 .fld .chips{padding:10px 0 0}
 
 /* превью-расчёт в формах */
@@ -293,10 +296,14 @@ body.form .act{display:block}
 .sheet.on .panel{transform:none}
 .grab{width:42px;height:5px;border-radius:999px;background:var(--color-fog-veil);opacity:.35;margin:2px auto 18px}
 .ctr{text-align:center;padding:6px 0 4px}
-.ctr .e{font-size:48px}
+.ctr .e{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 12px;border-radius:50%;background:var(--frost-wash-hi);color:var(--color-ice-highlight)}
+.ctr .e svg{width:30px;height:30px}
 .ctr p{color:var(--color-fog-veil)}
 .srow{display:flex;align-items:center;gap:14px;width:100%;padding:16px;border:0;margin-bottom:10px;border-radius:16px;text-align:left;color:var(--color-frost-glow);transition:transform .15s}
-.srow .e{font-size:30px}
+.srow .e{display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:14px;background:var(--frost-wash-hi);color:var(--color-ice-highlight)}
+.srow .e svg{width:22px;height:22px}
+.srow.off{opacity:.55;pointer-events:none}
+.k small svg{width:14px;height:14px;vertical-align:-2px;margin-right:6px}
 .srow span:nth-child(2){flex:1}
 .srow b{display:block;color:var(--color-pure-white);font-weight:600}
 .srow small{color:var(--color-fog-veil)}
@@ -312,8 +319,8 @@ body.form .act{display:block}
   transform:translate(-50%,-160%);transition:transform .45s cubic-bezier(.2,.9,.3,1.2);
 }
 #toast.on{transform:translate(-50%,0)}
-#toast.ok::before{content:"✓ ";color:var(--ok)}
-#toast.err::before{content:"⚠ ";color:var(--err)}
+#toast.ok::before{content:"";display:inline-block;width:8px;height:8px;margin-right:9px;border-radius:50%;background:#34c759}
+#toast.err::before{content:"";display:inline-block;width:8px;height:8px;margin-right:9px;border-radius:50%;background:#ff453a}
 
 /* ---------- вход ---------- */
 .login{text-align:center;margin-top:8vh}
@@ -323,6 +330,7 @@ body.form .act{display:block}
   animation:flt 3.5s ease-in-out infinite;
 }
 @keyframes flt{50%{transform:translateY(-8px)}}
+.login .logo svg{width:46px;height:46px;color:var(--color-ice-highlight)}
 .login .wordmark{font-family:var(--font-display);font-weight:500;font-size:32px;letter-spacing:-.01em;margin:16px 0 4px}
 .login .eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-fog-veil);display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:20px}
 .login .eyebrow::before,.login .eyebrow::after{content:"";width:36px;height:1px}
@@ -360,6 +368,11 @@ const tg = window.Telegram.WebApp, inTg = !!tg.initData;
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const NF = {};
+/* Длина в метрах: 6000 -> «6 м», 4500 -> «4,5 м» */
+const lenM = mm => fmt(mm / 1000, 2) + ' м';
+/* Доска по-человечески: «Доска 50×150 · 6 м · Сосна, сорт 1» (без технических номеров) */
+const boardTitle = b => `Доска ${b.height_mm}×${b.width_mm}`;
+const boardLabel = b => `${boardTitle(b)} · ${lenM(b.length_mm)} · ${b.species || 'порода не указана'}${b.grade ? ', сорт ' + b.grade : ''}`;
 const fmt = (n, d = 1) => (NF[d] || (NF[d] = new Intl.NumberFormat('ru-RU', {maximumFractionDigits: d}))).format(+n || 0);
 const sum = (a, k) => a.reduce((s, x) => s + (+x[k] || 0), 0);
 const pad = n => String(n).padStart(2, '0'), ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -374,9 +387,21 @@ const ICP = {
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>', check: '<path d="M5 12l5 5L20 7"/>',
   file: '<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/>',
-  back: '<path d="M15 5l-7 7 7 7"/>', chev: '<path d="M9 5l7 7-7 7"/>'
+  back: '<path d="M15 5l-7 7 7 7"/>', chev: '<path d="M9 5l7 7-7 7"/>',
+  arrival: '<path d="M1 6h13v10H1z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  sawing: '<path d="M12 2l10 5-10 5L2 7z"/><path d="M2 12l10 5 10-5"/><path d="M2 17l10 5 10-5"/>',
+  order: '<path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 12h6M9 16h6"/>',
+  send: '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
+  download: '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
+  eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  ok: '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>',
+  warn: '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>',
+  trend: '<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>',
+  mark: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="3"/>',
 };
-const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICP[n]}</svg>`;
+const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICP[n] || ''}</svg>`;
 
 tg.ready(); tg.expand();
 /* тема: всегда midnight — кастомная палитра является основной темой приложения */
@@ -411,6 +436,7 @@ function perfProbe() {
 
 /* ---------- состояние и утилиты ---------- */
 const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month'};
+let CFG = {pdf_send: true}; // настройки с сервера (/config)
 const D = {boards: [], logs: [], orders: [], con: {}};
 let MEM = {}; try { MEM = JSON.parse(localStorage.getItem('mem') || '{}'); } catch (e) {}
 const mem = (k, v) => { MEM[k] = v; try { localStorage.setItem('mem', JSON.stringify(MEM)); } catch (e) {} };
@@ -434,6 +460,7 @@ async function api(path, opts = {}) {
   return t ? JSON.parse(t) : null;
 }
 const safe = async u => { try { return (await api(u)) || []; } catch (e) { return null; } };
+async function loadConfig() { try { const c = await api('/config'); if (c) CFG = {...CFG, ...c}; } catch (e) {} }
 async function loadStock() { const [b, l] = await Promise.all([safe('/boards'), safe('/logs')]); if (b) D.boards = b; if (l) D.logs = l; }
 async function ensureCon() { if (Object.keys(D.con).length) return; (await safe('/contractors') || []).forEach(c => D.con[c.id] = c.name); }
 
@@ -453,7 +480,7 @@ const closeSheet = () => $('#sheet').classList.remove('on');
 function ask(e, title, text, ok) {
   return new Promise(res => {
     ASK = res;
-    sheet(`<div class="ctr"><div class="e">${e}</div><h3>${esc(title)}</h3><p>${esc(text)}</p></div>
+    sheet(`<div class="ctr"><div class="e">${ic(e)}</div><h3>${esc(title)}</h3><p>${esc(text)}</p></div>
       <div class="two"><button class="btn ghost rip" data-a="no">Отмена</button><button class="btn rip" data-a="yes">${esc(ok)}</button></div>`);
   });
 }
@@ -522,14 +549,14 @@ async function vHome() {
       <div class="k glass"><small>Распилено</small><b data-n="${st.total_logs_sawed_volume || 0}" data-d="1" data-u=" м³">0</b></div></div>` : ''}
     <div class="sect"><span>Быстрые действия</span></div>
     <div class="tiles">
-      <button class="tile glass rip" data-a="new" data-v="arrival"><span class="e">📥</span>Приход леса</button>
-      <button class="tile glass rip" data-a="new" data-v="sawing"><span class="e">🪚</span>Распиловка</button>
-      ${canOrd() ? '<button class="tile glass rip" data-a="new" data-v="order"><span class="e">🧾</span>Новый заказ</button>' : '<button class="tile glass rip" data-a="go" data-v="stock"><span class="e">📦</span>Склад</button>'}
+      <button class="tile glass rip" data-a="new" data-v="arrival"><span class="e">${ic('arrival')}</span>Приход леса</button>
+      <button class="tile glass rip" data-a="new" data-v="sawing"><span class="e">${ic('sawing')}</span>Распиловка</button>
+      ${canOrd() ? `<button class="tile glass rip" data-a="new" data-v="order"><span class="e">${ic('order')}</span>Новый заказ</button>` : `<button class="tile glass rip" data-a="go" data-v="stock"><span class="e">${ic('box')}</span>Склад</button>`}
     </div>
     ${sp.length ? `<div class="sect"><span>Склад по породам</span><button data-a="go" data-v="stock">Всё</button></div><div class="card glass">
       ${sp.map(([n, x], i) => `<div class="bar"><div class="l"><span>${esc(n)}</span><b>${fmt(x, 2)} м³</b></div><div class="pb"><i style="--w:${x / mx * 100}%;--c:${PAL[i % 6]}"></i></div></div>`).join('')}</div>` : ''}
     ${canOrd() ? `<div class="sect"><span>Активные заказы · ${open.length}</span><button data-a="go" data-v="orders">Все</button></div>
-      ${open.length ? open.slice(0, 3).map(oCard).join('') : '<div class="empty glass card"><span class="e">🎉</span>Все заказы выполнены</div>'}` : ''}`;
+      ${open.length ? open.slice(0, 3).map(oCard).join('') : `<div class="empty glass card"><span class="e">${ic('ok')}</span>Все заказы выполнены</div>`}` : ''}`;
   countUp(v);
 }
 
@@ -546,21 +573,30 @@ async function vStock(fetchNew = true) {
   stockList();
 }
 const KEYS = new WeakMap();
-const skey = x => { let k = KEYS.get(x); if (k === undefined) { k = JSON.stringify(x).toLowerCase(); KEYS.set(x, k); } return k; };
+const skey = x => {
+  let k = KEYS.get(x);
+  if (k === undefined) {
+    k = [x.species, x.grade && 'сорт ' + x.grade,
+         x.height_mm != null ? `доска ${x.height_mm}×${x.width_mm} ${x.length_mm}` : `бревно ø${x.diameter_mm} ${x.length_mm}`,
+         x.arrival_id != null ? 'партия ' + x.arrival_id : ''].filter(Boolean).join(' ').toLowerCase();
+    KEYS.set(x, k);
+  }
+  return k;
+};
 let DEB;
 function stockList(animate = true) {
-  const t = S.wt, q = S.wq.toLowerCase();
+  const t = S.wt, q = S.wq.toLowerCase().replace(/(\d)\s*[*xх]\s*(\d)/g, '$1×$2');
   const list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
   const mx = Math.max(...list.map(x => +x.volume_m3 || 0), 0.0001);
   $('#sl').classList.toggle('noanim', !animate);
   $('#ssum').textContent = `${list.length} поз. · ${fmt(sum(list, 'count'), 0)} шт · ${fmt(sum(list, 'volume_m3'), 2)} м³`;
   $('#sl').innerHTML = list.length ? list.map((x, i) => `
     <div class="it glass rip" data-a="item" data-v="${t}:${x.id}" style="--i:${Math.min(i, 12)}">
-      <div class="row"><div><b>${t === 'boards' ? `${esc(x.species || 'Доска')} ${esc(x.height_mm)}×${esc(x.width_mm)}×${esc(x.length_mm)}` : `${esc(x.species || 'Бревно')} Ø${esc(x.diameter_mm)} · ${esc(x.length_mm)} мм`}</b>
-        <div class="hint sm">№${esc(x.id)} · ${t === 'boards' ? 'сорт ' + esc(x.grade || '1') : 'партия №' + esc(x.arrival_id)} · ${fmt(x.volume_m3, 3)} м³</div></div>
+      <div class="row"><div><b>${t === 'boards' ? esc(boardTitle(x)) + ' · ' + lenM(x.length_mm) : `Бревно Ø${esc(x.diameter_mm)} × ${lenM(x.length_mm)}`}</b>
+        <div class="hint sm">${[x.species, t === 'boards' ? (x.grade ? 'сорт ' + x.grade : '') : 'партия №' + x.arrival_id, fmt(x.volume_m3, 3) + ' м³'].filter(Boolean).map(esc).join(' · ')}</div></div>
         <span class="bd">${esc(x.count)} шт</span></div>
       <div class="pb"><i style="--w:${(x.volume_m3 / mx * 100).toFixed(1)}%"></i></div></div>`).join('')
-    : '<div class="empty"><span class="e">📭</span>Ничего не найдено</div>';
+    : `<div class="empty"><span class="e">${ic('inbox')}</span>Ничего не найдено</div>`;
 }
 
 /* ---------- заказы ---------- */
@@ -586,7 +622,7 @@ function orderList(animate = true) {
   const q = S.oq.toLowerCase();
   $('#ol').classList.toggle('noanim', !animate);
   const l = D.orders.filter(o => (S.of === 'all' || (S.of === 'open') === isOpen(o)) && (!q || `${o.id} ${D.con[o.contractor_id] || ''}`.toLowerCase().includes(q)));
-  $('#ol').innerHTML = l.length ? l.map(oCard).join('') : '<div class="empty"><span class="e">🧾</span>Заказов нет</div>';
+  $('#ol').innerHTML = l.length ? l.map(oCard).join('') : `<div class="empty"><span class="e">${ic('order')}</span>Заказов нет</div>`;
 }
 async function doComplete(id, btn) {
   btn.disabled = true; btn.classList.add('busy');
@@ -595,11 +631,13 @@ async function doComplete(id, btn) {
   show(S.cur);
 }
 function pdfSheet(id) {
-  const row = (a, e, t, d) => `<button class="srow glass rip" data-a="${a}" data-v="${esc(id)}"><span class="e">${e}</span><span><b>${t}</b><small>${d}</small></span>${ic('chev')}</button>`;
-  sheet(`<div class="ctr" style="margin-bottom:14px"><div class="e">📄</div><h3>Накладная №${esc(id)}</h3><p class="hint sm">Как получить файл?</p></div>
-    ${inTg ? row('pdfsend', '📨', 'Отправить в чат', 'Бот пришлёт PDF сообщением: его можно открыть, переслать и сохранить') : ''}
-    ${row('pdfdl', '⬇️', 'Скачать файл', 'Сохранить PDF на устройство')}
-    ${row('pdfview', '👁', 'Открыть', 'Просмотр в браузере')}`);
+  const row = (a, e, t, d) => `<button class="srow glass rip" data-a="${a}" data-v="${esc(id)}"><span class="e">${ic(e)}</span><span><b>${t}</b><small>${d}</small></span>${ic('chev')}</button>`;
+  sheet(`<div class="ctr" style="margin-bottom:14px"><div class="e">${ic('file')}</div><h3>Накладная №${esc(id)}</h3><p class="hint sm">Как получить файл?</p></div>
+    ${inTg ? (CFG.pdf_send
+      ? row('pdfsend', 'send', 'Отправить в чат', 'Бот пришлёт PDF сообщением: его можно открыть, переслать и сохранить')
+      : `<div class="srow glass off"><span class="e">${ic('send')}</span><span><b>Отправить в чат</b><small>Отправка PDF в чат пока что недоступна из-за блокировок</small></span></div>`) : ''}
+    ${row('pdfdl', 'download', 'Скачать файл', 'Сохранить PDF на устройство')}
+    ${row('pdfview', 'eye', 'Открыть', 'Просмотр в браузере')}`);
 }
 async function pdfDo(kind, id, btn) {
   btn.disabled = true;
@@ -637,13 +675,13 @@ async function loadStats() {
     const d = await api(sQ($('#d1').value, $('#d2').value));
     if (S.cur !== 'stats') return;
     const A = +d.total_logs_arrived_volume || 0, W = +d.total_logs_sawed_volume || 0, V = +d.total_sales_volume || 0, mx = Math.max(A, W, V, 0.0001);
-    const k = [['📥', 'Пришло сырья', A, ' м³', 2], ['🪚', 'Распилено', W, ' м³', 2], ['📦', 'Продано', V, ' м³', 2], ['💰', 'Выручка', +d.total_sales_amount || 0, ' ₽', 0]];
-    box.innerHTML = `<div class="tiles" style="grid-template-columns:1fr 1fr">${k.map(([e, l, n, u, dd], i) => `<div class="k glass" style="animation-delay:${i * 70}ms"><small>${e} ${l}</small><b style="font-size:21px" data-n="${n}" data-d="${dd}" data-u="${u}">0</b></div>`).join('')}</div>
+    const k = [['arrival', 'Пришло сырья', A, ' м³', 2], ['sawing', 'Распилено', W, ' м³', 2], ['box', 'Продано', V, ' м³', 2], ['trend', 'Выручка', +d.total_sales_amount || 0, ' ₽', 0]];
+    box.innerHTML = `<div class="tiles" style="grid-template-columns:1fr 1fr">${k.map(([e, l, n, u, dd], i) => `<div class="k glass" style="animation-delay:${i * 70}ms"><small>${ic(e)} ${l}</small><b style="font-size:21px" data-n="${n}" data-d="${dd}" data-u="${u}">0</b></div>`).join('')}</div>
       <div class="sect"><span>Воронка объёмов</span></div><div class="card glass">
       ${[['Пришло', A, PAL[0]], ['Распилено', W, PAL[1]], ['Продано', V, PAL[3]]].map(([l, x, c]) => `<div class="bar"><div class="l"><span>${l}</span><b>${fmt(x, 2)} м³</b></div><div class="pb"><i style="--w:${x / mx * 100}%;--c:${c}"></i></div></div>`).join('')}
       <div class="pills"><span class="pill">распилено ${A ? fmt(W / A * 100, 0) : 0}% от прихода</span><span class="pill">продано ${W ? fmt(V / W * 100, 0) : 0}% от распила</span></div></div>`;
     countUp(box);
-  } catch (e) { box.innerHTML = `<div class="empty"><span class="e">⚠️</span>${esc(e.message)}</div>`; }
+  } catch (e) { box.innerHTML = `<div class="empty"><span class="e">${ic('warn')}</span>${esc(e.message)}</div>`; }
 }
 
 /* ---------- профиль и вход ---------- */
@@ -658,7 +696,7 @@ function vProfile() {
 }
 function vLogin(msg) {
   document.body.classList.add('noauth'); S.cur = 'login';
-  $('#view').innerHTML = `<div class="login"><div class="logo">🪵</div><div class="wordmark gt">Лесопилка</div>
+  $('#view').innerHTML = `<div class="login"><div class="logo">${ic('mark')}</div><div class="wordmark gt">Лесопилка</div>
     <div class="eyebrow">Учёт производства</div>
     <div class="card glass"><div class="fld"><label>Логин</label><input id="lu" autocomplete="username"></div>
     <div class="fld"><label>Пароль</label><input id="lp" type="password" autocomplete="current-password"></div>
@@ -683,7 +721,7 @@ function finish(tkn, name) {
   localStorage.setItem('jwt_token', tkn);
   S.role = jwt()?.role || 'worker'; S.name = name || localStorage.getItem('uname') || 'Сотрудник';
   $('#av').textContent = S.name[0].toUpperCase();
-  document.body.classList.remove('noauth'); buildTabs(); go('home'); perfProbe();
+  document.body.classList.remove('noauth'); buildTabs(); loadConfig(); go('home'); perfProbe();
 }
 async function tgAuth() {
   document.body.classList.add('noauth'); $('#view').innerHTML = sk(2);
@@ -699,12 +737,12 @@ const SP = ['Сосна', 'Ель', 'Лиственница', 'Берёза', '�
 const SIZES = ['25×100', '40×100', '50×100', '50×150', '50×200', '100×100', '150×150'];
 const SRC = {
   con: () => Object.entries(D.con),
-  boards: () => D.boards.map(b => [b.id, `${b.species || 'Доска'} ${b.height_mm}×${b.width_mm}×${b.length_mm} · ${b.count} шт (№${b.id})`]),
-  logs: () => D.logs.map(l => [l.id, `${l.species || 'Бревно'} Ø${l.diameter_mm} · ${l.count} шт · ${fmt(l.volume_m3, 2)} м³ (№${l.id})`])
+  boards: () => D.boards.map(b => [b.id, `${boardLabel(b)} · ${b.count} шт`]),
+  logs: () => D.logs.map(l => [l.id, `${l.species || 'Бревно'} Ø${l.diameter_mm} × ${lenM(l.length_mm)} · ${l.count} шт · ${fmt(l.volume_m3, 2)} м³ · партия №${l.arrival_id}`])
 };
 const FORMS = {
   arrival: {
-    t: 'Приход леса', e: '📥', ok: 'Сохранить приход', path: '/arrivals', done: 'Приход зарегистрирован', after: 'home', auto: 'vol', need: ['con'],
+    t: 'Приход леса', e: 'arrival', ok: 'Сохранить приход', path: '/arrivals', done: 'Приход зарегистрирован', after: 'home', auto: 'vol', need: ['con'],
     f: [{k: 'supplier', l: 'Поставщик', t: 'sel', src: 'con', half: 1, m: 1}, {k: 'carrier', l: 'Перевозчик', t: 'sel', src: 'con', half: 1, m: 1},
       {k: 'truck', l: 'Номер машины', t: 'txt', ph: 'А000АА000', m: 1},
       {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1, h: 'Бревна в партии'},
@@ -718,7 +756,7 @@ const FORMS = {
       items: [{species: v.species, length_mm: Math.round(v.len), diameter_mm: Math.round(v.dia), count: Math.round(v.cnt), volume_m3: v.vol}]})
   },
   sawing: {
-    t: 'Распиловка', e: '🪚', ok: 'Сохранить распиловку', path: '/sawing', done: 'Распиловка сохранена', after: 'home', auto: 'vol', need: ['logs'],
+    t: 'Распиловка', e: 'sawing', ok: 'Сохранить распиловку', path: '/sawing', done: 'Распиловка сохранена', after: 'home', auto: 'vol', need: ['logs'],
     f: [{k: 'log', l: 'Сырьё (позиция прихода)', t: 'sel', src: 'logs'}, {k: 'lvol', l: 'Объём сырья, м³', t: 'num', v: 0, s: .1},
       {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1, h: 'Полученная продукция'},
       {k: 'size', l: 'Типовой размер', t: 'pre', c: SIZES},
@@ -734,7 +772,7 @@ const FORMS = {
       boards: [{species: v.species, grade: v.grade, height_mm: Math.round(v.th), width_mm: Math.round(v.wd), length_mm: Math.round(v.len), count: Math.round(v.cnt), volume_m3: v.vol}]})
   },
   order: {
-    t: 'Новый заказ', e: '🧾', ok: 'Создать заказ', path: '/orders', done: 'Заказ создан', after: 'orders', need: ['con', 'boards'],
+    t: 'Новый заказ', e: 'order', ok: 'Создать заказ', path: '/orders', done: 'Заказ создан', after: 'orders', need: ['con', 'boards'],
     f: [{k: 'con', l: 'Клиент', t: 'sel', src: 'con', m: 1}, {k: 'board', l: 'Доска со склада', t: 'sel', src: 'boards'},
       {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1}, {k: 'price', l: 'Цена за 1 м³, ₽', t: 'num', v: 9000, s: 500, half: 1, m: 1}],
     pv: v => {
@@ -744,7 +782,7 @@ const FORMS = {
         <div class="pvr"><span class="hint">На складе</span><b style="font-size:16px;color:${v.cnt > b.count ? 'var(--err)' : 'inherit'}">${b.count} шт${v.cnt > b.count ? ' · не хватает' : ''}</b></div>`;
     },
     req: v => !v.board ? 'Выберите доску' : v.cnt <= 0 ? 'Укажите количество' : null,
-    sum: v => `${fmt(v.cnt, 0)} шт по ${fmt(v.price, 0)} ₽ за м³, клиент: ${D.con[v.con] || '№' + v.con}`,
+    sum: v => { const b = D.boards.find(x => x.id == v.board); return `${b ? boardTitle(b) + ' · ' + lenM(b.length_mm) + ': ' : ''}${fmt(v.cnt, 0)} шт по ${fmt(v.price, 0)} ₽ за м³, клиент: ${D.con[v.con] || 'не выбран'}`; },
     mem: ['con', 'price'],
     body: v => ({contractor_id: +v.con || 1, status: 'new', delivery_price: 0, extra_price: 0, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
   }
@@ -809,23 +847,25 @@ const ACT = {
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
   new: v => { closeSheet(); go(v); },
   fab: () => sheet(`<div class="ctr" style="margin-bottom:14px"><h3>Что оформить?</h3></div>
-    ${[['arrival', '📥', 'Приход леса', 'Принять партию бревен'], ['sawing', '🪚', 'Распиловка', 'Записать результат распила'], canOrd() && ['order', '🧾', 'Новый заказ', 'Заказ клиента на доски']].filter(Boolean)
-      .map(([k, e, t, d]) => `<button class="srow glass rip" data-a="new" data-v="${k}"><span class="e">${e}</span><span><b>${t}</b><small>${d}</small></span>${ic('chev')}</button>`).join('')}`),
+    ${[['arrival', 'arrival', 'Приход леса', 'Принять партию бревен'], ['sawing', 'sawing', 'Распиловка', 'Записать результат распила'], canOrd() && ['order', 'order', 'Новый заказ', 'Заказ клиента на доски']].filter(Boolean)
+      .map(([k, e, t, d]) => `<button class="srow glass rip" data-a="new" data-v="${k}"><span class="e">${ic(e)}</span><span><b>${t}</b><small>${d}</small></span>${ic('chev')}</button>`).join('')}`),
   wt: v => { S.wt = v; S.wsp = ''; vStock(false); },
   sp: v => { S.wsp = v; vStock(false); },
   of: v => { S.of = v; vOrders(false); },
   range: v => { S.range = v; vStats(); },
   item: v => {
     const [t, id] = v.split(':'), x = find(t, id); if (!x) return;
-    sheet(`<h3>${t === 'boards' ? `${esc(x.species || 'Доска')} ${esc(x.height_mm)}×${esc(x.width_mm)}×${esc(x.length_mm)} мм` : `${esc(x.species || 'Бревно')} Ø${esc(x.diameter_mm)} · ${esc(x.length_mm)} мм`}</h3>
-      <div class="dl"><span class="hint">Номер позиции</span><b>№${esc(x.id)}</b></div><div class="dl"><span class="hint">Остаток</span><b>${esc(x.count)} шт</b></div>
-      <div class="dl"><span class="hint">Объём</span><b>${fmt(x.volume_m3, 3)} м³</b></div>
+    sheet(`<h3>${t === 'boards' ? esc(boardTitle(x)) : `Бревно Ø${esc(x.diameter_mm)}`}</h3>
+      <div class="dl"><span class="hint">Порода</span><b>${esc(x.species || 'не указана')}</b></div>
+      <div class="dl"><span class="hint">Длина</span><b>${lenM(x.length_mm)}</b></div>
       ${t === 'boards' ? `<div class="dl"><span class="hint">Сорт</span><b>${esc(x.grade || '1')}</b></div>` : `<div class="dl"><span class="hint">Партия прихода</span><b>№${esc(x.arrival_id)}</b></div>`}
+      <div class="dl"><span class="hint">Остаток</span><b>${esc(x.count)} шт</b></div>
+      <div class="dl"><span class="hint">Объём</span><b>${fmt(x.volume_m3, 3)} м³</b></div>
       ${t === 'boards' && canOrd() ? `<button class="btn rip" style="margin-top:14px" data-a="mk" data-v="order:board:${x.id}">Создать заказ на эту позицию</button>` : ''}
       ${t === 'logs' ? `<button class="btn rip" style="margin-top:14px" data-a="mk" data-v="sawing:log:${x.id}">Записать распиловку из этой партии</button>` : ''}`);
   },
   mk: v => { const [f, k, id] = v.split(':'); closeSheet(); go(f, {[k]: id}); },
-  done: (v, el) => ask('✅', 'Завершить заказ №' + v, 'Товары будут списаны со склада и проведены как продажа.', 'Завершить').then(ok => ok && doComplete(v, el)),
+  done: (v, el) => ask('ok', 'Завершить заказ №' + v, 'Товары будут списаны со склада и проведены как продажа.', 'Завершить').then(ok => ok && doComplete(v, el)),
   pdf: v => pdfSheet(v), pdfsend: (v, el) => pdfDo('send', v, el), pdfdl: (v, el) => pdfDo('dl', v, el), pdfview: (v, el) => pdfDo('view', v, el),
   chip: (v, el) => { fe(el.dataset.k).value = v; calcForm(); },
   size: v => { const [a, b] = v.split('×'); fe('th').value = a; fe('wd').value = b; calcForm(); },

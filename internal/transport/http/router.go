@@ -147,6 +147,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			r.Get("/boards", boardHandler.GetList)
 			r.Get("/logs", logHandler.GetList)
 			r.Get("/contractors", dictHandler.GetContractors)
+			r.Get("/config", ConfigHandler)
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleMaster))

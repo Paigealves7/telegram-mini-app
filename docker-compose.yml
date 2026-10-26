@@ -44,6 +44,8 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-}
       # Часовой пояс для дат в накладных, например Europe/Moscow или Europe/Tallinn
       TZ: ${TZ:-UTC}
+      # false = в приложении показывается, что отправка PDF в чат недоступна (блокировки)
+      PDF_SEND_ENABLED: ${PDF_SEND_ENABLED:-true}
       # Шапка накладной
       COMPANY_NAME: ${COMPANY_NAME:-Лесопилка}
       COMPANY_INFO: ${COMPANY_INFO:-}

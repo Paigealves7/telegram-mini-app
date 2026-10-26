@@ -248,7 +248,7 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 	footerLeft := fmt.Sprintf("Накладная № %d · %s", order.ID, s.company)
 	pdf.SetFooterFunc(func() {
 		pdf.SetY(-14)
-		pdf.SetDrawColor(215, 220, 215)
+		pdf.SetDrawColor(205, 205, 205)
 		pdf.SetLineWidth(0.2)
 		pdf.Line(marginX, pdf.GetY(), pageW-marginX, pdf.GetY())
 		pdf.SetFont(fontName, "", 8)
@@ -260,7 +260,7 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 	pdf.AddPage()
 
 	// ----- шапка -----
-	pdf.SetTextColor(46, 92, 62)
+	pdf.SetTextColor(30, 30, 30)
 	name := fitText(pdf, "B", s.company, 98, 16)
 	pdf.CellFormat(100, 8, name, "", 0, "L", false, 0, "")
 	pdf.SetTextColor(30, 30, 30)
@@ -284,8 +284,8 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 		infoEnd = y + 5
 	}
 	y = infoEnd + 3
-	pdf.SetDrawColor(46, 92, 62)
-	pdf.SetLineWidth(0.6)
+	pdf.SetDrawColor(60, 60, 60)
+	pdf.SetLineWidth(0.4)
 	pdf.Line(marginX, y, pageW-marginX, y)
 	pdf.SetXY(marginX, y+5)
 
@@ -310,15 +310,17 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 
 	// ----- таблица -----
 	drawHeader := func() {
-		pdf.SetFillColor(46, 92, 62)
-		pdf.SetTextColor(255, 255, 255)
+		// Шапка таблицы без заливки: тонкие линии сверху и снизу (так накладная экономно печатается)
+		pdf.SetTextColor(30, 30, 30)
+		pdf.SetDrawColor(60, 60, 60)
+		pdf.SetLineWidth(0.3)
 		for i, c := range tableCols {
 			txt := fitText(pdf, "B", c.title, c.w-2, 8.5)
 			ln := 0
 			if i == len(tableCols)-1 {
 				ln = 1
 			}
-			pdf.CellFormat(c.w, 9, txt, "", ln, "C", true, 0, "")
+			pdf.CellFormat(c.w, 9, txt, "TB", ln, "C", false, 0, "")
 		}
 	}
 	drawHeader()
@@ -339,9 +341,8 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 		totalVol += l.VolumeM3
 		totalSum += sum
 
-		fill := i%2 == 1
-		pdf.SetFillColor(244, 247, 244)
-		pdf.SetDrawColor(215, 220, 215)
+		fill := false
+		pdf.SetDrawColor(215, 215, 215)
 		pdf.SetLineWidth(0.2)
 		pdf.SetTextColor(30, 30, 30)
 		cells := []string{
@@ -372,16 +373,18 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 	const labelW, valW = 60.0, 40.0
 	totalRow := func(label, value string, accent bool) {
 		pdf.SetX(pageW - marginX - labelW - valW)
+		border := ""
+		pdf.SetTextColor(30, 30, 30)
 		if accent {
-			pdf.SetFillColor(46, 92, 62)
-			pdf.SetTextColor(255, 255, 255)
-			pdf.SetFont(fontName, "B", 11)
+			pdf.SetDrawColor(60, 60, 60)
+			pdf.SetLineWidth(0.3)
+			pdf.SetFont(fontName, "B", 12)
+			border = "T" // итог выделен жирным шрифтом и линией сверху, без заливки
 		} else {
-			pdf.SetTextColor(30, 30, 30)
 			pdf.SetFont(fontName, "", 10)
 		}
-		pdf.CellFormat(labelW, 7, label, "", 0, "R", accent, 0, "")
-		pdf.CellFormat(valW, 7, value, "", 1, "R", accent, 0, "")
+		pdf.CellFormat(labelW, 8, label, border, 0, "R", false, 0, "")
+		pdf.CellFormat(valW, 8, value, border, 1, "R", false, 0, "")
 	}
 	totalRow("Итого объём:", formatVolume(totalVol)+" м³", false)
 	totalRow("Сумма по позициям:", formatMoney(totalSum)+" руб.", false)

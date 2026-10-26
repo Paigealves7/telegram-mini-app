@@ -153,6 +153,10 @@ func (h *OrderHandler) ServePDF(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/orders/{id}/pdf/send — бот присылает накладную в личный чат пользователю.
 func (h *OrderHandler) PDFSend(w http.ResponseWriter, r *http.Request) {
+	if !pdfSendEnabled() {
+		http.Error(w, "отправка PDF в чат пока что недоступна из-за блокировок", http.StatusServiceUnavailable)
+		return
+	}
 	id, ok := parseOrderID(r)
 	if !ok {
 		http.Error(w, "некорректный ID заказа", http.StatusBadRequest)
