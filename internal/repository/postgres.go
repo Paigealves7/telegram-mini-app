@@ -98,8 +98,31 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.Sawin
 
 	logQuery := `INSERT INTO sawed_logs (sawing_id, log_id, volume_m3) VALUES ($1, $2, $3) RETURNING id`
 	for i := range sawedLogs {
+		if sawedLogs[i].LogID == nil {
+			return nil, ErrLogNotFound
+		}
+		logID := *sawedLogs[i].LogID
+
+		// Блокируем партию на время распила: два одновременных распила не спишут одно и то же сырьё дважды.
+		var remVol float64
+		var remCount int
+		err := tx.QueryRow(ctx, `SELECT remaining_volume_m3, remaining_count FROM log_items WHERE id = $1 FOR UPDATE`, logID).Scan(&remVol, &remCount)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrLogNotFound
+			}
+			return nil, err
+		}
+		newVol, newCount, err := consumeLog(remVol, remCount, sawedLogs[i].VolumeM3)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE log_items SET remaining_volume_m3 = $1, remaining_count = $2 WHERE id = $3`, newVol, newCount, logID); err != nil {
+			return nil, err
+		}
+
 		sawedLogs[i].SawingID = op.ID
-		err := tx.QueryRow(ctx, logQuery, op.ID, sawedLogs[i].LogID, sawedLogs[i].VolumeM3).Scan(&sawedLogs[i].ID)
+		err = tx.QueryRow(ctx, logQuery, op.ID, sawedLogs[i].LogID, sawedLogs[i].VolumeM3).Scan(&sawedLogs[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -404,7 +427,7 @@ func (r *Repository) GetAllBoards(ctx context.Context, filter domain.BoardFilter
 }
 
 func (r *Repository) GetAllLogs(ctx context.Context, filter domain.LogFilter, limit, offset int) ([]domain.LogItem, error) {
-	query := `SELECT id, arrival_id, length_mm, diameter_mm, species, count, volume_m3 FROM log_items WHERE 1=1`
+	query := `SELECT id, arrival_id, length_mm, diameter_mm, species, remaining_count, remaining_volume_m3 FROM log_items WHERE remaining_volume_m3 > 0`
 
 	args := []interface{}{}
 	argID := 1

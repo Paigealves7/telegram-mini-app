@@ -12,7 +12,9 @@ services:
       - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./migrations/000001_v1_init_schema.up.sql:/docker-entrypoint-initdb.d/init.sql
+      # Только на пустой базе. Выполняются по порядку имён; down-файлы подключать нельзя: они удаляют таблицы.
+      - ./migrations/000001_v1_init_schema.up.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./migrations/000002_log_stock.up.sql:/docker-entrypoint-initdb.d/02_log_stock.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d telegram-mini-app_db"]
       interval: 5s

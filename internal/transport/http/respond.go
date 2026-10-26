@@ -89,10 +89,10 @@ func serverError(w http.ResponseWriter, r *http.Request, what string, err error)
 // получают понятное сообщение и код 4xx, остальное считается сбоем сервера.
 func respondError(w http.ResponseWriter, r *http.Request, what string, err error) {
 	switch {
-	case errors.Is(err, repository.ErrInsufficientStock):
+	case errors.Is(err, repository.ErrInsufficientStock), errors.Is(err, repository.ErrInsufficientLogs):
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
-	case errors.Is(err, repository.ErrBoardNotFound), errors.Is(err, repository.ErrBoardEmpty):
+	case errors.Is(err, repository.ErrBoardNotFound), errors.Is(err, repository.ErrBoardEmpty), errors.Is(err, repository.ErrLogNotFound):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
