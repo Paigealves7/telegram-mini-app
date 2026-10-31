@@ -84,6 +84,17 @@ func (r *Repository) CreateLogArrival(ctx context.Context, arrival *domain.LogAr
 }
 
 func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.SawingOperation, sawedLogs []domain.SawedLog, producedBoards []domain.Board) (*domain.SawingOperation, error) {
+	var inputVolume, outputVolume float64
+	for _, log := range sawedLogs {
+		inputVolume += log.VolumeM3
+	}
+	for _, board := range producedBoards {
+		outputVolume += board.VolumeM3
+	}
+	if err := validateSawingYield(inputVolume, outputVolume); err != nil {
+		return nil, err
+	}
+
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -143,14 +154,24 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.Sawin
 	return op, nil
 }
 
+const sawingVolumeTolerance = 0.0005 // Допуск на округление объёма до трёх знаков.
+
 var (
-	ErrInsufficientStock = errors.New("недостаточно товара на складе")
-	ErrBoardNotFound     = errors.New("доска не найдена на складе")
-	ErrBoardEmpty        = errors.New("этой позиции нет на складе")
-	ErrOrderNotFound     = errors.New("заказ не найден")
-	ErrOrderClosed       = errors.New("заказ уже завершен или отменен")
-	ErrOrderEmpty        = errors.New("невозможно завершить пустой заказ")
+	ErrSawingYieldExceedsInput = errors.New("объём досок превышает объём распиленного сырья")
+	ErrInsufficientStock       = errors.New("недостаточно товара на складе")
+	ErrBoardNotFound           = errors.New("доска не найдена на складе")
+	ErrBoardEmpty              = errors.New("этой позиции нет на складе")
+	ErrOrderNotFound           = errors.New("заказ не найден")
+	ErrOrderClosed             = errors.New("заказ уже завершен или отменен")
+	ErrOrderEmpty              = errors.New("невозможно завершить пустой заказ")
 )
+
+func validateSawingYield(inputVolume, outputVolume float64) error {
+	if outputVolume > inputVolume+sawingVolumeTolerance {
+		return ErrSawingYieldExceedsInput
+	}
+	return nil
+}
 
 func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []domain.SaleItem) (*domain.Sale, error) {
 	tx, err := r.db.Begin(ctx)
@@ -306,6 +327,35 @@ func (r *Repository) CompleteOrder(ctx context.Context, orderID, userID int64) (
 	return &o, nil
 }
 
+type boardStock struct {
+	count  int
+	volume float64
+}
+
+func requestedOrderCounts(items []domain.OrderItem) map[int64]int {
+	requested := make(map[int64]int, len(items))
+	for _, item := range items {
+		requested[item.BoardID] += item.Count
+	}
+	return requested
+}
+
+func validateOrderStock(requested map[int64]int, stocks map[int64]boardStock) error {
+	for boardID, count := range requested {
+		stock, ok := stocks[boardID]
+		if !ok {
+			return ErrBoardNotFound
+		}
+		if stock.count <= 0 {
+			return ErrBoardEmpty
+		}
+		if count > stock.count {
+			return ErrInsufficientStock
+		}
+	}
+	return nil
+}
+
 func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items []domain.OrderItem) (*domain.Order, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -320,21 +370,27 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 	}
 
 	itemQuery := `INSERT INTO order_boards (order_id, board_id, count, volume_m3, price) VALUES ($1, $2, $3, $4, $5) RETURNING id`
-	for i := range items {
-		// Объём считаем по складу, а не доверяем клиенту.
-		var boardCount int
-		var boardVolume float64
-		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE id = $1`, items[i].BoardID).Scan(&boardCount, &boardVolume)
+	requestedByBoard := requestedOrderCounts(items)
+	boardStocks := make(map[int64]boardStock, len(requestedByBoard))
+	for boardID := range requestedByBoard {
+		var stock boardStock
+		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE id = $1`, boardID).Scan(&stock.count, &stock.volume)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil, ErrBoardNotFound
 			}
 			return nil, err
 		}
-		if boardCount <= 0 {
-			return nil, ErrBoardEmpty
-		}
-		items[i].VolumeM3 = domain.ItemVolume(boardCount, boardVolume, items[i].Count)
+		boardStocks[boardID] = stock
+	}
+	if err := validateOrderStock(requestedByBoard, boardStocks); err != nil {
+		return nil, err
+	}
+
+	for i := range items {
+		// Объём считаем по складу, а не доверяем клиенту.
+		stock := boardStocks[items[i].BoardID]
+		items[i].VolumeM3 = domain.ItemVolume(stock.count, stock.volume, items[i].Count)
 
 		items[i].OrderID = order.ID
 		err = tx.QueryRow(ctx, itemQuery, order.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID)

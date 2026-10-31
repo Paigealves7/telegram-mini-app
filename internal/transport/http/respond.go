@@ -92,6 +92,9 @@ func respondError(w http.ResponseWriter, r *http.Request, what string, err error
 	case errors.Is(err, repository.ErrInsufficientStock), errors.Is(err, repository.ErrInsufficientLogs):
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
+	case errors.Is(err, repository.ErrSawingYieldExceedsInput):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	case errors.Is(err, repository.ErrBoardNotFound), errors.Is(err, repository.ErrBoardEmpty), errors.Is(err, repository.ErrLogNotFound):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
