@@ -452,17 +452,33 @@ let tt;
 function toast(m, k = 'ok') { const t = $('#toast'); t.className = 'glass ' + k + ' on'; t.textContent = m; clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2900); }
 
 async function api(path, opts = {}) {
-  const headers = {'Content-Type': 'application/json'};
+  const headers = {'Content-Type': 'application/json', ...(opts.headers || {})};
   if (token()) headers.Authorization = 'Bearer ' + token();
-  const r = await fetch('/api/v1' + path, {...opts, headers});
-  if (!r.ok) throw new Error((await r.text()).trim() || 'Ошибка ' + r.status);
-  const t = await r.text();
-  return t ? JSON.parse(t) : null;
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
+  let r, text;
+  try {
+    r = await fetch('/api/v1' + path, {...opts, headers, signal: controller.signal});
+    text = await r.text();
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Сервер долго не отвечает. Проверьте соединение и повторите попытку.');
+    throw new Error('Не удалось связаться с сервером. Проверьте подключение и повторите попытку.');
+  } finally { clearTimeout(timer); }
+  let data = null;
+  if (text) { try { data = JSON.parse(text); } catch (e) { data = null; } }
+  if (!r.ok) {
+    const supplied = data && (data.message || data.error || data.detail);
+    const plainMessage = !data && text.trim() ? text.trim() : null;
+    if (r.status === 401 || r.status === 403) throw new Error(supplied || plainMessage || 'Нет доступа. Возможно, нужно войти снова.');
+    if (r.status >= 500) throw new Error(supplied || plainMessage || 'На сервере произошла ошибка. Попробуйте позже.');
+    throw new Error(supplied || plainMessage || (r.status === 400 ? 'Проверьте введённые данные.' : `Не удалось выполнить запрос (${r.status}).`));
+  }
+  if (text && data === null) throw new Error('Сервер вернул некорректный ответ. Попробуйте позже.');
+  return data;
 }
-const safe = async u => { try { return (await api(u)) || []; } catch (e) { return null; } };
-async function loadConfig() { try { const c = await api('/config'); if (c) CFG = {...CFG, ...c}; } catch (e) {} }
-async function loadStock() { const [b, l] = await Promise.all([safe('/boards'), safe('/logs')]); if (b) D.boards = b; if (l) D.logs = l; }
-async function ensureCon() { if (Object.keys(D.con).length) return; (await safe('/contractors') || []).forEach(c => D.con[c.id] = c.name); }
+const safe = async u => { try { return (await api(u)) || []; } catch (e) { toast(e.message, 'err'); return null; } };
+async function loadConfig() { try { const c = await api('/config'); if (c) CFG = {...CFG, ...c}; } catch (e) { /* необязательная конфигурация: используются значения по умолчанию */ } }
+async function loadStock() { const [b, l] = await Promise.all([safe('/boards'), safe('/logs')]); if (b) D.boards = b; if (l) D.logs = l; return !!b && !!l; }
+async function ensureCon() { if (Object.keys(D.con).length) return true; const list = await safe('/contractors'); if (!list) return false; list.forEach(c => D.con[c.id] = c.name); return true; }
 
 function countUp(root = $('#view')) {
   const still = matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -532,9 +548,9 @@ const sQ = (a, b) => `/statistics?start_date=${encodeURIComponent(a)}&end_date=$
 async function vHome() {
   const v = $('#view'), m = S.role === 'manager';
   v.innerHTML = sk(3);
-  const [, orders, st] = await Promise.all([loadStock(), canOrd() ? safe('/orders') : [], m ? api(sQ(...rng('month'))).catch(() => null) : null, ensureCon()]);
+  const [, orders, st] = await Promise.all([loadStock(), canOrd() ? safe('/orders') : [], m ? api(sQ(...rng('month'))).catch(e => { toast(e.message, 'err'); return null; }) : null, ensureCon()]);
   if (S.cur !== 'home') return;
-  D.orders = orders || [];
+  if (orders) D.orders = orders;
   const bv = sum(D.boards, 'volume_m3'), bc = sum(D.boards, 'count'), lv = sum(D.logs, 'volume_m3');
   const open = D.orders.filter(o => o.status !== 'completed' && o.status !== 'canceled');
   const by = {}; D.boards.forEach(b => { const k = b.species || '—'; by[k] = (by[k] || 0) + (+b.volume_m3 || 0); });
@@ -563,7 +579,7 @@ async function vHome() {
 /* ---------- склад ---------- */
 async function vStock(fetchNew = true) {
   const v = $('#view');
-  if (fetchNew) { v.innerHTML = sk(5); await loadStock(); if (S.cur !== 'stock') return; }
+  if (fetchNew) { v.innerHTML = sk(5); const ok = await loadStock(); if (S.cur !== 'stock') return; if (!ok) { v.innerHTML = `<div class="empty glass card"><span class="e">${ic('warn')}</span>Не удалось загрузить склад.<button class="btn ghost rip" data-a="go" data-v="stock">Повторить</button></div>`; return; } }
   const list = S.wt === 'boards' ? D.boards : D.logs, sps = [...new Set(list.map(x => x.species || '—'))];
   v.innerHTML = `
     <div class="srch glass">${ic('search')}<input id="q" placeholder="Поиск: порода, размер, №" value="${esc(S.wq)}"></div>
@@ -611,7 +627,7 @@ function oCard(o, i = 0) {
 }
 async function vOrders(fetchNew = true) {
   const v = $('#view');
-  if (fetchNew) { v.innerHTML = sk(4); const [o] = await Promise.all([safe('/orders'), ensureCon()]); if (S.cur !== 'orders') return; if (o) D.orders = o; }
+  if (fetchNew) { v.innerHTML = sk(4); const [o] = await Promise.all([safe('/orders'), ensureCon()]); if (S.cur !== 'orders') return; if (!o) { v.innerHTML = `<div class="empty glass card"><span class="e">${ic('warn')}</span>Не удалось загрузить заказы.<button class="btn ghost rip" data-a="go" data-v="orders">Повторить</button></div>`; return; } D.orders = o; }
   const c = {all: D.orders.length, open: D.orders.filter(isOpen).length, done: D.orders.filter(o => !isOpen(o)).length};
   v.innerHTML = `<div class="srch glass">${ic('search')}<input id="oq" placeholder="Поиск по №, клиенту" value="${esc(S.oq)}"></div>
     <div class="chips">${[['all', 'Все'], ['open', 'Активные'], ['done', 'Завершённые']].map(([k, l]) => `<button class="chip rip ${S.of === k ? 'on' : ''}" data-a="of" data-v="${k}">${l} · ${c[k]}</button>`).join('')}</div>
@@ -749,10 +765,10 @@ const FORMS = {
       {k: 'len', l: 'Длина, мм', t: 'num', v: 6000, s: 100, half: 1}, {k: 'dia', l: 'Диаметр, мм', t: 'num', v: 220, s: 10, half: 1},
       {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1}, {k: 'vol', l: 'Объём, м³', t: 'num', v: 0, s: .1, half: 1}],
     calc: v => ({vol: Math.PI * (v.dia / 2000) ** 2 * (v.len / 1000) * v.cnt}),
-    req: v => !v.truck ? 'Укажите номер машины' : v.cnt <= 0 ? 'Укажите количество бревен' : v.vol <= 0 ? 'Объём должен быть больше нуля' : null,
+    req: v => !Object.keys(D.con).length ? 'Не загружен список поставщиков и перевозчиков' : !v.supplier || !v.carrier ? 'Выберите поставщика и перевозчика' : !v.truck ? 'Укажите номер машины' : v.cnt <= 0 ? 'Укажите количество бревен' : v.vol <= 0 ? 'Объём должен быть больше нуля' : null,
     sum: v => `${v.species}: ${fmt(v.cnt, 0)} шт, ${fmt(v.vol, 3)} м³, машина ${v.truck}`,
     mem: ['supplier', 'carrier', 'truck', 'species'],
-    body: v => ({supplier_id: +v.supplier || 1, carrier_id: +v.carrier || 1, truck_number: v.truck, arrival_date: ymd(new Date()),
+    body: v => ({supplier_id: +v.supplier, carrier_id: +v.carrier, truck_number: v.truck, arrival_date: ymd(new Date()),
       items: [{species: v.species, length_mm: Math.round(v.len), diameter_mm: Math.round(v.dia), count: Math.round(v.cnt), volume_m3: v.vol}]})
   },
   sawing: {
@@ -781,10 +797,10 @@ const FORMS = {
       return `<div class="pvr"><span class="hint">Объём заказа</span><b>${fmt(vol, 3)} м³</b></div><div class="pvr"><span class="hint">Сумма</span><b class="gt">${fmt(vol * v.price, 0)} ₽</b></div>
         <div class="pvr"><span class="hint">На складе</span><b style="font-size:16px;color:${v.cnt > b.count ? 'var(--err)' : 'inherit'}">${b.count} шт${v.cnt > b.count ? ' · не хватает' : ''}</b></div>`;
     },
-    req: v => !v.board ? 'Выберите доску' : v.cnt <= 0 ? 'Укажите количество' : null,
+    req: v => !Object.keys(D.con).length ? 'Не загружен список клиентов' : !v.con ? 'Выберите клиента' : !v.board ? 'Выберите доску' : v.cnt <= 0 ? 'Укажите количество' : null,
     sum: v => { const b = D.boards.find(x => x.id == v.board); return `${b ? boardTitle(b) + ' · ' + lenM(b.length_mm) + ': ' : ''}${fmt(v.cnt, 0)} шт по ${fmt(v.price, 0)} ₽ за м³, клиент: ${D.con[v.con] || 'не выбран'}`; },
     mem: ['con', 'price'],
-    body: v => ({contractor_id: +v.con || 1, status: 'new', delivery_price: 0, extra_price: 0, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
+    body: v => ({contractor_id: +v.con, status: 'new', delivery_price: 0, extra_price: 0, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
   }
 };
 let FK = null;
@@ -814,8 +830,10 @@ async function vForm(kind, p = {}) {
   const F = FORMS[kind]; FK = kind;
   $('#view').innerHTML = `<div class="card glass"><div class="fgrid">${F.f.map(fld).join('')}</div></div>${F.pv ? '<div class="card glass pv" id="pv"></div>' : ''}`;
   $('#ok').textContent = F.ok;
-  await Promise.all([F.need.includes('con') ? ensureCon() : 0, F.need.some(n => n !== 'con') ? loadStock() : 0]);
+  const needs = await Promise.all([F.need.includes('con') ? ensureCon() : true, F.need.some(n => n !== 'con') ? loadStock() : true]);
   if (S.cur !== kind) return;
+  if (needs.some(ok => !ok)) { $('#view').innerHTML = `<div class="empty glass card"><span class="e">${ic('warn')}</span>Не удалось загрузить данные для формы.<button class="btn ghost rip" data-a="retryform">Повторить</button></div>`; $('#ok').disabled = true; return; }
+  $('#ok').disabled = false;
   F.f.forEach(f => {
     if (f.t !== 'sel' || !f.src) return;
     const el = fe(f.k), o = SRC[f.src]();
@@ -843,7 +861,7 @@ async function submitForm() {
 /* ---------- события ---------- */
 const find = (t, id) => (t === 'boards' ? D.boards : D.logs).find(x => x.id == id);
 const ACT = {
-  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth,
+  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK),
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
   new: v => { closeSheet(); go(v); },
   fab: () => sheet(`<div class="ctr" style="margin-bottom:14px"><h3>Что оформить?</h3></div>
