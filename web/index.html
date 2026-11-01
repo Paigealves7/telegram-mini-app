@@ -322,32 +322,41 @@ body.form .act{display:block}
 #toast.ok::before{content:"";display:inline-block;width:8px;height:8px;margin-right:9px;border-radius:50%;background:#34c759}
 #toast.err::before{content:"";display:inline-block;width:8px;height:8px;margin-right:9px;border-radius:50%;background:#ff453a}
 
-/* ---------- вход: тёмная студийная панель и точечные руки по референсу ---------- */
+/* ---------- вход: liquid glass и исходный точечный арт из референса ---------- */
 body.noauth{background:#05060f;color:#f4f4f5;min-height:100svh;overflow:hidden}
 body.noauth .bg,body.noauth .top,body.noauth .tabs,body.noauth .act{display:none}
 body.noauth #view{width:100%;min-height:100svh;min-height:100dvh;padding:0;display:grid;place-items:center}
-.login-scene{width:100%;min-height:100svh;min-height:100dvh;position:relative;isolation:isolate;overflow:hidden;display:grid;place-items:center;background:#05060f url("/hands-reference.jpg") center center/cover no-repeat}
-.login-scene::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,6,15,.12),rgba(5,6,15,.4) 33%,rgba(5,6,15,.4) 67%,rgba(5,6,15,.12))}
-.login{position:relative;z-index:1;width:min(100% - 36px,380px);margin:0 auto;padding:36px 28px;text-align:center;border-radius:18px;background:rgba(17,18,25,.84);box-shadow:inset 0 0 0 1px rgba(186,215,247,.11),0 20px 65px rgba(0,0,0,.28);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-.login .logo{display:grid;place-items:center;width:52px;height:52px;margin:0 auto 18px;border-radius:13px;background:rgba(186,214,247,.07);box-shadow:inset 0 0 0 1px rgba(186,215,247,.12)}
-.login .logo svg{width:30px;height:30px;color:#d8ecf8}
+.login-scene{width:100%;min-height:100svh;min-height:100dvh;position:relative;isolation:isolate;overflow:hidden;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 50%,#11131b 0%,#080910 52%,#05060f 100%)}
+.login-scene::before,.login-scene::after{content:"";position:absolute;z-index:0;top:50%;width:40vw;height:min(58vh,475px);background-image:url("/hands-reference.jpg");background-repeat:no-repeat;background-size:auto 100%;pointer-events:none;opacity:.94;transform:translateY(-50%);filter:contrast(1.08)}
+.login-scene::before{left:0;background-position:left center}
+.login-scene::after{right:0;background-position:right center}
+.login{position:relative;z-index:1;width:min(calc(100% - 36px),360px);margin:0 auto;padding:34px 28px 29px;text-align:center;border-radius:24px;overflow:hidden;
+  background:linear-gradient(145deg,rgba(255,255,255,.105),rgba(255,255,255,.025) 38%,rgba(145,170,210,.045) 100%),rgba(18,20,29,.62);
+  border:1px solid rgba(226,238,255,.17);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(255,255,255,.035),0 24px 80px rgba(0,0,0,.46),0 0 60px rgba(125,153,205,.08);
+  backdrop-filter:blur(28px) saturate(155%);-webkit-backdrop-filter:blur(28px) saturate(155%)}
+.login::before{content:"";position:absolute;inset:1px 1px auto;height:42%;border-radius:23px 23px 50% 50%;background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,0));pointer-events:none}
+.login>*{position:relative}
+.login .logo{display:grid;place-items:center;width:50px;height:50px;margin:0 auto 18px;border-radius:15px;background:linear-gradient(145deg,rgba(255,255,255,.13),rgba(255,255,255,.035));border:1px solid rgba(255,255,255,.13);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 8px 24px rgba(0,0,0,.24)}
+.login .logo svg{width:29px;height:29px;color:#d8ecf8}
 .login .wordmark{font-family:var(--font-display);font-weight:500;font-size:23px;letter-spacing:-.01em;margin:0 0 6px;color:#fff}
-.login .welcome-sub{font-size:12px;color:#a6a9b2;margin:0 0 22px}
+.login .welcome-sub{font-size:12px;color:#b2b7c4;margin:0 0 22px}
 .login .card{max-width:100%;margin:0;padding:0;background:none;background-image:none;box-shadow:none;animation:none}
 .login .fld{text-align:left;margin-bottom:10px}
 .login .fld>label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-.login .fld input{height:46px;border-radius:9px;background:rgba(5,6,15,.55);box-shadow:inset 0 0 0 1px rgba(186,215,247,.1);font-size:13px;padding:0 14px}
-.login .fld input::placeholder{color:#858995}
-.login .btn{min-height:44px;margin-top:4px;border-radius:9px;background:#f4f4f5;color:#1d1d1f;box-shadow:none;font-size:13px}
-.login .legal{margin:17px 0 0;color:#858995;font-size:10px;line-height:1.5}
-.login .legal a{color:#c7d3ea;text-decoration:underline;text-underline-offset:2px}
+.login .fld input{height:46px;border-radius:11px;background:rgba(5,7,13,.34);border:1px solid rgba(225,237,255,.105);box-shadow:inset 0 1px 4px rgba(0,0,0,.2),0 1px 0 rgba(255,255,255,.035);font-size:13px;padding:0 14px;transition:border-color .2s,background .2s,box-shadow .2s}
+.login .fld input:focus{border-color:rgba(194,218,255,.42);background:rgba(5,7,13,.5);box-shadow:0 0 0 3px rgba(182,217,252,.08),inset 0 1px 4px rgba(0,0,0,.2)}
+.login .fld input::placeholder{color:#9a9eaa}
+.login .btn{min-height:45px;margin-top:4px;border-radius:11px;background:linear-gradient(180deg,#fff,#e3e7ee);color:#17191f;box-shadow:inset 0 1px 0 #fff,0 7px 18px rgba(0,0,0,.2);font-size:13px}
+.login .legal{margin:17px 0 0;color:#969ba8;font-size:10px;line-height:1.5}
+.login .legal a{color:#d2d9e6;text-decoration:underline;text-underline-offset:2px}
 body.noauth #toast{background:rgba(28,28,30,.96)}
-@media(max-width:540px){
-  .login-scene{background-position:center center}
-  .login-scene::before{background:rgba(5,6,15,.52)}
-  .login{width:min(100% - 32px,380px);padding:32px 22px}
+@media(max-width:650px){
+  .login-scene::before,.login-scene::after{width:35vw;height:min(42vh,360px);opacity:.62}
+  .login-scene::before{left:-3vw}.login-scene::after{right:-3vw}
+  .login{width:min(calc(100% - 32px),360px);padding:31px 22px 26px;background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.035) 40%,rgba(145,170,210,.05)),rgba(15,17,25,.78)}
 }
-@media(prefers-reduced-transparency:reduce){.login{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(17,18,25,.96)}}
+@media(prefers-reduced-transparency:reduce){.login{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(17,18,25,.97)}}
 .av{width:88px;height:88px;margin:4px auto 14px;font-size:36px;font-family:var(--font-display);font-weight:500;color:var(--color-ice-highlight)}
 
 /* ---------- экономный режим: включается вручную в профиле или автоматически на слабых устройствах ---------- */
