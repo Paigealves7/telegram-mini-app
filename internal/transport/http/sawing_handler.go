@@ -21,6 +21,17 @@ type CreateSawingRequest struct {
 	Boards []domain.Board    `json:"boards" validate:"required,min=1,dive"`
 }
 
+func (h *SawingHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	limit, offset := pageParams(r, 100, 500)
+	ops, err := h.repo.GetSawingOperations(r.Context(), limit, offset)
+	if err != nil {
+		serverError(w, r, "не удалось получить историю распилов", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(ops)
+}
+
 func (h *SawingHandler) CreateSawing(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {

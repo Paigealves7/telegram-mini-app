@@ -1,0 +1,4 @@
+BEGIN;
+DROP INDEX IF EXISTS idx_boards_sawing_id;
+ALTER TABLE boards DROP COLUMN IF EXISTS sawing_id;
+COMMIT;

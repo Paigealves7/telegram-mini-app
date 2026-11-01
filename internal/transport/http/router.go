@@ -72,7 +72,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	sawingHandler := NewSawingHandler(repo)
 
 	// В SalesHandler теперь передаем Service, а не Repo
-	salesHandler := NewSalesHandler(salesService)
+	salesHandler := NewSalesHandler(salesService, repo)
 
 	orderHandler := NewOrderHandler(repo, orderService, pdfService, botService)
 	tgAuthHandler := NewTelegramAuthHandler(repo, botToken, jwtSecret)
@@ -152,7 +152,9 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleMaster))
 				r.Post("/contractors", dictHandler.CreateContractor)
+				r.Get("/arrivals", arrivalHandler.GetList)
 				r.Post("/arrivals", arrivalHandler.CreateArrival)
+				r.Get("/sales", salesHandler.GetList)
 				r.Post("/sales", salesHandler.CreateSale)
 				r.Get("/orders", orderHandler.GetOrders)
 				r.Post("/orders", orderHandler.CreateOrder)
@@ -164,6 +166,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleWorker))
+				r.Get("/sawing", sawingHandler.GetList)
 				r.Post("/sawing", sawingHandler.CreateSawing)
 			})
 

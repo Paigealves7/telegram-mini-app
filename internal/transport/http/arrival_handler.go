@@ -23,6 +23,18 @@ type CreateArrivalRequest struct {
 	Items       []domain.LogItem `json:"items" validate:"required,min=1,dive"` // dive валидирует элементы массива!
 }
 
+// GetList returns the paginated arrival history, including each arrival's tally.
+func (h *ArrivalHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	limit, offset := pageParams(r, 100, 500)
+	arrivals, err := h.repo.GetLogArrivals(r.Context(), limit, offset)
+	if err != nil {
+		serverError(w, r, "не удалось получить историю поступлений", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(arrivals)
+}
+
 func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {

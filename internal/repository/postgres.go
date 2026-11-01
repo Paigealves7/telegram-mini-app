@@ -53,6 +53,54 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*d
 	return &user, err
 }
 
+// GetLogArrivals returns the most recent arrivals and their tally items.
+func (r *Repository) GetLogArrivals(ctx context.Context, limit, offset int) ([]domain.LogArrival, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, COALESCE(supplier_id, 0), COALESCE(carrier_id, 0), truck_number, arrival_date::text, COALESCE(created_by, 0), created_at
+		FROM log_arrivals ORDER BY arrival_date DESC, id DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	arrivals := make([]domain.LogArrival, 0)
+	for rows.Next() {
+		var arrival domain.LogArrival
+		if err := rows.Scan(&arrival.ID, &arrival.SupplierID, &arrival.CarrierID, &arrival.TruckNumber, &arrival.ArrivalDate, &arrival.CreatedBy, &arrival.CreatedAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		arrivals = append(arrivals, arrival)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+
+	for i := range arrivals {
+		items, err := r.db.Query(ctx, `
+			SELECT id, arrival_id, length_mm, diameter_mm, species, count, volume_m3
+			FROM log_items WHERE arrival_id = $1 ORDER BY id`, arrivals[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		arrivals[i].Items = make([]domain.LogItem, 0)
+		for items.Next() {
+			var item domain.LogItem
+			if err := items.Scan(&item.ID, &item.ArrivalID, &item.LengthMM, &item.DiameterMM, &item.Species, &item.Count, &item.VolumeM3); err != nil {
+				items.Close()
+				return nil, err
+			}
+			arrivals[i].Items = append(arrivals[i].Items, item)
+		}
+		if err := items.Err(); err != nil {
+			items.Close()
+			return nil, err
+		}
+		items.Close()
+	}
+	return arrivals, nil
+}
+
 func (r *Repository) CreateLogArrival(ctx context.Context, arrival *domain.LogArrival, items []domain.LogItem) (*domain.LogArrival, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -139,9 +187,9 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.Sawin
 		}
 	}
 
-	boardQuery := `INSERT INTO boards (height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
+	boardQuery := `INSERT INTO boards (height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3, sawing_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
 	for i := range producedBoards {
-		err := tx.QueryRow(ctx, boardQuery, producedBoards[i].HeightMM, producedBoards[i].WidthMM, producedBoards[i].LengthMM, producedBoards[i].Species, producedBoards[i].Grade, producedBoards[i].Count, producedBoards[i].VolumeM3, producedBoards[i].PricePerM3).Scan(&producedBoards[i].ID)
+		err := tx.QueryRow(ctx, boardQuery, producedBoards[i].HeightMM, producedBoards[i].WidthMM, producedBoards[i].LengthMM, producedBoards[i].Species, producedBoards[i].Grade, producedBoards[i].Count, producedBoards[i].VolumeM3, producedBoards[i].PricePerM3, op.ID).Scan(&producedBoards[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -171,6 +219,52 @@ func validateSawingYield(inputVolume, outputVolume float64) error {
 		return ErrSawingYieldExceedsInput
 	}
 	return nil
+}
+
+// GetSales returns sales history with their line items.
+func (r *Repository) GetSales(ctx context.Context, limit, offset int) ([]domain.Sale, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, contractor_id, truck_number, delivery_price, extra_price, total_volume,
+		       total_price, COALESCE(created_by, 0), created_at
+		FROM sales ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	sales := make([]domain.Sale, 0)
+	for rows.Next() {
+		var sale domain.Sale
+		if err := rows.Scan(&sale.ID, &sale.ContractorID, &sale.TruckNumber, &sale.DeliveryPrice, &sale.ExtraPrice, &sale.TotalVolume, &sale.TotalPrice, &sale.CreatedBy, &sale.CreatedAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		sales = append(sales, sale)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+	for i := range sales {
+		items, err := r.db.Query(ctx, `SELECT id, sale_id, board_id, count, volume_m3, price FROM sale_boards WHERE sale_id = $1 ORDER BY id`, sales[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		sales[i].Items = make([]domain.SaleItem, 0)
+		for items.Next() {
+			var item domain.SaleItem
+			if err := items.Scan(&item.ID, &item.SaleID, &item.BoardID, &item.Count, &item.VolumeM3, &item.Price); err != nil {
+				items.Close()
+				return nil, err
+			}
+			sales[i].Items = append(sales[i].Items, item)
+		}
+		if err := items.Err(); err != nil {
+			items.Close()
+			return nil, err
+		}
+		items.Close()
+	}
+	return sales, nil
 }
 
 func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []domain.SaleItem) (*domain.Sale, error) {
@@ -425,6 +519,69 @@ func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain
 		return nil, err
 	}
 	return orders, nil
+}
+
+// GetSawingOperations returns recent production operations and their input/output records.
+func (r *Repository) GetSawingOperations(ctx context.Context, limit, offset int) ([]domain.SawingOperation, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, worker_id, date::text, created_at FROM sawing_operations ORDER BY date DESC, id DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	ops := make([]domain.SawingOperation, 0)
+	for rows.Next() {
+		var op domain.SawingOperation
+		if err := rows.Scan(&op.ID, &op.WorkerID, &op.Date, &op.CreatedAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ops = append(ops, op)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+	for i := range ops {
+		logs, err := r.db.Query(ctx, `SELECT id, sawing_id, log_id, volume_m3 FROM sawed_logs WHERE sawing_id = $1 ORDER BY id`, ops[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		ops[i].Logs = make([]domain.SawedLog, 0)
+		for logs.Next() {
+			var item domain.SawedLog
+			if err := logs.Scan(&item.ID, &item.SawingID, &item.LogID, &item.VolumeM3); err != nil {
+				logs.Close()
+				return nil, err
+			}
+			ops[i].Logs = append(ops[i].Logs, item)
+		}
+		if err := logs.Err(); err != nil {
+			logs.Close()
+			return nil, err
+		}
+		logs.Close()
+		boards, err := r.db.Query(ctx, `SELECT id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3 FROM boards WHERE sawing_id = $1 ORDER BY id`, ops[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		ops[i].Boards = make([]domain.Board, 0)
+		for boards.Next() {
+			var board domain.Board
+			var price *float64
+			if err := boards.Scan(&board.ID, &board.HeightMM, &board.WidthMM, &board.LengthMM, &board.Species, &board.Grade, &board.Count, &board.VolumeM3, &price); err != nil {
+				boards.Close()
+				return nil, err
+			}
+			board.PricePerM3 = price
+			ops[i].Boards = append(ops[i].Boards, board)
+		}
+		if err := boards.Err(); err != nil {
+			boards.Close()
+			return nil, err
+		}
+		boards.Close()
+	}
+	return ops, nil
 }
 
 func (r *Repository) GetAllBoards(ctx context.Context, filter domain.BoardFilter, limit, offset int) ([]domain.Board, error) {
