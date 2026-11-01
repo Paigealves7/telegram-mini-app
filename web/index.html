@@ -323,39 +323,31 @@ body.form .act{display:block}
 #toast.err::before{content:"";display:inline-block;width:8px;height:8px;margin-right:9px;border-radius:50%;background:#ff453a}
 
 /* ---------- вход: тёмная студийная панель и точечные руки по референсу ---------- */
-body.noauth{background:#fff;color:#f4f4f5;min-height:100svh;overflow:auto}
+body.noauth{background:#05060f;color:#f4f4f5;min-height:100svh;overflow:hidden}
 body.noauth .bg,body.noauth .top,body.noauth .tabs,body.noauth .act{display:none}
-body.noauth #view{min-height:100svh;padding:0;display:grid;place-items:center}
-.login-scene{width:min(82vw,1180px);min-height:min(74vh,680px);position:relative;isolation:isolate;overflow:hidden;display:grid;place-items:center;border-radius:18px;background:radial-gradient(ellipse at 85% 12%,rgba(255,255,255,.12),transparent 34%),radial-gradient(ellipse at 5% 100%,rgba(255,255,255,.12),transparent 32%),linear-gradient(112deg,#4b4b4d 0%,#242426 35%,#1c1c1e 68%,#414143 100%);box-shadow:0 26px 90px rgba(0,0,0,.12)}
-.login-art{position:absolute;inset:0;width:100%;height:100%;z-index:-1;opacity:.82;pointer-events:none}
-.login-art .dots{fill:url(#handDots)}
-.login{position:relative;z-index:1;width:min(100% - 36px,390px);margin:0 auto;padding:38px 0;text-align:center}
-.login .back{position:absolute;left:0;top:12px;border:0;padding:8px 10px;background:transparent;color:#c8c8ca;font-size:12px}
-.login .logo{display:grid;place-items:center;width:56px;height:56px;margin:0 auto 18px;border-radius:13px;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
-.login .logo svg{width:34px;height:34px;color:#d8d8da}
-.login .wordmark{font-family:var(--font-display);font-weight:500;font-size:24px;letter-spacing:-.01em;margin:0 0 6px;color:#fff}
-.login .welcome-sub{font-size:12px;color:#aaa9ac;margin:0 0 24px}
-.login .eyebrow{display:none}
+body.noauth #view{width:100%;min-height:100svh;min-height:100dvh;padding:0;display:grid;place-items:center}
+.login-scene{width:100%;min-height:100svh;min-height:100dvh;position:relative;isolation:isolate;overflow:hidden;display:grid;place-items:center;background:#05060f url("/hands-reference.jpg") center center/cover no-repeat}
+.login-scene::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,6,15,.12),rgba(5,6,15,.4) 33%,rgba(5,6,15,.4) 67%,rgba(5,6,15,.12))}
+.login{position:relative;z-index:1;width:min(100% - 36px,380px);margin:0 auto;padding:36px 28px;text-align:center;border-radius:18px;background:rgba(17,18,25,.84);box-shadow:inset 0 0 0 1px rgba(186,215,247,.11),0 20px 65px rgba(0,0,0,.28);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.login .logo{display:grid;place-items:center;width:52px;height:52px;margin:0 auto 18px;border-radius:13px;background:rgba(186,214,247,.07);box-shadow:inset 0 0 0 1px rgba(186,215,247,.12)}
+.login .logo svg{width:30px;height:30px;color:#d8ecf8}
+.login .wordmark{font-family:var(--font-display);font-weight:500;font-size:23px;letter-spacing:-.01em;margin:0 0 6px;color:#fff}
+.login .welcome-sub{font-size:12px;color:#a6a9b2;margin:0 0 22px}
 .login .card{max-width:100%;margin:0;padding:0;background:none;background-image:none;box-shadow:none;animation:none}
 .login .fld{text-align:left;margin-bottom:10px}
 .login .fld>label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-.login .fld input{height:44px;border-radius:9px;background:rgba(20,20,22,.55);box-shadow:inset 0 0 0 1px rgba(255,255,255,.055);font-size:13px;padding:0 14px}
-.login .fld input::placeholder{color:#77777b}
-.login .btn{min-height:42px;margin-top:4px;border-radius:9px;background:#f4f4f5;color:#1d1d1f;box-shadow:none;font-size:13px}
-.login .magic-link{display:block;margin:10px auto 18px;padding:5px;border:0;background:none;color:#ccc;font-size:12px}
-.login .divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:#77777b;font-size:11px}
-.login .divider::before,.login .divider::after{content:"";height:1px;flex:1;background:rgba(255,255,255,.09)}
-.login .sso{min-height:40px;border:1px solid rgba(255,255,255,.1);border-radius:9px;background:rgba(12,12,14,.28);color:#d4d4d6;font-size:12px}
-.login .legal{margin:18px 0 0;color:#77777b;font-size:10px;line-height:1.5}
-.login .legal a{color:#aaa9ac;text-decoration:underline;text-underline-offset:2px}
+.login .fld input{height:46px;border-radius:9px;background:rgba(5,6,15,.55);box-shadow:inset 0 0 0 1px rgba(186,215,247,.1);font-size:13px;padding:0 14px}
+.login .fld input::placeholder{color:#858995}
+.login .btn{min-height:44px;margin-top:4px;border-radius:9px;background:#f4f4f5;color:#1d1d1f;box-shadow:none;font-size:13px}
+.login .legal{margin:17px 0 0;color:#858995;font-size:10px;line-height:1.5}
+.login .legal a{color:#c7d3ea;text-decoration:underline;text-underline-offset:2px}
 body.noauth #toast{background:rgba(28,28,30,.96)}
-@media(max-width:700px){
-  body.noauth #view{padding:18px}
-  .login-scene{width:100%;min-height:min(78svh,700px);border-radius:16px}
-  .login{width:min(100% - 40px,360px)}
-  .login-art{opacity:.46}
+@media(max-width:540px){
+  .login-scene{background-position:center center}
+  .login-scene::before{background:rgba(5,6,15,.52)}
+  .login{width:min(100% - 32px,380px);padding:32px 22px}
 }
-@media(max-width:420px){.login-scene{min-height:calc(100svh - 36px)}.login{padding:54px 0}.login .back{top:15px}}
+@media(prefers-reduced-transparency:reduce){.login{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(17,18,25,.96)}}
 .av{width:88px;height:88px;margin:4px auto 14px;font-size:36px;font-family:var(--font-display);font-weight:500;color:var(--color-ice-highlight)}
 
 /* ---------- экономный режим: включается вручную в профиле или автоматически на слабых устройствах ---------- */
@@ -728,15 +720,10 @@ function vProfile() {
     <div class="dl"><span class="hint">Экономный режим<br><small>меньше эффектов, холоднее телефон</small></span><button class="chip rip ${isLite() ? 'on' : ''}" data-a="lite">${isLite() ? 'Вкл' : 'Выкл'}</button></div></div></div>
     ${inTg ? '' : '<button class="btn ghost rip" data-a="logout">Выйти</button>'}`;
 }
-const loginArt = `<svg class="login-art" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><pattern id="handDots" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1.15" fill="#f2f2f3"/></pattern></defs>
-  <path class="dots" d="M0 180h170l66 20 72 5 36 17 40 2 33 18 42 4 25 20 37 8 24 24-9 19-31-7-31-19-24-2 35 31 42 25 17 22-10 17-23-8-43-31-31-13 28 31 34 35 10 22-13 14-20-12-38-39-24-20 14 37 22 35 2 21-17 9-17-19-24-40-18-22 5 40 11 42-6 19-19 0-12-25-15-47-17-25-4 45-8 40-14 16-17-7-3-29 3-43-12-27-25-20-29-20-17-28-20-5-24 11-19 5-23-11-11-21-1-9-18-15-37-16-50-10-57-2-53 5-55-2-63 9-72 11-75 13-81 14-91 10-89 5-71 8-43 14-21 13 0 16 23 8 35-1 21 7 10 15-10 14-27 10-29 5-18 12-2 12 15 7 32-1 20 7 5 15-14 15-30 9-23 12-2 12 17 7 24 0 17 8 4 13-13 12-23 10-20 12-1 11 16 5 22-2 18 6 4 14-14 12-20 12-11 12 2 11 18 4 31-5 27-1 14 9 0 15-15 9-28 6-19 11-4 13 12 9 29-4 30 0 15 11-2 15-21 6-27 8-13 13 4 12 21 4 30-3 31 3 14 13-5 13-23 4-22 8-12 14 8 10 24 0 28 7 11 14-10 10-25 2-17 11-4 14 18 8 27 3 20 10 7 17-14 8-25 0-15 10-2 15 18 7 20 12 0 24H0z"/>
-  <path class="dots" transform="translate(1200 0) scale(-1 1)" d="M0 180h170l66 20 72 5 36 17 40 2 33 18 42 4 25 20 37 8 24 24-9 19-31-7-31-19-24-2 35 31 42 25 17 22-10 17-23-8-43-31-31-13 28 31 34 35 10 22-13 14-20-12-38-39-24-20 14 37 22 35 2 21-17 9-17-19-24-40-18-22 5 40 11 42-6 19-19 0-12-25-15-47-17-25-4 45-8 40-14 16-17-7-3-29 3-43-12-27-25-20-29-20-17-28-20-5-24 11-19 5-23-11-11-21-1-9-18-15-37-16-50-10-57-2-53 5-55-2-63 9-72 11-75 13-81 14-91 10-89 5-71 8-43 14-21 13 0 16 23 8 35-1 21 7 10 15-10 14-27 10-29 5-18 12-2 12 15 7 32-1 20 7 5 15-14 15-30 9-23 12-2 12 17 7 24 0 17 8 4 13-13 12-23 10-20 12-1 11 16 5 22-2 18 6 4 14-14 12-20 12-11 12 2 11 18 4 31-5 27-1 14 9 0 15-15 9-28 6-19 11-4 13 12 9 29-4 30 0 15 11-2 15-21 6-27 8-13 13 4 12 21 4 30-3 31 3 14 13-5 13-23 4-22 8-12 14 8 10 24 0 28 7 11 14-10 10-25 2-17 11-4 14 18 8 27 3 20 10 7 17-14 8-25 0-15 10-2 15 18 7 20 12 0 24H0z"/>
-</svg>`;
-function loginPanel() { return `<div class="login-scene">${loginArt}<section class="login"><span class="back">‹ &nbsp; Назад</span><div class="logo">${ic('mark')}</div><h1 class="wordmark">С возвращением</h1><p class="welcome-sub">Войдите в рабочее пространство лесопилки</p>
+function loginPanel() { return `<div class="login-scene"><section class="login"><div class="logo">${ic('mark')}</div><h1 class="wordmark">С возвращением</h1><p class="welcome-sub">Войдите в рабочее пространство лесопилки</p>
     <div class="card"><div class="fld"><label for="lu">Логин</label><input id="lu" placeholder="Логин" autocomplete="username"></div>
     <div class="fld"><label for="lp">Пароль</label><input id="lp" type="password" placeholder="Пароль" autocomplete="current-password"></div>
-    <button class="btn rip" id="lb" data-a="login">Войти</button><button class="magic-link" type="button" data-a="magic" aria-label="Вход по ссылке">Войти по ссылке</button>
-    <div class="divider">или</div><button class="sso" type="button" data-a="sso" style="width:100%">Единый вход (SSO)</button>
+    <button class="btn rip" id="lb" data-a="login">Войти</button>
     <p class="legal">Продолжая, вы соглашаетесь с <a href="#terms">Условиями использования</a><br>и <a href="#privacy">Политикой конфиденциальности</a>.</p></div></section></div>`; }
 function vLogin(msg) {
   document.body.classList.add('noauth'); S.cur = 'login';
@@ -745,7 +732,7 @@ function vLogin(msg) {
 }
 function vAuthErr(msg) {
   document.body.classList.add('noauth');
-  $('#view').innerHTML = `<div class="login-scene">${loginArt}<section class="login"><div class="logo">🔒</div><h1 class="wordmark">Не удалось войти</h1>
+  $('#view').innerHTML = `<div class="login-scene"><section class="login"><div class="logo">🔒</div><h1 class="wordmark">Не удалось войти</h1>
     <p class="welcome-sub">${esc(msg)}</p><button class="btn rip" data-a="retry" style="margin-top:14px">Повторить</button></section></div>`;
 }
 async function login() {
@@ -885,7 +872,7 @@ async function submitForm() {
 /* ---------- события ---------- */
 const find = (t, id) => (t === 'boards' ? D.boards : D.logs).find(x => x.id == id);
 const ACT = {
-  go: v => go(v), magic: () => toast('Вход по ссылке пока недоступен', 'err'), sso: () => toast('Единый вход пока не настроен', 'err'), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK),
+  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK),
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
   new: v => { closeSheet(); go(v); },
   fab: () => sheet(`<div class="ctr" style="margin-bottom:14px"><h3>Что оформить?</h3></div>
