@@ -423,7 +423,7 @@ const settle = v => { closeSheet(); if (ASK) { const r = ASK; ASK = null; r(v); 
 
 /* ---------- навигация ---------- */
 const TABS = ['home', 'stock', 'orders', 'journal', 'stats'];
-const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль'};
+const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники'};
 const canOrd = () => S.role === 'manager' || S.role === 'master';
 const jSegs = () => [canOrd() && ['arrivals', 'Приходы'], S.role !== 'master' && ['production', 'Распилы'], canOrd() && ['sales', 'Продажи']].filter(Boolean);
 
@@ -446,7 +446,7 @@ function go(v, p) {
 function back() { show(S.stack.pop() || S.tab); }
 function show(v, p) {
   S.cur = v;
-  const f = FORMS[v], sub = !!f || v === 'profile';
+  const f = FORMS[v], sub = !!f || v === 'profile' || v === 'staff';
   document.body.classList.toggle('form', !!f);
   document.body.classList.toggle('sub', sub);
   $('#title').textContent = f ? f.t : v === 'home' ? 'Лесопилка' : TT[v] || 'Лесопилка';
@@ -454,7 +454,7 @@ function show(v, p) {
   $$('.tab').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
   try { sub ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {}
   scrollTo(0, 0);
-  if (f) vForm(v, p); else ({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile}[v] || (() => {}))();
+  if (f) vForm(v, p); else ({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff}[v] || (() => {}))();
 }
 tg.BackButton.onClick(back);
 $('#hb').innerHTML = ic('back');
@@ -748,7 +748,20 @@ function vProfile() {
   $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><h2>${esc(S.name)}</h2><p class="mut">${esc(ROLE[S.role] || S.role)}</p></div>
     <div class="ld"><span>ID сотрудника</span><b>${esc(j.user_id || '—')}</b></div>
     <div class="ld"><div><span>Экономный режим</span><p class="mut sm">Меньше анимаций, телефон меньше греется</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
+    ${S.role === 'manager' ? '<button class="btn" style="margin-top:24px" data-a="go" data-v="staff">Сотрудники</button>' : ''}
     ${inTg ? '' : '<button class="btn ghost" style="margin-top:32px" data-a="logout">Выйти</button>'}`;
+}
+
+/* ---------- сотрудники (только руководитель) ---------- */
+const staffName = u => (u.kind === 'telegram' ? 'Telegram ' + u.username.slice(3) : u.username) + (u.id == uid() ? ' (вы)' : '');
+async function vStaff() {
+  const v = $('#view'); v.innerHTML = sk(4);
+  const list = await safe('/users');
+  if (S.cur !== 'staff') return;
+  if (!list) { v.innerHTML = fail('Не удалось загрузить сотрудников', 'staff'); return; }
+  D.staff = list;
+  const rows = list.map(u => li(esc(staffName(u)), u.kind === 'telegram' ? 'Вход через Telegram' : 'Вход по паролю', esc(ROLE[u.role] || u.role), esc(new Date(u.created_at).toLocaleDateString('ru-RU')), {a: 'staff', d: u.id})).join('');
+  v.innerHTML = `<button class="btn" data-a="new" data-v="user">Новый сотрудник</button>` + grp('Сотрудники', list.length, rows);
 }
 function vLogin(msg) {
   document.body.classList.add('noauth'); S.cur = 'login';
@@ -793,7 +806,17 @@ const SRC = {
   boards: () => D.boards.map(b => [b.id, `${boardLabel(b)} · ${b.count} шт`]),
   logs: () => D.logs.map(l => [l.id, `${l.species || 'Бревно'} Ø${l.diameter_mm} × ${lenM(l.length_mm)} · ${l.count} шт · ${fmt(l.volume_m3, 2)} м³ · партия №${l.arrival_id}`])
 };
+const pwBytes = x => new TextEncoder().encode(x || '').length;
 const FORMS = {
+  user: {
+    t: 'Новый сотрудник', e: 'user', ok: 'Создать сотрудника', path: '/users', done: 'Сотрудник создан', after: 'back', need: [],
+    f: [{k: 'login', l: 'Логин', t: 'acc', ph: 'ivanova', h: 'Вход по логину и паролю'}, {k: 'pass', l: 'Пароль (от 8 символов)', t: 'acc', ph: 'Придумайте и передайте сотруднику'},
+      {k: 'role', l: 'Роль', t: 'sel', o: [['master', ROLE.master], ['worker', ROLE.worker]]}],
+    req: v => !/^[A-Za-z0-9._-]{3,32}$/.test(v.login) ? 'Логин: 3–32 символа, латиница, цифры, точка, дефис, подчёркивание' : v.login.toLowerCase().startsWith('tg_') ? 'Логин не может начинаться с tg_' : pwBytes(v.pass) < 8 || pwBytes(v.pass) > 72 ? 'Пароль: от 8 до 72 символов' : null,
+    sum: v => `Логин ${v.login}, роль: ${ROLE[v.role]}`,
+    mem: [],
+    body: v => ({username: v.login, password: v.pass, role: v.role})
+  },
   arrival: {
     t: 'Приход леса', e: 'arrival', ok: 'Сохранить приход', path: '/arrivals', done: 'Приход зарегистрирован', after: 'home', auto: 'vol', need: ['con'],
     f: [{k: 'supplier', l: 'Поставщик', t: 'sel', src: 'con', half: 1, m: 1}, {k: 'carrier', l: 'Перевозчик', t: 'sel', src: 'con', half: 1, m: 1},
@@ -847,6 +870,7 @@ function fld(f) {
   let c;
   if (f.t === 'sel') c = `<div class="sel"><select data-k="${f.k}">${(f.o || []).map(o => `<option value="${o[0]}">${esc(o[1])}</option>`).join('')}</select></div>`;
   else if (f.t === 'num') c = `<div class="num"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="-1" aria-label="Меньше">${ic('minus')}</button><input data-k="${f.k}" inputmode="decimal" value="${esc(fval(f))}"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="1" aria-label="Больше">${ic('plus')}</button></div>`;
+  else if (f.t === 'acc') c = `<input data-k="${f.k}" value="${esc(fval(f))}" placeholder="${esc(f.ph || '')}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">`;
   else if (f.t === 'txt') c = `<input data-k="${f.k}" value="${esc(fval(f))}" placeholder="${esc(f.ph || '')}" autocomplete="off">`;
   else c = '';
   const ch = f.c ? `<div class="chips">${f.c.map(x => `<button type="button" class="chip rip" data-a="${f.t === 'pre' ? 'size' : 'chip'}" data-k="${f.k}" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : '';
@@ -890,7 +914,7 @@ async function submitForm() {
   try {
     await api(F.path, {method: 'POST', body: JSON.stringify(F.body(v))});
     F.mem.forEach(k => mem(k, v[k]));
-    notify('success'); toast(F.done); go(F.after);
+    notify('success'); toast(F.done); F.after === 'back' ? back() : go(F.after);
   } catch (er) { notify('error'); toast(er.message, 'err'); }
   b.disabled = false; b.classList.remove('busy');
 }
@@ -909,6 +933,36 @@ const ACT = {
       ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div>` : ''}${(o.items || []).length ? `<div class="dl"><span class="mut">Позиций</span><b>${o.items.length}</b></div>` : ''}
       <div class="dl"><span class="mut">Создан</span><b>${esc(odate(o, {day: 'numeric', month: 'long', year: 'numeric'}) || '—')}</b></div>
       <div class="stackb">${isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button></div>`);
+  },
+  staff: v => {
+    const u = (D.staff || []).find(x => x.id == v); if (!u) return;
+    const btns = (u.role === 'manager' ? '' : ['master', 'worker'].filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">Назначить: ${esc(ROLE[r])}</button>`).join('')) + (u.kind === 'password' ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '');
+    sheet(`<h3>${esc(staffName(u))}</h3>
+      <div class="dl"><span class="mut">Вход</span><b>${u.kind === 'telegram' ? 'Через Telegram' : 'Логин и пароль'}</b></div>
+      <div class="dl"><span class="mut">Роль</span><b>${esc(ROLE[u.role] || u.role)}</b></div>
+      ${btns ? `<div class="stackb">${btns}</div>` : ''}
+      <p class="mut sm" style="margin-top:16px">${u.role === 'manager' ? 'Роль руководителя изменить нельзя.' : 'Новая роль заработает, когда человек заново откроет приложение или войдёт.'}</p>`);
+  },
+  srole: v => {
+    const [id, role] = v.split(':'), u = D.staff.find(x => x.id == id); if (!u) return;
+    ask('user', 'Изменить роль', `${staffName(u)}: ${ROLE[role]}`, 'Изменить').then(async ok => {
+      if (!ok) return;
+      try { await api(`/users/${id}/role`, {method: 'PUT', body: JSON.stringify({role})}); notify('success'); toast('Роль изменена'); vStaff(); }
+      catch (e) { notify('error'); toast(e.message, 'err'); }
+    });
+  },
+  spw: v => {
+    const u = D.staff.find(x => x.id == v); if (!u) return;
+    sheet(`<h3>Новый пароль</h3><p class="mut">${esc(staffName(u))}</p>
+      <div class="fld" style="margin-top:16px"><label for="np">Пароль (от 8 символов)</label><input id="np" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Придумайте и передайте сотруднику"></div>
+      <button class="btn" data-a="spwok" data-v="${u.id}">Сохранить пароль</button>`);
+  },
+  spwok: async (v, el) => {
+    const p = $('#np').value, n = pwBytes(p);
+    if (n < 8 || n > 72) { notify('error'); toast('Пароль: от 8 до 72 символов', 'err'); return; }
+    el.disabled = true;
+    try { await api(`/users/${v}/password`, {method: 'PUT', body: JSON.stringify({password: p})}); notify('success'); closeSheet(); toast('Пароль изменён'); }
+    catch (e) { notify('error'); toast(e.message, 'err'); el.disabled = false; }
   },
   jt: v => { S.jt = v; vJournal(); },
   wt: v => { S.wt = v; S.wsp = ''; vStock(false); },

@@ -84,6 +84,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	boardHandler := NewBoardHandler(repo)
 	logHandler := NewLogHandler(repo)
 	statsHandler := NewStatsHandler(repo)
+	staffHandler := NewStaffHandler(repo)
 
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(r.Context()); err != nil {
@@ -174,6 +175,9 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Use(RequireRoles(domain.RoleManager))
 				r.Get("/statistics", statsHandler.GetSummary)
 				r.Post("/users", authHandler.Register) // создание сотрудников: только менеджер
+				r.Get("/users", staffHandler.List)
+				r.Put("/users/{id}/role", staffHandler.SetRole)
+				r.Put("/users/{id}/password", staffHandler.SetPassword)
 			})
 		})
 	})

@@ -746,3 +746,40 @@ func (r *Repository) GetUserByID(ctx context.Context, id int64) (*domain.User, e
 	err := r.db.QueryRow(ctx, query, id).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt)
 	return &user, err
 }
+
+// ListUsers возвращает всех сотрудников (хеш пароля нужен только чтобы отличить Telegram-аккаунты).
+func (r *Repository) ListUsers(ctx context.Context) ([]domain.User, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, username, password_hash, role, created_at FROM users ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	users := make([]domain.User, 0)
+	for rows.Next() {
+		var u domain.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+// UpdateUserRole меняет роль сотрудника. Руководителей этот запрос не трогает.
+// Возвращает false, если подходящего сотрудника нет (не найден или это руководитель).
+func (r *Repository) UpdateUserRole(ctx context.Context, id int64, role domain.Role) (bool, error) {
+	tag, err := r.db.Exec(ctx, `UPDATE users SET role = $2 WHERE id = $1 AND role <> 'manager'`, id, role)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// UpdateUserPassword задаёт новый пароль. Telegram-аккаунты (хеш начинается с tg_) не трогает.
+func (r *Repository) UpdateUserPassword(ctx context.Context, id int64, passwordHash string) (bool, error) {
+	tag, err := r.db.Exec(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1 AND password_hash NOT LIKE 'tg\_%'`, id, passwordHash)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
