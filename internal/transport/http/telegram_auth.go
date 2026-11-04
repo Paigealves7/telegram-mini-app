@@ -96,7 +96,7 @@ func (h *TelegramAuthHandler) LoginViaTelegram(w http.ResponseWriter, r *http.Re
 		Role:   string(user.Role),
 	}
 
-	tokenString, err := generateToken(claims, h.jwtSecret)
+	tokenString, err := generateToken(claims, h.jwtSecret, telegramSessionTTL)
 	if err != nil {
 		log.Printf("TG AUTH: ошибка генерации JWT: %v", err)
 		http.Error(w, "ошибка генерации токена", http.StatusInternalServerError)

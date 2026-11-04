@@ -16,6 +16,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	// Сессия после входа по логину и паролю (веб-версия: бухгалтерия и др.).
+	passwordSessionTTL = 7 * 24 * time.Hour
+	// Сессия после входа через Telegram: Telegram сам подтверждает личность при каждом открытии.
+	telegramSessionTTL = 24 * time.Hour
+)
+
 type Claims struct {
 	UserID int64  `json:"user_id"`
 	Role   string `json:"role"`
@@ -125,7 +132,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Role:   string(user.Role),
 	}
 
-	tokenString, err := generateToken(claims, h.jwtSecret)
+	tokenString, err := generateToken(claims, h.jwtSecret, passwordSessionTTL)
 	if err != nil {
 		http.Error(w, "ошибка генерации токена", http.StatusInternalServerError)
 		return
@@ -138,8 +145,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 // Теперь функция требует передачи ключа
-func generateToken(claims *Claims, secret []byte) (string, error) {
-	claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(24 * time.Hour))
+func generateToken(claims *Claims, secret []byte, ttl time.Duration) (string, error) {
+	claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(ttl))
 	claims.IssuedAt = jwt.NewNumericDate(time.Now())
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
