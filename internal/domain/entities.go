@@ -21,6 +21,9 @@ type User struct {
 	PasswordHash string    `json:"-"`
 	Role         Role      `json:"role"`
 	CreatedAt    time.Time `json:"created_at"`
+	// Имя и @username из Telegram (заполняются при входе через Telegram; в обычные ответы не попадают).
+	DisplayName string `json:"-"`
+	TGUsername  string `json:"-"`
 }
 
 type LogItem struct {

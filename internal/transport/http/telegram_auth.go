@@ -91,6 +91,12 @@ func (h *TelegramAuthHandler) LoginViaTelegram(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Имя и @username нужны только для списка сотрудников; сбой здесь не должен мешать входу.
+	displayName := strings.TrimSpace(data.User.FirstName + " " + data.User.LastName)
+	if err := h.repo.UpdateTelegramProfile(r.Context(), user.ID, displayName, data.User.Username); err != nil {
+		log.Printf("TG AUTH: не удалось сохранить имя пользователя %s: %v", username, err)
+	}
+
 	claims := &Claims{
 		UserID: user.ID,
 		Role:   string(user.Role),

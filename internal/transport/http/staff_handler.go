@@ -28,7 +28,9 @@ type staffItem struct {
 	ID        int64       `json:"id"`
 	Username  string      `json:"username"`
 	Role      domain.Role `json:"role"`
-	Kind      string      `json:"kind"` // "telegram" или "password"
+	Kind      string      `json:"kind"`        // "telegram" или "password"
+	Name      string      `json:"name"`        // имя из Telegram (пусто, пока человек не открыл приложение после обновления)
+	TGUser    string      `json:"tg_username"` // @username без «@»
 	CreatedAt time.Time   `json:"created_at"`
 }
 
@@ -44,7 +46,7 @@ func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(u.PasswordHash, tgPasswordPrefix) {
 			kind = "telegram"
 		}
-		out = append(out, staffItem{ID: u.ID, Username: u.Username, Role: u.Role, Kind: kind, CreatedAt: u.CreatedAt})
+		out = append(out, staffItem{ID: u.ID, Username: u.Username, Role: u.Role, Kind: kind, Name: u.DisplayName, TGUser: u.TGUsername, CreatedAt: u.CreatedAt})
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)

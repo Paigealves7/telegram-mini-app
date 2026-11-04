@@ -753,14 +753,16 @@ function vProfile() {
 }
 
 /* ---------- сотрудники (только руководитель) ---------- */
-const staffName = u => (u.kind === 'telegram' ? 'Telegram ' + u.username.slice(3) : u.username) + (u.id == uid() ? ' (вы)' : '');
+const tgId = u => u.username.slice(3);
+const staffName = u => (u.kind === 'telegram' ? (u.name || 'Telegram ' + tgId(u)) : u.username) + (u.id == uid() ? ' (вы)' : '');
+const staffSub = u => u.kind === 'telegram' ? (u.tg_username ? '@' + u.tg_username + ' · ' : '') + 'ID ' + tgId(u) : 'Вход по паролю';
 async function vStaff() {
   const v = $('#view'); v.innerHTML = sk(4);
   const list = await safe('/users');
   if (S.cur !== 'staff') return;
   if (!list) { v.innerHTML = fail('Не удалось загрузить сотрудников', 'staff'); return; }
   D.staff = list;
-  const rows = list.map(u => li(esc(staffName(u)), u.kind === 'telegram' ? 'Вход через Telegram' : 'Вход по паролю', esc(ROLE[u.role] || u.role), esc(new Date(u.created_at).toLocaleDateString('ru-RU')), {a: 'staff', d: u.id})).join('');
+  const rows = list.map(u => li(esc(staffName(u)), esc(staffSub(u)), esc(ROLE[u.role] || u.role), esc(new Date(u.created_at).toLocaleDateString('ru-RU')), {a: 'staff', d: u.id})).join('');
   v.innerHTML = `<button class="btn" data-a="new" data-v="user">Новый сотрудник</button>` + grp('Сотрудники', list.length, rows);
 }
 function vLogin(msg) {
@@ -939,6 +941,7 @@ const ACT = {
     const btns = (u.role === 'manager' ? '' : ['master', 'worker'].filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">Назначить: ${esc(ROLE[r])}</button>`).join('')) + (u.kind === 'password' ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '');
     sheet(`<h3>${esc(staffName(u))}</h3>
       <div class="dl"><span class="mut">Вход</span><b>${u.kind === 'telegram' ? 'Через Telegram' : 'Логин и пароль'}</b></div>
+      ${u.kind === 'telegram' ? `<div class="dl"><span class="mut">Telegram</span><b>${esc(u.tg_username ? '@' + u.tg_username : 'ник не задан')} · ID ${esc(tgId(u))}</b></div>` : ''}
       <div class="dl"><span class="mut">Роль</span><b>${esc(ROLE[u.role] || u.role)}</b></div>
       ${btns ? `<div class="stackb">${btns}</div>` : ''}
       <p class="mut sm" style="margin-top:16px">${u.role === 'manager' ? 'Роль руководителя изменить нельзя.' : 'Новая роль заработает, когда человек заново откроет приложение или войдёт.'}</p>`);

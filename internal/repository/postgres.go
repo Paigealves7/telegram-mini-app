@@ -749,7 +749,7 @@ func (r *Repository) GetUserByID(ctx context.Context, id int64) (*domain.User, e
 
 // ListUsers возвращает всех сотрудников (хеш пароля нужен только чтобы отличить Telegram-аккаунты).
 func (r *Repository) ListUsers(ctx context.Context) ([]domain.User, error) {
-	rows, err := r.db.Query(ctx, `SELECT id, username, password_hash, role, created_at FROM users ORDER BY id`)
+	rows, err := r.db.Query(ctx, `SELECT id, username, password_hash, role, created_at, display_name, tg_username FROM users ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -757,7 +757,7 @@ func (r *Repository) ListUsers(ctx context.Context) ([]domain.User, error) {
 	users := make([]domain.User, 0)
 	for rows.Next() {
 		var u domain.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.DisplayName, &u.TGUsername); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -782,4 +782,10 @@ func (r *Repository) UpdateUserPassword(ctx context.Context, id int64, passwordH
 		return false, err
 	}
 	return tag.RowsAffected() > 0, nil
+}
+
+// UpdateTelegramProfile сохраняет имя и @username из Telegram (обновляется при каждом входе, чтобы переименования не терялись).
+func (r *Repository) UpdateTelegramProfile(ctx context.Context, id int64, displayName, tgUsername string) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET display_name = $2, tg_username = $3 WHERE id = $1`, id, displayName, tgUsername)
+	return err
 }
