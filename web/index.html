@@ -355,9 +355,9 @@ function perfProbe() {
 }
 
 /* ---------- состояние и утилиты ---------- */
-const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month'};
+const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month', cq: ''};
 let CFG = {pdf_send: true}; // настройки с сервера (/config)
-const D = {boards: [], logs: [], orders: [], con: {}};
+const D = {boards: [], logs: [], orders: [], con: {}, cl: []};
 let MEM = {}; try { MEM = JSON.parse(localStorage.getItem('mem') || '{}'); } catch (e) {}
 const mem = (k, v) => { MEM[k] = v; try { localStorage.setItem('mem', JSON.stringify(MEM)); } catch (e) {} };
 const hap = t => { try { tg.HapticFeedback.impactOccurred(t || 'light'); } catch (e) {} };
@@ -397,7 +397,7 @@ async function api(path, opts = {}) {
 const safe = async u => { try { return (await api(u)) || []; } catch (e) { toast(e.message, 'err'); return null; } };
 async function loadConfig() { try { const c = await api('/config'); if (c) CFG = {...CFG, ...c}; } catch (e) { /* необязательная конфигурация: используются значения по умолчанию */ } }
 async function loadStock() { const [b, l] = await Promise.all([safe('/boards'), safe('/logs')]); if (b) D.boards = b; if (l) D.logs = l; return !!b && !!l; }
-async function ensureCon() { if (Object.keys(D.con).length) return true; const list = await safe('/contractors'); if (!list) return false; list.forEach(c => D.con[c.id] = c.name); return true; }
+async function ensureCon() { if (Object.keys(D.con).length) return true; const list = await safe('/contractors'); if (!list) return false; D.cl = list; list.forEach(c => D.con[c.id] = c.name); return true; }
 
 function countUp(root = $('#view')) {
   const still = matchMedia('(prefers-reduced-motion:reduce)').matches || isLite();
@@ -423,7 +423,7 @@ const settle = v => { closeSheet(); if (ASK) { const r = ASK; ASK = null; r(v); 
 
 /* ---------- навигация ---------- */
 const TABS = ['home', 'stock', 'orders', 'journal', 'stats'];
-const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники'};
+const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники', cons: 'Контрагенты'};
 const canOrd = () => S.role === 'manager' || S.role === 'master';
 const jSegs = () => [canOrd() && ['arrivals', 'Приходы'], S.role !== 'master' && ['production', 'Распилы'], canOrd() && ['sales', 'Продажи']].filter(Boolean);
 
@@ -446,7 +446,7 @@ function go(v, p) {
 function back() { show(S.stack.pop() || S.tab); }
 function show(v, p) {
   S.cur = v;
-  const f = FORMS[v], sub = !!f || v === 'profile' || v === 'staff';
+  const f = FORMS[v], sub = !!f || v === 'profile' || v === 'staff' || v === 'cons';
   document.body.classList.toggle('form', !!f);
   document.body.classList.toggle('sub', sub);
   $('#title').textContent = f ? f.t : v === 'home' ? 'Лесопилка' : TT[v] || 'Лесопилка';
@@ -454,7 +454,7 @@ function show(v, p) {
   $$('.tab').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
   try { sub ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {}
   scrollTo(0, 0);
-  if (f) vForm(v, p); else ({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff}[v] || (() => {}))();
+  if (f) vForm(v, p); else ({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff, cons: vCons}[v] || (() => {}))();
 }
 tg.BackButton.onClick(back);
 $('#hb').innerHTML = ic('back');
@@ -748,8 +748,27 @@ function vProfile() {
   $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><h2>${esc(S.name)}</h2><p class="mut">${esc(ROLE[S.role] || S.role)}</p></div>
     <div class="ld"><span>ID сотрудника</span><b>${esc(j.user_id || '—')}</b></div>
     <div class="ld"><div><span>Экономный режим</span><p class="mut sm">Меньше анимаций, телефон меньше греется</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
-    ${S.role === 'manager' ? '<button class="btn" style="margin-top:24px" data-a="go" data-v="staff">Сотрудники</button>' : ''}
+    ${S.role === 'manager' ? '<button class="btn" style="margin-top:24px" data-a="go" data-v="staff">Сотрудники</button><button class="btn" style="margin-top:12px" data-a="go" data-v="cons">Контрагенты</button>' : ''}
     ${inTg ? '' : '<button class="btn ghost" style="margin-top:32px" data-a="logout">Выйти</button>'}`;
+}
+
+/* ---------- контрагенты (только руководитель) ---------- */
+const conOpts = k => D.cl.filter(c => c.is_active && c[k]).sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(c => [c.id, c.name]);
+const conTypes = c => [c.is_supplier && 'поставщик', c.is_carrier && 'перевозчик', c.is_client && 'клиент'].filter(Boolean).join(', ');
+async function vCons() {
+  const v = $('#view'); v.innerHTML = sk(4);
+  const list = await safe('/contractors');
+  if (S.cur !== 'cons') return;
+  if (!list) { v.innerHTML = fail('Не удалось загрузить контрагентов', 'cons'); return; }
+  D.cl = list; D.con = {}; list.forEach(c => D.con[c.id] = c.name);
+  v.innerHTML = `<button class="btn" data-a="cedit" data-v="new">Новый контрагент</button>
+    <div class="srch" style="margin-top:16px">${ic('search')}<input id="cq" placeholder="Поиск по названию" aria-label="Поиск" value="${esc(S.cq)}"></div><div id="cl"></div>`;
+  conList();
+}
+function conList() {
+  const q = S.cq.toLowerCase();
+  const l = D.cl.filter(c => !q || c.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  $('#cl').innerHTML = l.length ? grp('Контрагенты', l.length, l.map(c => li(esc(c.name), esc(conTypes(c)), c.is_active ? '' : 'скрыт', '', {a: 'cedit', d: c.id})).join('')) : none('Ничего не найдено');
 }
 
 /* ---------- сотрудники (только руководитель) ---------- */
@@ -805,6 +824,7 @@ const SP = ['Сосна', 'Ель', 'Лиственница', 'Берёза', '�
 const SIZES = ['25×100', '40×100', '50×100', '50×150', '50×200', '100×100', '150×150'];
 const SRC = {
   con: () => Object.entries(D.con),
+  sup: () => conOpts('is_supplier'), car: () => conOpts('is_carrier'), cli: () => conOpts('is_client'),
   boards: () => D.boards.map(b => [b.id, `${boardLabel(b)} · ${b.count} шт`]),
   logs: () => D.logs.map(l => [l.id, `${l.species || 'Бревно'} Ø${l.diameter_mm} × ${lenM(l.length_mm)} · ${l.count} шт · ${fmt(l.volume_m3, 2)} м³ · партия №${l.arrival_id}`])
 };
@@ -821,7 +841,7 @@ const FORMS = {
   },
   arrival: {
     t: 'Приход леса', e: 'arrival', ok: 'Сохранить приход', path: '/arrivals', done: 'Приход зарегистрирован', after: 'home', auto: 'vol', need: ['con'],
-    f: [{k: 'supplier', l: 'Поставщик', t: 'sel', src: 'con', half: 1, m: 1}, {k: 'carrier', l: 'Перевозчик', t: 'sel', src: 'con', half: 1, m: 1},
+    f: [{k: 'supplier', l: 'Поставщик', t: 'sel', src: 'sup', half: 1, m: 1}, {k: 'carrier', l: 'Перевозчик', t: 'sel', src: 'car', half: 1, m: 1},
       {k: 'truck', l: 'Номер машины', t: 'txt', ph: 'А000АА000', m: 1},
       {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1, h: 'Бревна в партии'},
       {k: 'len', l: 'Длина, мм', t: 'num', v: 6000, s: 100, half: 1}, {k: 'dia', l: 'Диаметр, мм', t: 'num', v: 220, s: 10, half: 1},
@@ -851,7 +871,7 @@ const FORMS = {
   },
   order: {
     t: 'Новый заказ', e: 'order', ok: 'Создать заказ', path: '/orders', done: 'Заказ создан', after: 'orders', need: ['con', 'boards'],
-    f: [{k: 'con', l: 'Клиент', t: 'sel', src: 'con', m: 1}, {k: 'board', l: 'Доска со склада', t: 'sel', src: 'boards'},
+    f: [{k: 'con', l: 'Клиент', t: 'sel', src: 'cli', m: 1}, {k: 'board', l: 'Доска со склада', t: 'sel', src: 'boards'},
       {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1}, {k: 'price', l: 'Цена за 1 м³, ₽', t: 'num', v: 9000, s: 500, half: 1, m: 1}],
     pv: v => {
       const b = D.boards.find(x => x.id == v.board); if (!b || !(b.count > 0)) return '<span class="hint">Выберите доску со склада</span>';
@@ -936,6 +956,45 @@ const ACT = {
       <div class="dl"><span class="mut">Создан</span><b>${esc(odate(o, {day: 'numeric', month: 'long', year: 'numeric'}) || '—')}</b></div>
       <div class="stackb">${isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button></div>`);
   },
+  cedit: v => {
+    const c = v === 'new' ? {id: 0, name: '', is_supplier: true, is_carrier: false, is_client: false, is_active: true} : D.cl.find(x => x.id == v);
+    if (!c) return;
+    sheet(`<h3>${c.id ? 'Контрагент' : 'Новый контрагент'}</h3>
+      <div class="fld" style="margin-top:16px"><label for="cn">Название</label><input id="cn" value="${esc(c.name)}" maxlength="100" autocomplete="off" placeholder="ООО «Лес» или ИП Иванов"></div>
+      <div class="fld"><label>Кто это</label><div class="chips" id="ct" style="flex-wrap:wrap;overflow:visible;margin:0;padding:0">${[['is_supplier', 'Поставщик'], ['is_carrier', 'Перевозчик'], ['is_client', 'Клиент']].map(([k, l]) => `<button type="button" class="chip rip${c[k] ? ' on' : ''}" data-a="ctog" data-k="${k}">${l}</button>`).join('')}</div></div>
+      <div class="stackb"><button class="btn" data-a="csave" data-v="${c.id}">Сохранить</button>
+      ${c.id ? `<button class="btn ghost" data-a="cact" data-v="${c.id}">${c.is_active ? 'Скрыть из списков' : 'Вернуть в списки'}</button><button class="btn ghost" data-a="cdel" data-v="${c.id}">Удалить</button>` : ''}</div>
+      ${c.id ? '<p class="mut sm" style="margin-top:16px">Скрытый контрагент пропадает из выбора в формах, но остаётся в старых записях. Удалить можно только того, у кого нет приходов, продаж и заказов.</p>' : ''}`);
+  },
+  ctog: (v, el) => el.classList.toggle('on'),
+  csave: async (v, el) => {
+    const id = +v, name = $('#cn').value.trim().replace(/\s+/g, ' '), f = {};
+    $$('#ct .chip').forEach(b => f[b.dataset.k] = b.classList.contains('on'));
+    if (name.length < 2) { notify('error'); toast('Название: от 2 символов', 'err'); return; }
+    if (!f.is_supplier && !f.is_carrier && !f.is_client) { notify('error'); toast('Выберите хотя бы один тип', 'err'); return; }
+    const old = id ? D.cl.find(x => x.id == id) : null;
+    el.disabled = true;
+    try {
+      await api(id ? `/contractors/${id}` : '/contractors', {method: id ? 'PUT' : 'POST', body: JSON.stringify({name, ...f, is_active: old ? old.is_active : true})});
+      notify('success'); closeSheet(); toast(id ? 'Сохранено' : 'Контрагент добавлен'); vCons();
+    } catch (e) { notify('error'); toast(e.message, 'err'); el.disabled = false; }
+  },
+  cact: async (v, el) => {
+    const c = D.cl.find(x => x.id == v); if (!c) return;
+    el.disabled = true;
+    try {
+      await api(`/contractors/${v}`, {method: 'PUT', body: JSON.stringify({name: c.name, is_supplier: c.is_supplier, is_carrier: c.is_carrier, is_client: c.is_client, is_active: !c.is_active})});
+      notify('success'); closeSheet(); toast(c.is_active ? 'Скрыт из списков' : 'Возвращён в списки'); vCons();
+    } catch (e) { notify('error'); toast(e.message, 'err'); el.disabled = false; }
+  },
+  cdel: v => {
+    const c = D.cl.find(x => x.id == v); if (!c) return;
+    ask('user', 'Удалить контрагента', c.name, 'Удалить').then(async ok => {
+      if (!ok) return;
+      try { await api(`/contractors/${v}`, {method: 'DELETE'}); notify('success'); toast('Контрагент удалён'); vCons(); }
+      catch (e) { notify('error'); toast(e.message, 'err'); }
+    });
+  },
   staff: v => {
     const u = (D.staff || []).find(x => x.id == v); if (!u) return;
     const btns = (u.role === 'manager' ? '' : ['master', 'worker'].filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">Назначить: ${esc(ROLE[r])}</button>`).join('')) + (u.kind === 'password' ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '');
@@ -1000,6 +1059,7 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'q') { S.wq = t.value; clearTimeout(DEB); DEB = setTimeout(() => stockList(false), 120); }
+  else if (t.id === 'cq') { S.cq = t.value; clearTimeout(DEB); DEB = setTimeout(conList, 120); }
   else if (t.id === 'oq') { S.oq = t.value; clearTimeout(DEB); DEB = setTimeout(() => orderList(false), 120); }
   else if (t.id === 'd1' || t.id === 'd2') { S.range = 'custom'; $$('[data-a="range"]').forEach(b => b.classList.remove('on')); loadStats(); }
   else if (t.dataset.k && FK) calcForm(t.dataset.k === FORMS[FK].auto);

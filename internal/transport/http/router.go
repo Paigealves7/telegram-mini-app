@@ -46,7 +46,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	// Приложение и API живут на одном адресе, поэтому CORS нужен только для явно разрешённых сайтов.
 	// Токен передаётся заголовком, куки не используются, поэтому AllowCredentials выключен.
 	corsOpts := cors.Options{
-		AllowedMethods: []string{"POST", "GET", "PUT", "OPTIONS"},
+		AllowedMethods: []string{"POST", "GET", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
 		MaxAge:         300,
 	}
@@ -152,7 +152,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleMaster))
-				r.Post("/contractors", dictHandler.CreateContractor)
 				r.Get("/arrivals", arrivalHandler.GetList)
 				r.Post("/arrivals", arrivalHandler.CreateArrival)
 				r.Get("/sales", salesHandler.GetList)
@@ -175,6 +174,9 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Use(RequireRoles(domain.RoleManager))
 				r.Get("/statistics", statsHandler.GetSummary)
 				r.Post("/users", authHandler.Register) // создание сотрудников: только менеджер
+				r.Post("/contractors", dictHandler.CreateContractor)
+				r.Put("/contractors/{id}", dictHandler.UpdateContractor)
+				r.Delete("/contractors/{id}", dictHandler.DeleteContractor)
 				r.Get("/users", staffHandler.List)
 				r.Put("/users/{id}/role", staffHandler.SetRole)
 				r.Put("/users/{id}/password", staffHandler.SetPassword)

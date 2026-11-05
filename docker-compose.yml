@@ -17,6 +17,7 @@ services:
       - ./migrations/000002_log_stock.up.sql:/docker-entrypoint-initdb.d/02_log_stock.sql
       - ./migrations/000003_sawing_board_history.up.sql:/docker-entrypoint-initdb.d/03_sawing_board_history.sql
       - ./migrations/000004_users_display_name.up.sql:/docker-entrypoint-initdb.d/04_users_display_name.sql
+      - ./migrations/000005_contractor_types.up.sql:/docker-entrypoint-initdb.d/05_contractor_types.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d telegram-mini-app_db"]
       interval: 5s

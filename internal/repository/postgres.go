@@ -7,6 +7,7 @@ import (
 	"telegram-mini-app/internal/domain"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -19,7 +20,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) GetContractors(ctx context.Context) ([]domain.Contractor, error) {
-	query := `SELECT id, name FROM contractors ORDER BY id DESC`
+	query := `SELECT id, name, is_supplier, is_carrier, is_client, is_active FROM contractors ORDER BY id DESC`
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
 		return nil, err
@@ -29,11 +30,43 @@ func (r *Repository) GetContractors(ctx context.Context) ([]domain.Contractor, e
 	return pgx.CollectRows(rows, pgx.RowToStructByName[domain.Contractor])
 }
 
+// CreateContractor добавляет контрагента без разбора по типам (подходит всем ролям).
 func (r *Repository) CreateContractor(ctx context.Context, name string) (*domain.Contractor, error) {
-	query := `INSERT INTO contractors (name) VALUES ($1) RETURNING id, name`
+	return r.CreateContractorTyped(ctx, name, true, true, true)
+}
+
+func (r *Repository) CreateContractorTyped(ctx context.Context, name string, supplier, carrier, client bool) (*domain.Contractor, error) {
+	query := `INSERT INTO contractors (name, is_supplier, is_carrier, is_client) VALUES ($1, $2, $3, $4)
+		RETURNING id, name, is_supplier, is_carrier, is_client, is_active`
 	var c domain.Contractor
-	err := r.db.QueryRow(ctx, query, name).Scan(&c.ID, &c.Name)
+	err := r.db.QueryRow(ctx, query, name, supplier, carrier, client).
+		Scan(&c.ID, &c.Name, &c.IsSupplier, &c.IsCarrier, &c.IsClient, &c.IsActive)
 	return &c, err
+}
+
+// UpdateContractor меняет название, типы и признак «скрыт». Возвращает false, если контрагента нет.
+func (r *Repository) UpdateContractor(ctx context.Context, id int64, name string, supplier, carrier, client, active bool) (bool, error) {
+	tag, err := r.db.Exec(ctx, `UPDATE contractors SET name = $2, is_supplier = $3, is_carrier = $4, is_client = $5, is_active = $6 WHERE id = $1`,
+		id, name, supplier, carrier, client, active)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+var ErrContractorInUse = errors.New("у контрагента есть приходы, продажи или заказы: скройте его вместо удаления")
+
+// DeleteContractor удаляет контрагента, только если на него нет ссылок. Возвращает false, если его нет.
+func (r *Repository) DeleteContractor(ctx context.Context, id int64) (bool, error) {
+	tag, err := r.db.Exec(ctx, `DELETE FROM contractors WHERE id = $1`, id)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return false, ErrContractorInUse
+		}
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 func (r *Repository) CreateUser(ctx context.Context, username, passwordHash string, role domain.Role) (*domain.User, error) {

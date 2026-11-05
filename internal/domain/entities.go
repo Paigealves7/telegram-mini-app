@@ -3,8 +3,12 @@ package domain
 import "time"
 
 type Contractor struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID         int64  `json:"id" db:"id"`
+	Name       string `json:"name" db:"name"`
+	IsSupplier bool   `json:"is_supplier" db:"is_supplier"`
+	IsCarrier  bool   `json:"is_carrier" db:"is_carrier"`
+	IsClient   bool   `json:"is_client" db:"is_client"`
+	IsActive   bool   `json:"is_active" db:"is_active"`
 }
 
 type Role string
