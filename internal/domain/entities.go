@@ -130,6 +130,38 @@ type Order struct {
 	CreatedAt     time.Time   `json:"created_at"`
 	UpdatedAt     time.Time   `json:"updated_at"`
 	Items         []OrderItem `json:"items,omitempty"`
+	// Считаются при чтении списка: сумма заказа (позиции + доставка + допы) и сколько уже оплачено.
+	TotalPrice float64 `json:"total_price"`
+	PaidAmount float64 `json:"paid_amount"`
+}
+
+type Payment struct {
+	ID        int64     `json:"id"`
+	OrderID   int64     `json:"order_id"`
+	Amount    float64   `json:"amount"`
+	Note      string    `json:"note"`
+	CreatedBy int64     `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// OrderPayments: заказ с итогами и историей оплат (для окна «Оплата»).
+type OrderPayments struct {
+	OrderID      int64       `json:"order_id"`
+	ContractorID int64       `json:"contractor_id"`
+	Status       OrderStatus `json:"status"`
+	TotalPrice   float64     `json:"total_price"`
+	PaidAmount   float64     `json:"paid_amount"`
+	Payments     []Payment   `json:"payments"`
+}
+
+// DebtOrder: завершённый заказ, по которому клиент ещё не расплатился.
+type DebtOrder struct {
+	OrderID      int64     `json:"order_id"`
+	ContractorID int64     `json:"contractor_id"`
+	CreatedAt    time.Time `json:"created_at"`
+	Total        float64   `json:"total"`
+	Paid         float64   `json:"paid"`
+	Due          float64   `json:"due"`
 }
 
 type StatisticsSummary struct {

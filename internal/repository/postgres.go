@@ -533,7 +533,9 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 }
 
 func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain.Order, error) {
-	query := `SELECT id, master_id, contractor_id, notes, delivery_price, extra_price, status, created_at, updated_at FROM orders ORDER BY id DESC LIMIT $1 OFFSET $2`
+	query := `SELECT o.id, o.master_id, o.contractor_id, o.notes, o.delivery_price, o.extra_price, o.status, o.created_at, o.updated_at,
+		` + orderTotalExpr + `, ` + orderPaidExpr + `
+		FROM orders o ORDER BY o.id DESC LIMIT $1 OFFSET $2`
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, err
@@ -543,7 +545,7 @@ func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain
 	orders := make([]domain.Order, 0)
 	for rows.Next() {
 		var o domain.Order
-		if err := rows.Scan(&o.ID, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt); err != nil {
+		if err := rows.Scan(&o.ID, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt, &o.TotalPrice, &o.PaidAmount); err != nil {
 			return nil, err
 		}
 		orders = append(orders, o)

@@ -357,7 +357,7 @@ function perfProbe() {
 /* ---------- состояние и утилиты ---------- */
 const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month', cq: ''};
 let CFG = {pdf_send: true}; // настройки с сервера (/config)
-const D = {boards: [], logs: [], orders: [], con: {}, cl: []};
+const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: []};
 let MEM = {}; try { MEM = JSON.parse(localStorage.getItem('mem') || '{}'); } catch (e) {}
 const mem = (k, v) => { MEM[k] = v; try { localStorage.setItem('mem', JSON.stringify(MEM)); } catch (e) {} };
 const hap = t => { try { tg.HapticFeedback.impactOccurred(t || 'light'); } catch (e) {} };
@@ -484,7 +484,10 @@ const odate = (o, f) => { const d = o.created_at ? new Date(o.created_at) : null
 /* сумма заказа — только если сервер её отдаёт */
 const osum = o => +o.total_price || +o.total_amount || 0;
 const sdate = s => { const d = s ? new Date(s) : null; return d && !isNaN(d) ? d.toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'}) : ''; };
-const oRow = o => { const t = osum(o); return li(`Заказ №${esc(o.id)}`, esc(D.con[o.contractor_id] || 'Клиент №' + o.contractor_id), stl(o.status), esc([odate(o, {day: 'numeric', month: 'short'}), t > 0 ? fmt(t, 0) + ' ₽' : ''].filter(Boolean).join(' · ')), {a: 'order', d: o.id}); };
+const oPaid = o => +o.paid_amount || 0;
+const oDue = o => Math.max(osum(o) - oPaid(o), 0);
+const payTxt = o => { const t = osum(o); if (t <= 0 || o.status === 'canceled') return ''; return oPaid(o) >= t - .005 ? 'оплачен' : oPaid(o) > 0 ? 'долг ' + fmt(oDue(o), 0) + ' ₽' : 'не оплачен'; };
+const oRow = o => { const t = osum(o); return li(`Заказ №${esc(o.id)}`, esc(D.con[o.contractor_id] || 'Клиент №' + o.contractor_id), stl(o.status), esc([odate(o, {day: 'numeric', month: 'short'}), t > 0 ? fmt(t, 0) + ' ₽' : '', payTxt(o)].filter(Boolean).join(' · ')), {a: 'order', d: o.id}); };
 const pl = (n, f) => { n = Math.abs(n) % 100; const k = n % 10; return n > 10 && n < 20 ? f[2] : k > 1 && k < 5 ? f[1] : k === 1 ? f[0] : f[2]; };
 const fmtR = n => n >= 1e6 ? fmt(n / 1e6, 1) + ' млн' : fmt(n, 0);
 const tot = (a, f) => a.reduce((x, y) => x + (+f(y) || 0), 0);
@@ -659,14 +662,23 @@ function stockList() {
 /* ---------- заказы ---------- */
 async function vOrders(fetchNew = true) {
   const v = $('#view');
-  if (fetchNew) { v.innerHTML = sk(4); const [o] = await Promise.all([safe('/orders'), ensureCon()]); if (S.cur !== 'orders') return; if (!o) { v.innerHTML = fail('Не удалось загрузить заказы', 'orders'); return; } D.orders = o; }
-  const c = {all: D.orders.length, open: D.orders.filter(isOpen).length, done: D.orders.filter(o => !isOpen(o)).length};
+  if (fetchNew) { v.innerHTML = sk(4); const [o, , dbt] = await Promise.all([safe('/orders'), ensureCon(), canOrd() ? safe('/debts') : null]); if (S.cur !== 'orders') return; if (!o) { v.innerHTML = fail('Не удалось загрузить заказы', 'orders'); return; } D.orders = o; D.debts = dbt || []; }
+  const c = {all: D.orders.length, open: D.orders.filter(isOpen).length, done: D.orders.filter(o => !isOpen(o)).length, debt: new Set(D.debts.map(d => d.contractor_id)).size};
   v.innerHTML = `<div class="srch">${ic('search')}<input id="oq" placeholder="Поиск по №, клиенту" aria-label="Поиск" value="${esc(S.oq)}"></div>
-    <div class="utabs">${[['all', 'Все'], ['open', 'Активные'], ['done', 'Завершённые']].map(([k, l]) => `<button class="utab ${S.of === k ? 'on' : ''}" data-a="of" data-v="${k}">${l} <span class="mut">${c[k]}</span></button>`).join('')}</div>
+    <div class="utabs">${[['all', 'Все'], ['open', 'Активные'], ['done', 'Завершённые'], ['debt', 'Долги']].map(([k, l]) => `<button class="utab ${S.of === k ? 'on' : ''}" data-a="of" data-v="${k}">${l} <span class="mut">${c[k]}</span></button>`).join('')}</div>
     <div id="osum"></div><div id="ol"></div>`;
   orderList();
 }
+function debtList() {
+  const q = S.oq.toLowerCase(), by = {};
+  D.debts.forEach(d => { (by[d.contractor_id] = by[d.contractor_id] || []).push(d); });
+  const rows = Object.entries(by).map(([id, a]) => ({id, name: D.con[id] || 'Клиент №' + id, n: a.length, due: tot(a, x => x.due)}))
+    .filter(r => !q || r.name.toLowerCase().includes(q)).sort((a, b) => b.due - a.due);
+  $('#osum').innerHTML = rows.length ? tots([['Должников', fmt(rows.length, 0)], ['Долг, ₽', fmtR(tot(rows, r => r.due))]]) : '';
+  $('#ol').innerHTML = rows.length ? rows.map(r => li(esc(r.name), `${r.n} ${pl(r.n, ['заказ', 'заказа', 'заказов'])}`, `${fmt(r.due, 0)} ₽`, '', {a: 'debtc', d: r.id})).join('') : none('Долгов нет', 'Все завершённые заказы оплачены');
+}
 function orderList() {
+  if (S.of === 'debt') { debtList(); return; }
   const q = S.oq.toLowerCase();
   const l = D.orders.filter(o => (S.of === 'all' || (S.of === 'open') === isOpen(o)) && (!q || `${o.id} ${D.con[o.contractor_id] || ''}`.toLowerCase().includes(q)));
   const t = tot(l, osum);
@@ -952,9 +964,45 @@ const ACT = {
     sheet(`<h3>Заказ №${esc(o.id)}</h3>
       <div class="dl"><span class="mut">Клиент</span><b>${esc(D.con[o.contractor_id] || 'Клиент №' + o.contractor_id)}</b></div>
       <div class="dl"><span class="mut">Статус</span>${stl(o.status, 1)}</div>
-      ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div>` : ''}${(o.items || []).length ? `<div class="dl"><span class="mut">Позиций</span><b>${o.items.length}</b></div>` : ''}
+      ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div><div class="dl"><span class="mut">Оплата</span><b>${esc(payTxt(o) || '—')}</b></div>` : ''}${(o.items || []).length ? `<div class="dl"><span class="mut">Позиций</span><b>${o.items.length}</b></div>` : ''}
       <div class="dl"><span class="mut">Создан</span><b>${esc(odate(o, {day: 'numeric', month: 'long', year: 'numeric'}) || '—')}</b></div>
-      <div class="stackb">${isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button></div>`);
+      <div class="stackb">${isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}${canOrd() && o.status !== 'canceled' && osum(o) > 0 ? `<button class="btn ghost" data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button></div>`);
+  },
+  debtc: v => {
+    const a = D.debts.filter(d => d.contractor_id == v);
+    sheet(`<h3>${esc(D.con[v] || 'Клиент №' + v)}</h3><p class="mut">Долг: ${fmt(tot(a, x => x.due), 2)} ₽</p>
+      ${a.map(d => li(`Заказ №${esc(d.order_id)}`, esc(sdate(d.created_at)), `${fmt(d.due, 0)} ₽`, `из ${fmt(d.total, 0)} ₽`, {a: 'pay', d: d.order_id})).join('')}`);
+  },
+  pay: async v => {
+    let d; try { d = await api(`/orders/${v}/payments`); } catch (e) { toast(e.message, 'err'); return; }
+    await ensureCon();
+    const due = Math.max(Math.round((d.total_price - d.paid_amount) * 100) / 100, 0), mgr = S.role === 'manager';
+    const hist = (d.payments || []).map(p => li(esc(fmt(p.amount, 2) + ' ₽'), esc(p.note || ''), '', esc(new Date(p.created_at).toLocaleDateString('ru-RU', {day: 'numeric', month: 'short', year: 'numeric'})), mgr ? {a: 'payx', d: p.id + ':' + v} : {})).join('');
+    sheet(`<h3>Оплата · заказ №${esc(v)}</h3><p class="mut">${esc(D.con[d.contractor_id] || 'Клиент №' + d.contractor_id)}</p>
+      <div class="dl"><span class="mut">Сумма заказа</span><b>${fmt(d.total_price, 2)} ₽</b></div>
+      <div class="dl"><span class="mut">Оплачено</span><b>${fmt(d.paid_amount, 2)} ₽</b></div>
+      <div class="dl"><span class="mut">Остаток</span><b>${fmt(due, 2)} ₽</b></div>
+      ${due > 0 && d.status !== 'canceled' ? `<div class="fld" style="margin-top:16px"><label for="pa">Принять оплату, ₽</label><input id="pa" inputmode="decimal" value="${due}" autocomplete="off"></div>
+        <div class="fld"><label for="pn">Заметка (необязательно)</label><input id="pn" maxlength="200" placeholder="наличные, перевод…" autocomplete="off"></div>
+        <button class="btn" data-a="payok" data-v="${esc(v)}">Записать оплату</button>` : `<p class="mut" style="margin-top:16px">${d.status === 'canceled' ? 'Заказ отменён.' : 'Заказ оплачен полностью.'}</p>`}
+      ${hist ? `<h2 class="grp" style="margin-top:24px"><span>История оплат</span></h2>${hist}${mgr ? '<p class="mut sm" style="margin-top:8px">Чтобы убрать ошибочную оплату, нажмите на неё.</p>' : ''}` : ''}`);
+  },
+  payok: async (v, el) => {
+    const a = num($('#pa').value);
+    if (!(a > 0)) { notify('error'); toast('Укажите сумму оплаты', 'err'); return; }
+    el.disabled = true;
+    try {
+      await api(`/orders/${v}/payments`, {method: 'POST', body: JSON.stringify({amount: a, note: $('#pn').value.trim()})});
+      notify('success'); closeSheet(); toast('Оплата записана'); if (S.cur === 'orders') vOrders(true);
+    } catch (e) { notify('error'); toast(e.message, 'err'); el.disabled = false; }
+  },
+  payx: v => {
+    const [pid, oid] = v.split(':');
+    ask('ok', 'Удалить оплату', 'Оплата будет убрана из истории, а долг по заказу вырастет.', 'Удалить').then(async ok => {
+      if (!ok) return;
+      try { await api(`/payments/${pid}`, {method: 'DELETE'}); notify('success'); toast('Оплата удалена'); if (S.cur === 'orders') vOrders(true); ACT.pay(oid); }
+      catch (e) { notify('error'); toast(e.message, 'err'); }
+    });
   },
   cedit: v => {
     const c = v === 'new' ? {id: 0, name: '', is_supplier: true, is_carrier: false, is_client: false, is_active: true} : D.cl.find(x => x.id == v);

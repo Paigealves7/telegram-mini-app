@@ -85,6 +85,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	logHandler := NewLogHandler(repo)
 	statsHandler := NewStatsHandler(repo)
 	staffHandler := NewStaffHandler(repo)
+	paymentHandler := NewPaymentHandler(repo)
 
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(r.Context()); err != nil {
@@ -159,6 +160,9 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Get("/orders", orderHandler.GetOrders)
 				r.Post("/orders", orderHandler.CreateOrder)
 				r.Put("/orders/{id}/complete", orderHandler.CompleteOrder)
+				r.Get("/orders/{id}/payments", paymentHandler.List)
+				r.Post("/orders/{id}/payments", paymentHandler.Add)
+				r.Get("/debts", paymentHandler.Debts)
 				r.Get("/orders/{id}/pdf", pdfLimiter.Middleware(orderHandler.DownloadPDF))
 				r.Post("/orders/{id}/pdf/link", pdfLimiter.Middleware(orderHandler.PDFLink))
 				r.Post("/orders/{id}/pdf/send", pdfLimiter.Middleware(orderHandler.PDFSend))
@@ -177,6 +181,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Post("/contractors", dictHandler.CreateContractor)
 				r.Put("/contractors/{id}", dictHandler.UpdateContractor)
 				r.Delete("/contractors/{id}", dictHandler.DeleteContractor)
+				r.Delete("/payments/{id}", paymentHandler.Delete)
 				r.Get("/users", staffHandler.List)
 				r.Put("/users/{id}/role", staffHandler.SetRole)
 				r.Put("/users/{id}/password", staffHandler.SetPassword)
