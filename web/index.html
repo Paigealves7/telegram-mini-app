@@ -423,7 +423,7 @@ const settle = v => { closeSheet(); if (ASK) { const r = ASK; ASK = null; r(v); 
 
 /* ---------- навигация ---------- */
 const TABS = ['home', 'stock', 'orders', 'journal', 'stats'];
-const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники', cons: 'Контрагенты'};
+const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники', cons: 'Контрагенты', xls: 'Выгрузка', adjlog: 'Корректировки склада'};
 const canOrd = () => S.role === 'manager' || S.role === 'master';
 const jSegs = () => [canOrd() && ['arrivals', 'Приходы'], S.role !== 'master' && ['production', 'Распилы'], canOrd() && ['sales', 'Продажи']].filter(Boolean);
 
@@ -446,7 +446,7 @@ function go(v, p) {
 function back() { show(S.stack.pop() || S.tab); }
 function show(v, p) {
   S.cur = v;
-  const f = FORMS[v], sub = !!f || v === 'profile' || v === 'staff' || v === 'cons';
+  const f = FORMS[v], sub = !!f || v === 'profile' || v === 'staff' || v === 'cons' || v === 'xls' || v === 'adjlog';
   document.body.classList.toggle('form', !!f);
   document.body.classList.toggle('sub', sub);
   $('#title').textContent = f ? f.t : v === 'home' ? 'Лесопилка' : TT[v] || 'Лесопилка';
@@ -454,7 +454,7 @@ function show(v, p) {
   $$('.tab').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
   try { sub ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {}
   scrollTo(0, 0);
-  if (f) vForm(v, p); else ({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff, cons: vCons}[v] || (() => {}))();
+  if (f) vForm(v, p); else ({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff, cons: vCons, xls: vXls, adjlog: vAdjLog}[v] || (() => {}))();
 }
 tg.BackButton.onClick(back);
 $('#hb').innerHTML = ic('back');
@@ -760,8 +760,35 @@ function vProfile() {
   $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><h2>${esc(S.name)}</h2><p class="mut">${esc(ROLE[S.role] || S.role)}</p></div>
     <div class="ld"><span>ID сотрудника</span><b>${esc(j.user_id || '—')}</b></div>
     <div class="ld"><div><span>Экономный режим</span><p class="mut sm">Меньше анимаций, телефон меньше греется</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
-    ${S.role === 'manager' ? '<button class="btn" style="margin-top:24px" data-a="go" data-v="staff">Сотрудники</button><button class="btn" style="margin-top:12px" data-a="go" data-v="cons">Контрагенты</button>' : ''}
+    ${canOrd() ? '<button class="btn" style="margin-top:24px" data-a="go" data-v="xls">Выгрузка для бухгалтерии</button>' : ''}
+    ${S.role === 'manager' ? '<button class="btn" style="margin-top:12px" data-a="go" data-v="staff">Сотрудники</button><button class="btn" style="margin-top:12px" data-a="go" data-v="cons">Контрагенты</button><button class="btn" style="margin-top:12px" data-a="go" data-v="adjlog">Корректировки склада</button>' : ''}
     ${inTg ? '' : '<button class="btn ghost" style="margin-top:32px" data-a="logout">Выйти</button>'}`;
+}
+
+/* ---------- корректировки склада (только руководитель) ---------- */
+const ADJ = {defect: 'Брак', loss: 'Потеря, недостача', own_use: 'Использовано на свои нужды', surplus: 'Излишек (нашли)', other: 'Другое'};
+async function vAdjLog() {
+  const v = $('#view'); v.innerHTML = sk(4);
+  const list = await safe('/stock/adjustments');
+  if (S.cur !== 'adjlog') return;
+  if (!list) { v.innerHTML = fail('Не удалось загрузить журнал', 'adjlog'); return; }
+  v.innerHTML = list.length ? grp('Корректировки', list.length, list.map(a => li(esc(a.item_label), esc([ADJ[a.reason] || a.reason, a.note].filter(Boolean).join(' · ')),
+    `${a.delta_count > 0 ? '+' : '−'}${fmt(Math.abs(a.delta_count), 0)} шт`, esc([sdate(a.created_at), fmt(Math.abs(a.delta_volume), 3) + ' м³', a.user_name].filter(Boolean).join(' · ')), {})).join(''))
+    : none('Корректировок пока не было', 'Списание и излишки появятся здесь');
+}
+
+/* ---------- выгрузка для бухгалтерии ---------- */
+const XLS = [['arrivals', 'Приходы леса', 'Партии бревен: поставщик, машина, порода, размеры, объём'], ['sales', 'Продажи', 'Клиент, машина, объём, доставка, допы, сумма'],
+  ['orders', 'Заказы', 'Статус, сумма, оплачено, остаток'], ['payments', 'Оплаты', 'Кто и когда принял оплату по заказам'], ['debts', 'Долги клиентов', 'Неоплаченные заказы на сегодня (период не нужен)']];
+function vXls() {
+  const n = new Date();
+  $('#view').innerHTML = `<p class="mut">Файлы в формате CSV открываются в Excel. Выберите период и нужный отчёт.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+      <div class="fld"><label for="xf">С</label><input id="xf" type="date" value="${ymd(new Date(n.getFullYear(), n.getMonth(), 1))}"></div>
+      <div class="fld"><label for="xt">По</label><input id="xt" type="date" value="${ymd(n)}"></div></div>
+    <div class="chips" style="margin:0;padding:0;flex-wrap:wrap;overflow:visible">${[['m', 'Этот месяц'], ['pm', 'Прошлый месяц'], ['y', 'Этот год']].map(([k, l]) => `<button type="button" class="chip rip" data-a="xr" data-v="${k}">${l}</button>`).join('')}</div>
+    <div style="margin-top:16px">${XLS.map(([k, t, s]) => li(esc(t), esc(s), '', '', {a: 'xexp', d: k})).join('')}</div>
+    ${inTg ? '<p class="mut sm" style="margin-top:16px">В Telegram скачивание файла может не сработать. Тогда откройте веб-версию в браузере.</p>' : ''}`;
 }
 
 /* ---------- контрагенты (только руководитель) ---------- */
@@ -1004,6 +1031,24 @@ const ACT = {
       catch (e) { notify('error'); toast(e.message, 'err'); }
     });
   },
+  xr: v => {
+    const n = new Date(), y = n.getFullYear(), m = n.getMonth();
+    const [a, b] = v === 'm' ? [new Date(y, m, 1), n] : v === 'pm' ? [new Date(y, m - 1, 1), new Date(y, m, 0)] : [new Date(y, 0, 1), n];
+    $('#xf').value = ymd(a); $('#xt').value = ymd(b);
+  },
+  xexp: async v => {
+    const f = $('#xf').value, t = $('#xt').value;
+    if (v !== 'debts' && (!f || !t || f > t)) { notify('error'); toast('Проверьте период', 'err'); return; }
+    try {
+      const r = await fetch(`/api/v1/export/${v}?from=${f}&to=${t}`, {headers: {Authorization: 'Bearer ' + token()}});
+      if (r.status === 401) throw new Error('Сессия истекла, войдите заново');
+      if (!r.ok) throw new Error((await r.text()).trim() || 'Не удалось сформировать файл');
+      const url = URL.createObjectURL(await r.blob()), a = document.createElement('a');
+      a.href = url; a.download = v === 'debts' ? `debts_${ymd(new Date())}.csv` : `${v}_${f}_${t}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+      notify('success'); toast('Файл готов');
+    } catch (e) { notify('error'); toast(e.message, 'err'); }
+  },
   cedit: v => {
     const c = v === 'new' ? {id: 0, name: '', is_supplier: true, is_carrier: false, is_client: false, is_active: true} : D.cl.find(x => x.id == v);
     if (!c) return;
@@ -1088,7 +1133,34 @@ const ACT = {
       <div class="dl"><span class="hint">Остаток</span><b>${esc(x.count)} шт${t === 'boards' && (+x.count || 0) <= LOW_STOCK_PCS ? ' · мало на складе' : ''}</b></div>
       <div class="dl"><span class="hint">Объём</span><b>${fmt(x.volume_m3, 3)} м³</b></div>
       ${t === 'boards' && canOrd() ? `<button class="btn rip" style="margin-top:14px" data-a="mk" data-v="order:board:${x.id}">Создать заказ на эту позицию</button>` : ''}
-      ${t === 'logs' ? `<button class="btn rip" style="margin-top:14px" data-a="mk" data-v="sawing:log:${x.id}">Записать распиловку из этой партии</button>` : ''}`);
+      ${t === 'logs' ? `<button class="btn rip" style="margin-top:14px" data-a="mk" data-v="sawing:log:${x.id}">Записать распиловку из этой партии</button>` : ''}
+      ${S.role === 'manager' ? `<button class="btn ghost" style="margin-top:10px" data-a="adj" data-v="${t}:${x.id}">Списать или исправить остаток</button>` : ''}`);
+  },
+  adj: v => {
+    const [t, id] = v.split(':'), x = find(t, id); if (!x) return;
+    const rs = Object.entries(ADJ).filter(([k]) => t === 'boards' || k !== 'surplus');
+    sheet(`<h3>Корректировка остатка</h3><p class="mut">${esc(t === 'boards' ? boardTitle(x) : 'Бревно Ø' + x.diameter_mm + ' · партия №' + x.arrival_id)} · сейчас ${esc(x.count)} шт</p>
+      <div class="fld" style="margin-top:16px"><label>Причина</label><div class="chips" id="ar" style="flex-wrap:wrap;overflow:visible;margin:0;padding:0">${rs.map(([k, l]) => `<button type="button" class="chip rip" data-a="adjr" data-v="${k}">${esc(l)}</button>`).join('')}</div></div>
+      <div class="fld"><label for="ac">Сколько штук</label><input id="ac" inputmode="numeric" autocomplete="off" placeholder="например, 5"></div>
+      <div class="fld"><label for="an">Пояснение</label><input id="an" maxlength="200" autocomplete="off" placeholder="что случилось"></div>
+      <button class="btn" data-a="adjok" data-v="${t}:${id}">Записать</button>
+      <p class="mut sm" style="margin-top:12px">Операция попадёт в журнал корректировок.</p>`);
+  },
+  adjr: (v, el) => { $$('#ar .chip').forEach(b => b.classList.toggle('on', b === el)); },
+  adjok: v => {
+    const [t, id] = v.split(':'), x = find(t, id); if (!x) return;
+    const r = ($('#ar .chip.on') || {}).dataset ? $('#ar .chip.on').dataset.v : '', n = Math.round(num($('#ac').value)), note = $('#an').value.trim();
+    if (!r) { notify('error'); toast('Выберите причину', 'err'); return; }
+    if (!(n > 0)) { notify('error'); toast('Укажите, сколько штук', 'err'); return; }
+    if (r !== 'surplus' && n > x.count) { notify('error'); toast(`На складе только ${x.count} шт`, 'err'); return; }
+    if (r === 'other' && !note) { notify('error'); toast('Напишите пояснение', 'err'); return; }
+    ask('ok', r === 'surplus' ? 'Добавить на склад' : 'Списать со склада', `${n} шт · ${ADJ[r]}`, 'Записать').then(async ok => {
+      if (!ok) return;
+      try {
+        await api('/stock/adjust', {method: 'POST', body: JSON.stringify({kind: t === 'boards' ? 'board' : 'log', item_id: +id, count: n, reason: r, note})});
+        notify('success'); toast('Остаток исправлен'); if (S.cur === 'stock') vStock(true);
+      } catch (e) { notify('error'); toast(e.message, 'err'); }
+    });
   },
   mk: v => { const [f, k, id] = v.split(':'); closeSheet(); go(f, {[k]: id}); },
   done: (v, el) => ask('ok', 'Завершить заказ №' + v, 'Товары будут списаны со склада и проведены как продажа.', 'Завершить').then(ok => ok && doComplete(v, el)),

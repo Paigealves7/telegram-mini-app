@@ -144,6 +144,21 @@ type Payment struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// StockAdjustment: запись журнала корректировок склада (отрицательные значения = списание).
+type StockAdjustment struct {
+	ID          int64     `json:"id"`
+	Kind        string    `json:"kind"` // "board" или "log"
+	ItemID      int64     `json:"item_id"`
+	ItemLabel   string    `json:"item_label"`
+	DeltaCount  int       `json:"delta_count"`
+	DeltaVolume float64   `json:"delta_volume"`
+	Reason      string    `json:"reason"`
+	Note        string    `json:"note"`
+	CreatedBy   int64     `json:"created_by"`
+	UserName    string    `json:"user_name"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // OrderPayments: заказ с итогами и историей оплат (для окна «Оплата»).
 type OrderPayments struct {
 	OrderID      int64       `json:"order_id"`
