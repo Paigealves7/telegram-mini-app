@@ -86,7 +86,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	statsHandler := NewStatsHandler(repo)
 	staffHandler := NewStaffHandler(repo)
 	paymentHandler := NewPaymentHandler(repo)
-	exportHandler := NewExportHandler(repo)
 	stockHandler := NewStockHandler(repo)
 
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +164,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Get("/orders/{id}/payments", paymentHandler.List)
 				r.Post("/orders/{id}/payments", paymentHandler.Add)
 				r.Get("/debts", paymentHandler.Debts)
-				r.Get("/export/{kind}", exportHandler.Download)
 				r.Get("/orders/{id}/pdf", pdfLimiter.Middleware(orderHandler.DownloadPDF))
 				r.Post("/orders/{id}/pdf/link", pdfLimiter.Middleware(orderHandler.PDFLink))
 				r.Post("/orders/{id}/pdf/send", pdfLimiter.Middleware(orderHandler.PDFSend))

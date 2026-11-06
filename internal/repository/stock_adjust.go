@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 
@@ -14,8 +13,6 @@ import (
 )
 
 var ErrLogSurplus = errors.New("излишек можно добавить только для пиломатериалов")
-
-func round3(v float64) float64 { return math.Round(v*1000) / 1000 }
 
 func lenLabel(mm int) string {
 	return strings.Replace(strconv.FormatFloat(float64(mm)/1000, 'f', -1, 64), ".", ",", 1) + " м"
