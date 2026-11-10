@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"telegram-mini-app/internal/domain"
@@ -12,25 +13,32 @@ import (
 )
 
 type OrderHandler struct {
-	repo    *repository.Repository
-	service *service.OrderService
+	repo       *repository.Repository
+	service    *service.OrderService
+	pdfService *service.PDFService
+	botService *service.BotService
 }
 
 // Теперь хендлер принимает и репозиторий, и сервис
-func NewOrderHandler(repo *repository.Repository, svc *service.OrderService) *OrderHandler {
-	return &OrderHandler{repo: repo, service: svc}
+func NewOrderHandler(repo *repository.Repository, svc *service.OrderService, pdfSvc *service.PDFService, botSvc *service.BotService) *OrderHandler {
+	return &OrderHandler{repo: repo, service: svc, pdfService: pdfSvc, botService: botSvc}
 }
 
 type CreateOrderRequest struct {
-	MasterID      int64              `json:"master_id" validate:"required,gt=0"`
 	ContractorID  int64              `json:"contractor_id" validate:"required,gt=0"`
-	Notes         string             `json:"notes"`
+	Notes         string             `json:"notes" validate:"max=1000"`
 	DeliveryPrice float64            `json:"delivery_price" validate:"gte=0"`
 	ExtraPrice    float64            `json:"extra_price" validate:"gte=0"`
 	Items         []domain.OrderItem `json:"items" validate:"required,min=1,dive"`
 }
 
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUser(r)
+	if !ok {
+		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
 	var req CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "некорректный JSON", http.StatusBadRequest)
@@ -38,12 +46,12 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := Validate.Struct(req); err != nil {
-		http.Error(w, "ошибка валидации данных: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, validationMessage(err), http.StatusBadRequest)
 		return
 	}
 
 	order := &domain.Order{
-		MasterID:      req.MasterID,
+		MasterID:      user.UserID, // из JWT; мастер заказа = тот, кто его создал
 		ContractorID:  req.ContractorID,
 		Notes:         req.Notes,
 		DeliveryPrice: req.DeliveryPrice,
@@ -53,7 +61,7 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.CreateOrder(r.Context(), order, req.Items)
 	if err != nil {
-		http.Error(w, "ошибка создания заказа: "+err.Error(), http.StatusInternalServerError)
+		respondError(w, r, "не удалось создать заказ", err)
 		return
 	}
 
@@ -63,19 +71,11 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
-	limit := 50
-	offset := 0
-
-	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
-		limit = l
-	}
-	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && o >= 0 {
-		offset = o
-	}
+	limit, offset := pageParams(r, 200, 1000)
 
 	orders, err := h.repo.GetOrders(r.Context(), limit, offset)
 	if err != nil {
-		http.Error(w, "ошибка получения заказов: "+err.Error(), http.StatusInternalServerError)
+		serverError(w, r, "не удалось получить заказы", err)
 		return
 	}
 
@@ -100,7 +100,17 @@ func (h *OrderHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) {
 
 	err = h.service.CompleteOrder(r.Context(), orderID, claims.UserID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		// Тексты ошибок сервиса уже понятны пользователю; код выбираем по типу.
+		status := http.StatusInternalServerError
+		switch {
+		case errors.Is(err, repository.ErrOrderNotFound):
+			status = http.StatusNotFound
+		case errors.Is(err, repository.ErrOrderClosed), errors.Is(err, repository.ErrInsufficientStock):
+			status = http.StatusConflict
+		case errors.Is(err, repository.ErrOrderEmpty), errors.Is(err, repository.ErrBoardNotFound):
+			status = http.StatusBadRequest
+		}
+		http.Error(w, err.Error(), status)
 		return
 	}
 

@@ -23,10 +23,20 @@ func (h *StatsHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Параметры start_date и end_date обязательны", http.StatusBadRequest)
 		return
 	}
+	start, errS := parseDate(startDate)
+	end, errE := parseDate(endDate)
+	if errS != nil || errE != nil {
+		http.Error(w, "start_date и end_date должны быть в формате ГГГГ-ММ-ДД", http.StatusBadRequest)
+		return
+	}
+	if end.Before(start) {
+		http.Error(w, "конечная дата раньше начальной", http.StatusBadRequest)
+		return
+	}
 
 	stats, err := h.repo.GetStatisticsSummary(r.Context(), startDate, endDate)
 	if err != nil {
-		http.Error(w, "Ошибка получения статистики: "+err.Error(), http.StatusInternalServerError)
+		serverError(w, r, "не удалось получить статистику", err)
 		return
 	}
 

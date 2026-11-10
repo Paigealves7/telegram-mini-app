@@ -9,7 +9,8 @@ RUN go build -o sawmill-backend ./cmd/main.go
 
 # Этап 2: Запуск
 FROM alpine:latest
-RUN apk --no-cache add ca-certificates tzdata
+# font-dejavu: шрифт с кириллицей для PDF (ищется на диске при старте, из интернета не качается)
+RUN apk --no-cache add ca-certificates tzdata font-dejavu
 WORKDIR /root/
 # Забираем свежий бинарник и файлы фронтенда
 COPY --from=builder /app/sawmill-backend .

@@ -16,13 +16,29 @@ func NewSawingHandler(repo *repository.Repository) *SawingHandler {
 }
 
 type CreateSawingRequest struct {
-	WorkerID int64             `json:"worker_id" validate:"required,gt=0"`
-	Date     string            `json:"date" validate:"required"`
-	Logs     []domain.SawedLog `json:"logs" validate:"required,min=1,dive"`
-	Boards   []domain.Board    `json:"boards" validate:"required,min=1,dive"`
+	Date   string            `json:"date" validate:"required"`
+	Logs   []domain.SawedLog `json:"logs" validate:"required,min=1,dive"`
+	Boards []domain.Board    `json:"boards" validate:"required,min=1,dive"`
+}
+
+func (h *SawingHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	limit, offset := pageParams(r, 100, 500)
+	ops, err := h.repo.GetSawingOperations(r.Context(), limit, offset)
+	if err != nil {
+		serverError(w, r, "не удалось получить историю распилов", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(ops)
 }
 
 func (h *SawingHandler) CreateSawing(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUser(r)
+	if !ok {
+		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
 	var req CreateSawingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "некорректный JSON", http.StatusBadRequest)
@@ -30,18 +46,23 @@ func (h *SawingHandler) CreateSawing(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := Validate.Struct(req); err != nil {
-		http.Error(w, "ошибка валидации данных: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, validationMessage(err), http.StatusBadRequest)
+		return
+	}
+
+	if _, err := parseDate(req.Date); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	operation := &domain.SawingOperation{
-		WorkerID: req.WorkerID,
+		WorkerID: user.UserID, // из JWT, а не из тела запроса
 		Date:     req.Date,
 	}
 
 	result, err := h.repo.CreateSawingOperation(r.Context(), operation, req.Logs, req.Boards)
 	if err != nil {
-		http.Error(w, "ошибка сохранения распила: "+err.Error(), http.StatusInternalServerError)
+		respondError(w, r, "не удалось сохранить распил", err)
 		return
 	}
 

@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE users DROP COLUMN IF EXISTS tg_username;
+ALTER TABLE users DROP COLUMN IF EXISTS display_name;
+
+COMMIT;

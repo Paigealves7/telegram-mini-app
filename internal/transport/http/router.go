@@ -1,13 +1,16 @@
 package http
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 	"telegram-mini-app/internal/service"
+	"telegram-mini-app/pkg/telegram"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,24 +25,37 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		log.Fatal("Критическая ошибка: JWT_SECRET не задан в переменных окружения")
 	}
 
-	botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	botToken := strings.Trim(strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN")), "\"'")
 	if botToken == "" {
 		log.Fatal("Критическая ошибка: TELEGRAM_BOT_TOKEN не задан в переменных окружения")
 	}
 
+	// Диагностика: какому боту принадлежит токен. Сравни с ботом, через который открываешь Mini App.
+	if username, err := telegram.BotUsername(context.Background(), botToken); err != nil {
+		log.Printf("ВНИМАНИЕ: токен бота не прошёл проверку getMe: %v", err)
+	} else {
+		log.Printf("Telegram: токен принадлежит боту @%s (длина токена: %d)", username, len(botToken))
+	}
+
 	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)
+	r.Use(accessLog)
+	r.Use(securityHeaders)
 	r.Use(middleware.Recoverer)
 
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"POST", "GET", "DELETE", "PUT", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
+	// Приложение и API живут на одном адресе, поэтому CORS нужен только для явно разрешённых сайтов.
+	// Токен передаётся заголовком, куки не используются, поэтому AllowCredentials выключен.
+	corsOpts := cors.Options{
+		AllowedMethods: []string{"POST", "GET", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
+		MaxAge:         300,
+	}
+	if origins := corsOrigins(); len(origins) > 0 {
+		corsOpts.AllowedOrigins = origins
+	} else {
+		corsOpts.AllowedOrigins = []string{"https://cors-disabled.invalid"} // пустой список библиотека трактует как «разрешить всем»
+	}
+	r.Use(cors.Handler(corsOpts))
 
 	repo := repository.NewRepository(db)
 
@@ -47,6 +63,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	botService := service.NewBotService(botToken, repo)
 	salesService := service.NewSalesService(repo)
 	orderService := service.NewOrderService(repo, salesService, botService)
+	pdfService := service.NewPDFService(repo, jwtSecret)
 
 	// 2. Прокидываем секреты и зависимости в хендлеры
 	dictHandler := NewDictHandler(repo)
@@ -55,13 +72,21 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	sawingHandler := NewSawingHandler(repo)
 
 	// В SalesHandler теперь передаем Service, а не Repo
-	salesHandler := NewSalesHandler(salesService)
+	salesHandler := NewSalesHandler(salesService, repo)
 
-	orderHandler := NewOrderHandler(repo, orderService)
+	orderHandler := NewOrderHandler(repo, orderService, pdfService, botService)
 	tgAuthHandler := NewTelegramAuthHandler(repo, botToken, jwtSecret)
+	// Лимиты по IP клиента (см. client_ip.go). Значения подобраны так, чтобы бригада за одним IP не мешала друг другу.
+	loginLimiter := NewRateLimiter(5, 5)    // вход по паролю: 5 попыток подряд, затем 1 в 12 секунд (защита от подбора)
+	tgLimiter := NewRateLimiter(60, 30)     // вход через Telegram: сотрудники за одним Wi-Fi
+	pdfLimiter := NewRateLimiter(30, 15)    // сборка накладных нагружает процессор
+	apiLimiter := NewRateLimiter(1200, 300) // общий потолок на один IP
 	boardHandler := NewBoardHandler(repo)
 	logHandler := NewLogHandler(repo)
 	statsHandler := NewStatsHandler(repo)
+	staffHandler := NewStaffHandler(repo)
+	paymentHandler := NewPaymentHandler(repo)
+	stockHandler := NewStockHandler(repo)
 
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(r.Context()); err != nil {
@@ -79,7 +104,26 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	webDir := filepath.Join(workDir, "web")
 	fileServer := http.FileServer(http.Dir(webDir))
 
+	// Проверки состояния для Docker, nginx и мониторинга (без авторизации, ответ «ok»).
+	healthHandler := NewHealthHandler(repo)
+	healthLimiter := NewRateLimiter(120, 60)
+	r.Get("/healthz", healthHandler.Live)
+	r.Head("/healthz", healthHandler.Live)
+	r.Get("/readyz", healthLimiter.Middleware(healthHandler.Ready))
+	r.Head("/readyz", healthLimiter.Middleware(healthHandler.Ready))
+
+	// Публичные ссылки на накладные (подписанные, живут 10 минут): без них файл не скачать в Telegram.
+	r.Get("/files/pdf/{token}/{name}", pdfLimiter.Middleware(orderHandler.ServePDF))
+	r.Head("/files/pdf/{token}/{name}", pdfLimiter.Middleware(orderHandler.ServePDF))
+
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		// Telegram WebView агрессивно кеширует страницу. no-cache заставляет его сверяться
+		// с сервером (ETag/Last-Modified) при каждом открытии, а не показывать старую версию.
+		w.Header().Set("Cache-Control", "no-cache")
+		if r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
+			http.Error(w, "маршрут не найден", http.StatusNotFound) // неизвестный адрес API не должен отдавать страницу приложения
+			return
+		}
 		filePath := filepath.Join(webDir, filepath.Clean(r.URL.Path))
 		info, err := os.Stat(filePath)
 
@@ -91,10 +135,12 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(apiLimiter.Wrap)
+		r.Use(limitBody)
+
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", authHandler.Register)
-			r.Post("/login", authHandler.Login)
-			r.Post("/telegram", tgAuthHandler.LoginViaTelegram)
+			r.Post("/login", loginLimiter.Middleware(authHandler.Login))
+			r.Post("/telegram", tgLimiter.Middleware(tgAuthHandler.LoginViaTelegram))
 		})
 
 		r.Group(func(r chi.Router) {
@@ -104,28 +150,63 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			r.Get("/boards", boardHandler.GetList)
 			r.Get("/logs", logHandler.GetList)
 			r.Get("/contractors", dictHandler.GetContractors)
+			r.Get("/config", ConfigHandler)
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleMaster))
-				r.Post("/contractors", dictHandler.CreateContractor)
+				r.Get("/arrivals", arrivalHandler.GetList)
 				r.Post("/arrivals", arrivalHandler.CreateArrival)
+				r.Get("/sales", salesHandler.GetList)
 				r.Post("/sales", salesHandler.CreateSale)
 				r.Get("/orders", orderHandler.GetOrders)
 				r.Post("/orders", orderHandler.CreateOrder)
 				r.Put("/orders/{id}/complete", orderHandler.CompleteOrder)
+				r.Get("/orders/{id}/payments", paymentHandler.List)
+				r.Post("/orders/{id}/payments", paymentHandler.Add)
+				r.Get("/debts", paymentHandler.Debts)
+				r.Get("/orders/{id}/pdf", pdfLimiter.Middleware(orderHandler.DownloadPDF))
+				r.Post("/orders/{id}/pdf/link", pdfLimiter.Middleware(orderHandler.PDFLink))
+				r.Post("/orders/{id}/pdf/send", pdfLimiter.Middleware(orderHandler.PDFSend))
 			})
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleWorker))
+				r.Get("/sawing", sawingHandler.GetList)
 				r.Post("/sawing", sawingHandler.CreateSawing)
 			})
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager))
 				r.Get("/statistics", statsHandler.GetSummary)
+				r.Post("/users", authHandler.Register) // создание сотрудников: только менеджер
+				r.Post("/contractors", dictHandler.CreateContractor)
+				r.Put("/contractors/{id}", dictHandler.UpdateContractor)
+				r.Delete("/contractors/{id}", dictHandler.DeleteContractor)
+				r.Delete("/payments/{id}", paymentHandler.Delete)
+				r.Post("/stock/adjust", stockHandler.Adjust)
+				r.Get("/stock/adjustments", stockHandler.List)
+				r.Get("/users", staffHandler.List)
+				r.Put("/users/{id}/role", staffHandler.SetRole)
+				r.Put("/users/{id}/password", staffHandler.SetPassword)
 			})
 		})
 	})
 
 	return r
+}
+
+// corsOrigins: список сайтов, которым разрешён доступ к API из браузера (CORS_ORIGINS через запятую, иначе PUBLIC_URL).
+func corsOrigins() []string {
+	var out []string
+	for _, v := range strings.Split(os.Getenv("CORS_ORIGINS"), ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		if u := strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_URL")), "/"); u != "" {
+			out = append(out, u)
+		}
+	}
+	return out
 }

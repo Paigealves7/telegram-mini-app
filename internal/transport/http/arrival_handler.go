@@ -18,13 +18,30 @@ func NewArrivalHandler(repo *repository.Repository) *ArrivalHandler {
 type CreateArrivalRequest struct {
 	SupplierID  int64            `json:"supplier_id" validate:"required,gt=0"`
 	CarrierID   int64            `json:"carrier_id" validate:"required,gt=0"`
-	TruckNumber string           `json:"truck_number" validate:"required"`
+	TruckNumber string           `json:"truck_number" validate:"required,max=20"`
 	ArrivalDate string           `json:"arrival_date" validate:"required"`
-	CreatedBy   int64            `json:"created_by" validate:"required,gt=0"`
 	Items       []domain.LogItem `json:"items" validate:"required,min=1,dive"` // dive валидирует элементы массива!
 }
 
+// GetList returns the paginated arrival history, including each arrival's tally.
+func (h *ArrivalHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	limit, offset := pageParams(r, 100, 500)
+	arrivals, err := h.repo.GetLogArrivals(r.Context(), limit, offset)
+	if err != nil {
+		serverError(w, r, "не удалось получить историю поступлений", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(arrivals)
+}
+
 func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUser(r)
+	if !ok {
+		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
+		return
+	}
+
 	var req CreateArrivalRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "некорректный JSON", http.StatusBadRequest)
@@ -32,7 +49,12 @@ func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := Validate.Struct(req); err != nil {
-		http.Error(w, "ошибка валидации данных: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, validationMessage(err), http.StatusBadRequest)
+		return
+	}
+
+	if _, err := parseDate(req.ArrivalDate); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -41,12 +63,12 @@ func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
 		CarrierID:   req.CarrierID,
 		TruckNumber: req.TruckNumber,
 		ArrivalDate: req.ArrivalDate,
-		CreatedBy:   req.CreatedBy,
+		CreatedBy:   user.UserID, // из JWT, а не из тела запроса
 	}
 
 	result, err := h.repo.CreateLogArrival(r.Context(), arrival, req.Items)
 	if err != nil {
-		http.Error(w, "ошибка сохранения прихода: "+err.Error(), http.StatusInternalServerError)
+		respondError(w, r, "не удалось сохранить приход", err)
 		return
 	}
 

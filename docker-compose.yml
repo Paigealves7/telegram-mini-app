@@ -5,18 +5,31 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Zombi2010
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан в .env}
       POSTGRES_DB: telegram-mini-app_db
     ports:
-      - "5433:5432"
+      # Только с самого сервера (для доступа с ноутбука используй SSH-туннель).
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./migrations/000001_v1_init_schema.up.sql:/docker-entrypoint-initdb.d/init.sql
+      # Только на пустой базе. Выполняются по порядку имён; down-файлы подключать нельзя: они удаляют таблицы.
+      - ./migrations/000001_v1_init_schema.up.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./migrations/000002_log_stock.up.sql:/docker-entrypoint-initdb.d/02_log_stock.sql
+      - ./migrations/000003_sawing_board_history.up.sql:/docker-entrypoint-initdb.d/03_sawing_board_history.sql
+      - ./migrations/000004_users_display_name.up.sql:/docker-entrypoint-initdb.d/04_users_display_name.sql
+      - ./migrations/000005_contractor_types.up.sql:/docker-entrypoint-initdb.d/05_contractor_types.sql
+      - ./migrations/000006_order_payments.up.sql:/docker-entrypoint-initdb.d/06_order_payments.sql
+      - ./migrations/000007_stock_adjustments.up.sql:/docker-entrypoint-initdb.d/07_stock_adjustments.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d telegram-mini-app_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m" # без ограничения логи Docker со временем забивают диск
+        max-file: "3"
 
   app:
     build:
@@ -24,16 +37,38 @@ services:
       dockerfile: Dockerfile
     container_name: sawmill_app
     restart: always
+    stop_grace_period: 30s # время на дозавершение запросов при остановке
     ports:
       - "8080:8080"
     environment:
       PORT: 8080
-      DATABASE_URL: postgres://postgres:Zombi2010@postgres:5432/telegram-mini-app_db?sslmode=disable
-      JWT_SECRET: sawmill_super_secret_jwt_key_2026_x98z
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан в .env}@postgres:5432/telegram-mini-app_db?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET не задан в .env}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN не задан в .env}
+      # Адрес сайта для ссылок на PDF, например https://sawmill.example.com (без слэша в конце)
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      # Часовой пояс для дат в накладных, например Europe/Moscow или Europe/Tallinn
+      TZ: ${TZ:-UTC}
+      # false = в приложении показывается, что отправка PDF в чат недоступна (блокировки)
+      PDF_SEND_ENABLED: ${PDF_SEND_ENABLED:-true}
+      # Шапка накладной
+      COMPANY_NAME: ${COMPANY_NAME:-Лесопилка}
+      COMPANY_INFO: ${COMPANY_INFO:-}
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      # /readyz проверяет и приложение, и связь с базой
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/readyz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m" # без ограничения логи Docker со временем забивают диск
+        max-file: "3"
 
 volumes:
   pgdata:

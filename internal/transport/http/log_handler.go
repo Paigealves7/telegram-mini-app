@@ -17,15 +17,7 @@ func NewLogHandler(repo *repository.Repository) *LogHandler {
 }
 
 func (h *LogHandler) GetList(w http.ResponseWriter, r *http.Request) {
-	limit := 50
-	offset := 0
-
-	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
-		limit = l
-	}
-	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && o >= 0 {
-		offset = o
-	}
+	limit, offset := pageParams(r, 500, 1000)
 
 	filter := domain.LogFilter{
 		Species: r.URL.Query().Get("species"),
@@ -39,7 +31,7 @@ func (h *LogHandler) GetList(w http.ResponseWriter, r *http.Request) {
 
 	logs, err := h.repo.GetAllLogs(r.Context(), filter, limit, offset)
 	if err != nil {
-		http.Error(w, `{"error":"не удалось получить список сырья"}`, http.StatusInternalServerError)
+		serverError(w, r, "не удалось получить список сырья", err)
 		return
 	}
 
