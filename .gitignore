@@ -14,3 +14,7 @@ vendor/
 sawmill-backend
 bin/
 html.txt
+.aider*
+
+backup_*.sql
+*.dump
