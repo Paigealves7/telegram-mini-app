@@ -346,7 +346,7 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 		pdf.SetLineWidth(0.2)
 		pdf.SetTextColor(30, 30, 30)
 		cells := []string{
-			strconv.Itoa(i + 1), itemTitle(l), formatInt(l.Count),
+			strconv.Itoa(i + 1), itemTitle(l), itemCount(l),
 			formatVolume(l.VolumeM3), formatMoney(l.Price), formatMoney(sum),
 		}
 		for j, c := range tableCols {

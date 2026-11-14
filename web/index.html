@@ -396,7 +396,7 @@ async function api(path, opts = {}) {
 }
 const safe = async u => { try { return (await api(u)) || []; } catch (e) { toast(e.message, 'err'); return null; } };
 async function loadConfig() { try { const c = await api('/config'); if (c) CFG = {...CFG, ...c}; } catch (e) { /* необязательная конфигурация: используются значения по умолчанию */ } }
-async function loadStock() { const [b, l, f] = await Promise.all([safe('/boards'), safe('/logs'), safe('/firewood/stock')]); if (b) D.boards = b; if (l) D.logs = l; if (f) D.fw = f; return !!b && !!l; }
+async function loadStock() { const [b, l, f] = await Promise.all([safe('/boards'), safe('/logs'), safe('/firewood/stock')]); if (b) D.boards = b; if (l) D.logs = l; if (f) D.fw = f; return !!b && !!l && !!f; }
 async function ensureCon() { if (Object.keys(D.con).length) return true; const list = await safe('/contractors'); if (!list) return false; D.cl = list; list.forEach(c => D.con[c.id] = c.name); return true; }
 
 function countUp(root = $('#view')) {
@@ -436,7 +436,7 @@ function buildTabs() {
 const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}">${ic('plus')}${l}</button>`;
 function setAct(v) {
   $('#hact').innerHTML = v === 'home' ? `${S.role === 'manager' ? `<button class="rbtn" data-a="go" data-v="stats" aria-label="Отчёты">${ic('chart')}<span>Отчёты</span></button>` : ''}<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль">${esc((S.name || '?')[0].toUpperCase())}</button>`
-    : v === 'orders' ? hbtn('order', 'Заказ')
+    : v === 'orders' ? hbtn('order', 'Доски') + hbtn('fworder', 'Дрова')
     : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
 }
 function go(v, p) {
@@ -650,7 +650,7 @@ function stockList() {
     const f = D.fw || {raw_m3: 0};
     $('#ssum').innerHTML = tots([['Сырьё, м³', fmt(f.raw_m3, 3)]]);
     $('#sl').innerHTML = li('Дрова, берёза (сырьё)', 'Приходы дров общим объёмом', `${fmt(f.raw_m3, 3)} м³`, '', {});
-    return;
+    $('#sl').innerHTML += Object.entries(FW_NAMES).map(([k,n])=>li(n,'Готовые дрова',`${fmt(f[k+'_m3']||0,3)} м³`,'',{})).join('') + `${S.role==='manager'||S.role==='worker'?'<button class="btn" data-a="mk" data-v="fwproc">Напилили / Накололи</button>':''}<button class="btn ghost" data-a="fwhistory">История переработки</button>${S.role==='manager'?'<button class="btn ghost" data-a="mk" data-v="fwsettings">Коэффициенты</button>':''}`;    return;
   }
   const t = S.wt, q = S.wq.toLowerCase().replace(/(\d)\s*[*xх]\s*(\d)/g, '$1×$2');
   const list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
@@ -927,6 +927,33 @@ const FORMS = {
     body: v => ({contractor_id: +v.con, status: 'new', delivery_price: 0, extra_price: 0, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
   }
 };
+const FW_NAMES = {split: 'Колотые', round: 'Чурбаки (пиленые)'};
+FORMS.fwproc = {
+ t:'Напилили / Накололи',e:'sawing',ok:'Записать переработку',path:'/firewood/processing',done:'Переработка записана',after:'stock',need:[],mem:[],
+ f:[{k:'kind',l:'Готовые дрова',t:'sel',o:Object.entries(FW_NAMES)},{k:'vol',l:'Получено готовых дров, м³',t:'num',v:3,s:.1},{k:'performer',l:'Кто делал',t:'txt'},{k:'date',l:'Дата (ГГГГ-ММ-ДД)',t:'txt',v:ymd(new Date())},{k:'comment',l:'Комментарий',t:'txt'}],
+ req:v=>!(v.vol>0)?'Укажите объём':!v.performer?'Укажите исполнителя':null,
+ sum:v=>`${FW_NAMES[v.kind]}: ${fmt(v.vol,3)} м³; ${v.performer}, ${v.date}`,
+ body:v=>({kind:v.kind,volume_m3:v.vol,performer:v.performer,date:v.date,comment:v.comment})
+};
+FORMS.fwsettings = {
+ t:'Коэффициенты дров',e:'sawing',ok:'Сохранить коэффициенты',path:'/firewood/settings',done:'Коэффициенты сохранены',after:'stock',need:[],mem:[],
+ f:[{k:'split',l:'Колотые (навалом)',t:'num',s:.01},{k:'round',l:'Чурбаки (навалом)',t:'num',s:.01}],
+ req:v=>!(v.split>0&&v.split<=1&&v.round>0&&v.round<=1)?'Коэффициенты должны быть больше 0 и не больше 1':null,
+ sum:v=>`Колотые: ${v.split}; чурбаки: ${v.round}. Изменятся только новые операции.`,body:v=>v
+};
+async function fwHistory(offset=0){
+ try { const rows=await api('/firewood/processing?limit=50&offset='+offset);
+ sheet('<h2>Переработка дров</h2>'+rows.map(p=>`<div class="dl"><div><b>${esc(FW_NAMES[p.kind])}: ${fmt(p.volume_m3,3)} м³</b><p>${esc(p.date)} · ${esc(p.performer)}</p><p>Сырьё: ${fmt(p.raw_m3,4)} м³ · коэффициент ${p.coefficient}</p><p>${esc(p.comment)}</p></div>${S.role==='manager'?`<button class="lnk" data-a="fwdelete" data-v="${p.id}">Удалить</button>`:''}</div>`).join('')+`${offset?`<button class="btn ghost" data-a="fwhistory" data-v="${Math.max(0,offset-50)}">Назад</button>`:''}${rows.length===50?`<button class="btn ghost" data-a="fwhistory" data-v="${offset+50}">Далее</button>`:''}`);
+ }catch(e){toast(e.message,'err')}
+}
+FORMS.fworder={
+ t:'Заказ на дрова',e:'order',ok:'Создать заказ',path:'/orders',done:'Заказ создан',after:'orders',need:['con','stock'],mem:['con','price'],
+ f:[{k:'con',l:'Клиент',t:'sel',src:'cli',m:1},{k:'kind',l:'Вид дров',t:'sel',o:Object.entries(FW_NAMES)},{k:'vol',l:'Объём готовых дров, м³',t:'num',v:3,s:.1},{k:'price',l:'Цена за м³, ₽',t:'num',v:2000,s:100},{k:'delivery',l:'Доставка, ₽',t:'num',v:0,s:100},{k:'extra',l:'Дополнительно, ₽',t:'num',v:0,s:100},{k:'notes',l:'Примечание',t:'txt'}],
+ pv:v=>`<div class="pvr"><span>На складе</span><b>${fmt(D.fw[v.kind+'_m3']||0,3)} м³</b></div><div class="pvr"><span>Сумма</span><b>${fmt(Math.round(v.vol*v.price*100)/100+v.delivery+v.extra,2)} ₽</b></div>`,
+ req:v=>!v.con?'Выберите клиента':!(v.vol>0)?'Укажите объём':v.price<0||v.delivery<0||v.extra<0?'Цена не может быть отрицательной':null,
+ sum:v=>`${FW_NAMES[v.kind]}: ${fmt(v.vol,3)} м³ по ${fmt(v.price,2)} ₽/м³`,
+ body:v=>({contractor_id:+v.con,notes:v.notes,delivery_price:v.delivery,extra_price:v.extra,firewood_items:[{kind:v.kind,volume_m3:v.vol,price:v.price}]})
+};
 let FK = null;
 const fe = k => $(`input[data-k="${k}"],select[data-k="${k}"]`);
 const fval = (f, x) => (f.m && MEM[f.k] != null) ? MEM[f.k] : (x ?? f.v ?? '');
@@ -966,6 +993,13 @@ async function vForm(kind, p = {}) {
     const want = p[f.k] ?? (f.m ? MEM[f.k] : null);
     if (want != null && o.some(x => String(x[0]) === String(want))) el.value = want;
   });
+  if (kind === 'fwsettings' || kind === 'fwproc') {
+    try {const settings=await api('/firewood/settings');
+      if(S.cur!==kind)return;
+      if(kind==='fwsettings'){fe('split').value=settings.split;fe('round').value=settings.round;}
+      else {FORMS.fwproc.pv=v=>`<div class="pvr"><span>Списание сырья</span><b>${fmt(v.vol*settings[v.kind],4)} м³</b></div><p class="hint">Коэффициент: ${settings[v.kind]}. При сохранении применяется актуальный коэффициент из настроек.</p>`;if(!$('#pv'))$('#view').insertAdjacentHTML('beforeend','<section class="pv" id="pv"></section>');}
+    }catch(e){toast(e.message,'err');$('#ok').disabled=true;return;}
+  }
   if (kind === 'sawing') syncLog();
   calcForm();
 }
@@ -986,6 +1020,8 @@ async function submitForm() {
 /* ---------- события ---------- */
 const find = (t, id) => (t === 'boards' ? D.boards : D.logs).find(x => x.id == id);
 const ACT = {
+ fwhistory:v=>fwHistory(+v||0),
+ fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){toast(e.message,'err')}},
   go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK),
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
   new: v => { closeSheet(); go(v); },
@@ -994,6 +1030,7 @@ const ACT = {
     sheet(`<h3>Заказ №${esc(o.id)}</h3>
       <div class="dl"><span class="mut">Клиент</span><b>${esc(D.con[o.contractor_id] || 'Клиент №' + o.contractor_id)}</b></div>
       <div class="dl"><span class="mut">Статус</span>${stl(o.status, 1)}</div>
+${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}</span><b>${fmt(p.volume_m3,3)} м³ × ${fmt(p.price,2)} ₽</b></div>`).join('')}
       ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div><div class="dl"><span class="mut">Оплата</span><b>${esc(payTxt(o) || '—')}</b></div>` : ''}${(o.items || []).length ? `<div class="dl"><span class="mut">Позиций</span><b>${o.items.length}</b></div>` : ''}
       <div class="dl"><span class="mut">Создан</span><b>${esc(odate(o, {day: 'numeric', month: 'long', year: 'numeric'}) || '—')}</b></div>
       <div class="stackb">${isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}${canOrd() && o.status !== 'canceled' && osum(o) > 0 ? `<button class="btn ghost" data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button></div>`);

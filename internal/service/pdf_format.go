@@ -56,6 +56,12 @@ func formatInt(n int64) string {
 
 // itemTitle: "Сосна 50×150×6000 мм, сорт 1".
 func itemTitle(l domain.OrderLine) string {
+	if l.FirewoodKind == "split" {
+		return "Дрова колотые (берёза)"
+	}
+	if l.FirewoodKind == "round" {
+		return "Дрова чурбаки (пиленые, берёза)"
+	}
 	species := strings.TrimSpace(l.Species)
 	if l.HeightMM == 0 && l.WidthMM == 0 && l.LengthMM == 0 && species == "" {
 		return fmt.Sprintf("Позиция склада №%d", l.BoardID)
@@ -186,4 +192,11 @@ func amountInWords(v float64) string {
 	w := numberWords(rub) + " " + plural(rub, "рубль", "рубля", "рублей") +
 		fmt.Sprintf(" %02d ", kop) + plural(kop, "копейка", "копейки", "копеек")
 	return upperFirst(w)
+}
+
+func itemCount(l domain.OrderLine) string {
+	if l.FirewoodKind != "" {
+		return "—"
+	}
+	return formatInt(l.Count)
 }

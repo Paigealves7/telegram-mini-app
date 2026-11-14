@@ -120,16 +120,17 @@ type OrderItem struct {
 }
 
 type Order struct {
-	ID            int64       `json:"id"`
-	MasterID      int64       `json:"master_id"`
-	ContractorID  int64       `json:"contractor_id"`
-	Notes         string      `json:"notes,omitempty"`
-	DeliveryPrice float64     `json:"delivery_price" validate:"gte=0"`
-	ExtraPrice    float64     `json:"extra_price" validate:"gte=0"`
-	Status        OrderStatus `json:"status"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
-	Items         []OrderItem `json:"items,omitempty"`
+	FirewoodItems []FirewoodOrderItem `json:"firewood_items,omitempty"`
+	ID            int64               `json:"id"`
+	MasterID      int64               `json:"master_id"`
+	ContractorID  int64               `json:"contractor_id"`
+	Notes         string              `json:"notes,omitempty"`
+	DeliveryPrice float64             `json:"delivery_price" validate:"gte=0"`
+	ExtraPrice    float64             `json:"extra_price" validate:"gte=0"`
+	Status        OrderStatus         `json:"status"`
+	CreatedAt     time.Time           `json:"created_at"`
+	UpdatedAt     time.Time           `json:"updated_at"`
+	Items         []OrderItem         `json:"items,omitempty"`
 	// Считаются при чтении списка: сумма заказа (позиции + доставка + допы) и сколько уже оплачено.
 	TotalPrice float64 `json:"total_price"`
 	PaidAmount float64 `json:"paid_amount"`
@@ -157,7 +158,9 @@ type FirewoodArrival struct {
 
 // FirewoodStock: остатки дров, м³.
 type FirewoodStock struct {
-	RawM3 float64 `json:"raw_m3"` // сырьё (дрова, не переработанные)
+	SplitM3 float64 `json:"split_m3"`
+	RoundM3 float64 `json:"round_m3"`
+	RawM3   float64 `json:"raw_m3"` // сырьё (дрова, не переработанные)
 }
 
 // StockAdjustment: запись журнала корректировок склада (отрицательные значения = списание).

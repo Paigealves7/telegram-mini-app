@@ -25,11 +25,12 @@ func NewOrderHandler(repo *repository.Repository, svc *service.OrderService, pdf
 }
 
 type CreateOrderRequest struct {
-	ContractorID  int64              `json:"contractor_id" validate:"required,gt=0"`
-	Notes         string             `json:"notes" validate:"max=1000"`
-	DeliveryPrice float64            `json:"delivery_price" validate:"gte=0"`
-	ExtraPrice    float64            `json:"extra_price" validate:"gte=0"`
-	Items         []domain.OrderItem `json:"items" validate:"required,min=1,dive"`
+	FirewoodItems []domain.FirewoodOrderItem `json:"firewood_items" validate:"max=100,dive"`
+	ContractorID  int64                      `json:"contractor_id" validate:"required,gt=0"`
+	Notes         string                     `json:"notes" validate:"max=1000"`
+	DeliveryPrice float64                    `json:"delivery_price" validate:"gte=0"`
+	ExtraPrice    float64                    `json:"extra_price" validate:"gte=0"`
+	Items         []domain.OrderItem         `json:"items" validate:"max=100,dive"`
 }
 
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +51,18 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.Items)+len(req.FirewoodItems) == 0 {
+		http.Error(w, "добавьте позиции заказа", 400)
+		return
+	}
+	for _, p := range req.FirewoodItems {
+		if !validFirewoodVolume(p.VolumeM3) {
+			http.Error(w, "объём дров: от 0.001 до 100000, до трёх знаков после запятой", 400)
+			return
+		}
+	}
 	order := &domain.Order{
+		FirewoodItems: req.FirewoodItems,
 		MasterID:      user.UserID, // из JWT; мастер заказа = тот, кто его создал
 		ContractorID:  req.ContractorID,
 		Notes:         req.Notes,

@@ -15,7 +15,8 @@ import (
 // Запросы используют алиас таблицы заказов o.
 const (
 	orderTotalExpr = `(COALESCE((SELECT SUM(ROUND(ob.price * ob.volume_m3, 2)) FROM order_boards ob WHERE ob.order_id = o.id), 0)
-		+ COALESCE(o.delivery_price, 0) + COALESCE(o.extra_price, 0))`
+		+ COALESCE((SELECT SUM(ROUND(f.price*f.volume_m3,2)) FROM order_firewood f WHERE f.order_id=o.id),0)
+ + COALESCE(o.delivery_price, 0) + COALESCE(o.extra_price, 0))`
 	orderPaidExpr = `COALESCE((SELECT SUM(p.amount) FROM order_payments p WHERE p.order_id = o.id), 0)`
 )
 

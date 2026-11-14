@@ -429,7 +429,17 @@ func (r *Repository) CompleteOrder(ctx context.Context, orderID, userID int64) (
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if len(saleItems) == 0 {
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(900009)`); err != nil {
+		return nil, err
+	}
+	fwItems, err := firewoodOrderItems(ctx, tx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if err = checkFirewoodOrderStock(ctx, tx, fwItems); err != nil {
+		return nil, err
+	}
+	if len(saleItems) == 0 && len(fwItems) == 0 {
 		return nil, ErrOrderEmpty
 	}
 
@@ -444,6 +454,14 @@ func (r *Repository) CompleteOrder(ctx context.Context, orderID, userID int64) (
 		return nil, err
 	}
 
+	var fwVolume, fwPrice float64
+	for _, p := range fwItems {
+		fwVolume += p.VolumeM3
+		fwPrice += domain.Round2(p.VolumeM3 * p.Price)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE sales SET total_volume=total_volume+$1,total_price=total_price+$2 WHERE id=$3`, fwVolume, fwPrice, sale.ID); err != nil {
+		return nil, err
+	}
 	if _, err := tx.Exec(ctx, `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`, domain.OrderStatusCompleted, orderID); err != nil {
 		return nil, err
 	}
@@ -525,6 +543,19 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 			return nil, err
 		}
 	}
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(900009)`); err != nil {
+		return nil, err
+	}
+	if err = checkFirewoodOrderStock(ctx, tx, order.FirewoodItems); err != nil {
+		return nil, err
+	}
+	for i := range order.FirewoodItems {
+		p := &order.FirewoodItems[i]
+		p.Price = domain.Round2(p.Price)
+		if _, err = tx.Exec(ctx, `INSERT INTO order_firewood(order_id,kind,volume_m3,price) VALUES($1,$2,$3,$4)`, order.ID, p.Kind, p.VolumeM3, p.Price); err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
@@ -552,6 +583,26 @@ func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	rows.Close()
+	for i := range orders {
+		fr, err := r.db.Query(ctx, `SELECT kind,volume_m3,price FROM order_firewood WHERE order_id=$1 ORDER BY id`, orders[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		for fr.Next() {
+			var p domain.FirewoodOrderItem
+			if err = fr.Scan(&p.Kind, &p.VolumeM3, &p.Price); err != nil {
+				fr.Close()
+				return nil, err
+			}
+			orders[i].FirewoodItems = append(orders[i].FirewoodItems, p)
+		}
+		err = fr.Err()
+		fr.Close()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return orders, nil
 }
@@ -733,7 +784,7 @@ func (r *Repository) GetStatisticsSummary(ctx context.Context, startDate, endDat
 		return nil, err
 	}
 
-	q4 := `SELECT COALESCE(SUM(sb.volume_m3), 0) FROM sale_boards sb JOIN sales s ON sb.sale_id = s.id WHERE s.created_at >= $1::timestamp AND s.created_at <= $2::timestamp + interval '23 hours 59 minutes 59 seconds'`
+	q4 := `SELECT COALESCE(SUM(s.total_volume), 0) FROM sales s WHERE s.created_at >= $1::timestamp AND s.created_at <= $2::timestamp + interval '23 hours 59 minutes 59 seconds'`
 	if err := r.db.QueryRow(ctx, q4, startDate, endDate).Scan(&stats.TotalSalesVolume); err != nil {
 		return nil, err
 	}

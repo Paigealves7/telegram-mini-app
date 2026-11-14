@@ -39,10 +39,10 @@ func (r *Repository) GetFirewoodArrivals(ctx context.Context, limit, offset int)
 	return out, rows.Err()
 }
 
-// GetFirewoodStock считает остатки дров. Сейчас сырьё = сумма приходов; переработку вычтем следующим шагом.
+// GetFirewoodStock считает остатки дров. Сырьё = приходы минус списания на переработку.
 func (r *Repository) GetFirewoodStock(ctx context.Context) (*domain.FirewoodStock, error) {
 	var s domain.FirewoodStock
-	err := r.db.QueryRow(ctx, `SELECT COALESCE(SUM(volume_m3), 0) FROM firewood_arrivals`).Scan(&s.RawM3)
+	err := r.db.QueryRow(ctx, `SELECT (SELECT COALESCE(SUM(volume_m3),0) FROM firewood_arrivals)-(SELECT COALESCE(SUM(raw_m3),0) FROM firewood_processing), COALESCE(SUM(volume_m3) FILTER (WHERE kind='split'),0)-(SELECT COALESCE(SUM(f.volume_m3),0) FROM order_firewood f JOIN orders o ON o.id=f.order_id WHERE f.kind='split' AND o.status='completed'), COALESCE(SUM(volume_m3) FILTER (WHERE kind='round'),0)-(SELECT COALESCE(SUM(f.volume_m3),0) FROM order_firewood f JOIN orders o ON o.id=f.order_id WHERE f.kind='round' AND o.status='completed') FROM firewood_processing`).Scan(&s.RawM3, &s.SplitM3, &s.RoundM3)
 	if err != nil {
 		return nil, err
 	}
