@@ -20,6 +20,7 @@ services:
       - ./migrations/000005_contractor_types.up.sql:/docker-entrypoint-initdb.d/05_contractor_types.sql
       - ./migrations/000006_order_payments.up.sql:/docker-entrypoint-initdb.d/06_order_payments.sql
       - ./migrations/000007_stock_adjustments.up.sql:/docker-entrypoint-initdb.d/07_stock_adjustments.sql
+      - ./migrations/000008_firewood_arrivals.up.sql:/docker-entrypoint-initdb.d/08_firewood_arrivals.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d telegram-mini-app_db"]
       interval: 5s

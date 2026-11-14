@@ -144,6 +144,22 @@ type Payment struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// FirewoodArrival: приход дров (берёза) общей кубатурой.
+type FirewoodArrival struct {
+	ID          int64     `json:"id"`
+	SupplierID  int64     `json:"supplier_id"`
+	CarrierID   int64     `json:"carrier_id"`
+	TruckNumber string    `json:"truck_number"`
+	VolumeM3    float64   `json:"volume_m3"`
+	ArrivalDate string    `json:"arrival_date"` // ГГГГ-ММ-ДД
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// FirewoodStock: остатки дров, м³.
+type FirewoodStock struct {
+	RawM3 float64 `json:"raw_m3"` // сырьё (дрова, не переработанные)
+}
+
 // StockAdjustment: запись журнала корректировок склада (отрицательные значения = списание).
 type StockAdjustment struct {
 	ID          int64     `json:"id"`

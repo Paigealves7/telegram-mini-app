@@ -357,7 +357,7 @@ function perfProbe() {
 /* ---------- состояние и утилиты ---------- */
 const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month', cq: ''};
 let CFG = {pdf_send: true}; // настройки с сервера (/config)
-const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: []};
+const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}};
 let MEM = {}; try { MEM = JSON.parse(localStorage.getItem('mem') || '{}'); } catch (e) {}
 const mem = (k, v) => { MEM[k] = v; try { localStorage.setItem('mem', JSON.stringify(MEM)); } catch (e) {} };
 const hap = t => { try { tg.HapticFeedback.impactOccurred(t || 'light'); } catch (e) {} };
@@ -396,7 +396,7 @@ async function api(path, opts = {}) {
 }
 const safe = async u => { try { return (await api(u)) || []; } catch (e) { toast(e.message, 'err'); return null; } };
 async function loadConfig() { try { const c = await api('/config'); if (c) CFG = {...CFG, ...c}; } catch (e) { /* необязательная конфигурация: используются значения по умолчанию */ } }
-async function loadStock() { const [b, l] = await Promise.all([safe('/boards'), safe('/logs')]); if (b) D.boards = b; if (l) D.logs = l; return !!b && !!l; }
+async function loadStock() { const [b, l, f] = await Promise.all([safe('/boards'), safe('/logs'), safe('/firewood/stock')]); if (b) D.boards = b; if (l) D.logs = l; if (f) D.fw = f; return !!b && !!l; }
 async function ensureCon() { if (Object.keys(D.con).length) return true; const list = await safe('/contractors'); if (!list) return false; D.cl = list; list.forEach(c => D.con[c.id] = c.name); return true; }
 
 function countUp(root = $('#view')) {
@@ -437,7 +437,7 @@ const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}">${ic('pl
 function setAct(v) {
   $('#hact').innerHTML = v === 'home' ? `${S.role === 'manager' ? `<button class="rbtn" data-a="go" data-v="stats" aria-label="Отчёты">${ic('chart')}<span>Отчёты</span></button>` : ''}<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль">${esc((S.name || '?')[0].toUpperCase())}</button>`
     : v === 'orders' ? hbtn('order', 'Заказ')
-    : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Приход') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
+    : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
 }
 function go(v, p) {
   if (TABS.includes(v)) { S.tab = v; S.stack = []; } else S.stack.push(S.cur);
@@ -583,11 +583,13 @@ async function homeExtra(open) {
 
 /* ---------- журнал: приходы, распилы, продажи ---------- */
 async function jArrivals(box) {
-  const [a, c] = await Promise.all([safe('/arrivals?limit=100'), ensureCon()]);
+  const [a, fw, c] = await Promise.all([safe('/arrivals?limit=100'), safe('/firewood/arrivals?limit=100'), ensureCon()]);
   if (!box.isConnected) return;
   if (!a || !c) { box.innerHTML = fail('Не удалось загрузить поступления', 'journal'); return; }
-  box.innerHTML = a.length ? tots([['Приходов', a.length], ['Штук', fmt(tot(a.flatMap(x => x.items || []), x => x.count), 0)], ['Объём, м³', fmt(tot(a.flatMap(x => x.items || []), x => x.volume_m3), 2)]]) + cap(a) + byDay(a, x => x.arrival_date, x => {
+  const f = (fw || []).map(x => ({...x, fw: 1})), all = [...a, ...f].sort((x, y) => dayKey(y.arrival_date).localeCompare(dayKey(x.arrival_date)) || String(y.created_at).localeCompare(String(x.created_at)));
+  box.innerHTML = all.length ? tots([['Приходов', all.length], ['Лес, м³', fmt(tot(a.flatMap(x => x.items || []), x => x.volume_m3), 2)], ['Дрова, м³', fmt(tot(f, x => x.volume_m3), 2)]]) + cap(a) + byDay(all, x => x.arrival_date, x => {
     const it = x.items || [], sup = D.con[x.supplier_id] || 'Поставщик №' + x.supplier_id, car = D.con[x.carrier_id] || '№' + x.carrier_id;
+    if (x.fw) return li(`Дрова №${esc(x.id)}`, esc(`${sup}, машина ${x.truck_number}`), `${fmt(x.volume_m3, 3)} м³`, 'берёза', {lines: lines(car !== sup ? ['Перевозчик: ' + car] : [])});
     return li(`Поступление №${esc(x.id)}`, esc(`${sup}, машина ${x.truck_number}`), `${fmt(sum(it, 'volume_m3'), 3)} м³`, `${fmt(sum(it, 'count'), 0)} шт`,
       {lines: lines([...(car !== sup ? ['Перевозчик: ' + car] : []), ...it.map(i => `${i.species} Ø${i.diameter_mm} × ${lenM(i.length_mm)}, ${fmt(i.count, 0)} шт`)])});
   }) : none('Поступлений пока нет');
@@ -624,9 +626,9 @@ async function vJournal() {
 async function vStock(fetchNew = true) {
   const v = $('#view');
   if (fetchNew) { v.innerHTML = sk(5); const ok = await loadStock(); if (S.cur !== 'stock') return; if (!ok) { v.innerHTML = fail('Не удалось загрузить склад', 'stock'); return; } }
-  const list = S.wt === 'boards' ? D.boards : D.logs, sps = [...new Set(list.map(x => x.species || '—'))];
-  v.innerHTML = `<div class="srch">${ic('search')}<input id="q" placeholder="Поиск: порода, размер, №" aria-label="Поиск" value="${esc(S.wq)}"></div>
-    <div class="seg">${[['boards', 'Пиломатериалы'], ['logs', 'Сырьё']].map(([k, l]) => `<button class="${S.wt === k ? 'on' : ''}" data-a="wt" data-v="${k}">${l}</button>`).join('')}</div>
+  const fwOn = S.wt === 'firewood', list = S.wt === 'boards' ? D.boards : D.logs, sps = fwOn ? [] : [...new Set(list.map(x => x.species || '—'))];
+  v.innerHTML = `${fwOn ? '' : `<div class="srch">${ic('search')}<input id="q" placeholder="Поиск: порода, размер, №" aria-label="Поиск" value="${esc(S.wq)}"></div>`}
+    <div class="seg">${[['boards', 'Пиломатериалы'], ['logs', 'Сырьё'], ['firewood', 'Дрова']].map(([k, l]) => `<button class="${S.wt === k ? 'on' : ''}" data-a="wt" data-v="${k}">${l}</button>`).join('')}</div>
     ${sps.length > 1 ? `<div class="chips"><button class="chip ${S.wsp ? '' : 'on'}" data-a="sp" data-v="">Все</button>${sps.map(x => `<button class="chip ${S.wsp === x ? 'on' : ''}" data-a="sp" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : ''}
     <div id="ssum"></div><div id="sl"></div>`;
   stockList();
@@ -644,6 +646,12 @@ const skey = x => {
 };
 let DEB;
 function stockList() {
+  if (S.wt === 'firewood') {
+    const f = D.fw || {raw_m3: 0};
+    $('#ssum').innerHTML = tots([['Сырьё, м³', fmt(f.raw_m3, 3)]]);
+    $('#sl').innerHTML = li('Дрова, берёза (сырьё)', 'Приходы дров общим объёмом', `${fmt(f.raw_m3, 3)} м³`, '', {});
+    return;
+  }
   const t = S.wt, q = S.wq.toLowerCase().replace(/(\d)\s*[*xх]\s*(\d)/g, '$1×$2');
   const list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
   $('#ssum').innerHTML = tots([['Позиций', fmt(list.length, 0)], ['Штук', fmt(sum(list, 'count'), 0)], ['Объём, м³', fmt(sum(list, 'volume_m3'), 2)]]);
@@ -876,6 +884,16 @@ const FORMS = {
     mem: ['supplier', 'carrier', 'truck', 'species'],
     body: v => ({supplier_id: +v.supplier, carrier_id: +v.carrier, truck_number: v.truck, arrival_date: ymd(new Date()),
       items: [{species: v.species, length_mm: Math.round(v.len), diameter_mm: Math.round(v.dia), count: Math.round(v.cnt), volume_m3: v.vol}]})
+  },
+  fwarr: {
+    t: 'Приход дров', e: 'arrival', ok: 'Сохранить приход', path: '/firewood/arrivals', done: 'Приход дров записан', after: 'home', need: ['con'],
+    f: [{k: 'supplier', l: 'Поставщик', t: 'sel', src: 'sup', half: 1, m: 1}, {k: 'carrier', l: 'Перевозчик', t: 'sel', src: 'car', half: 1, m: 1},
+      {k: 'truck', l: 'Номер машины', t: 'txt', ph: 'А000АА000', m: 1},
+      {k: 'vol', l: 'Объём берёзовых дров, м³', t: 'num', v: 0, s: .5, h: 'Общая кубатура машины'}],
+    req: v => !Object.keys(D.con).length ? 'Не загружен список поставщиков и перевозчиков' : !v.supplier || !v.carrier ? 'Выберите поставщика и перевозчика' : !v.truck ? 'Укажите номер машины' : !(v.vol > 0) ? 'Укажите объём' : null,
+    sum: v => `Дрова (берёза): ${fmt(v.vol, 3)} м³, машина ${v.truck}`,
+    mem: ['supplier', 'carrier', 'truck'],
+    body: v => ({supplier_id: +v.supplier, carrier_id: +v.carrier, truck_number: v.truck, arrival_date: ymd(new Date()), volume_m3: v.vol})
   },
   sawing: {
     t: 'Распиловка', e: 'sawing', ok: 'Сохранить распиловку', path: '/sawing', done: 'Распиловка сохранена', after: 'home', auto: 'vol', need: ['logs'],

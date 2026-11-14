@@ -87,6 +87,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	staffHandler := NewStaffHandler(repo)
 	paymentHandler := NewPaymentHandler(repo)
 	stockHandler := NewStockHandler(repo)
+	firewoodHandler := NewFirewoodHandler(repo)
 
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(r.Context()); err != nil {
@@ -149,6 +150,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 			r.Get("/boards", boardHandler.GetList)
 			r.Get("/logs", logHandler.GetList)
+			r.Get("/firewood/stock", firewoodHandler.GetStock)
 			r.Get("/contractors", dictHandler.GetContractors)
 			r.Get("/config", ConfigHandler)
 
@@ -156,6 +158,8 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleMaster))
 				r.Get("/arrivals", arrivalHandler.GetList)
 				r.Post("/arrivals", arrivalHandler.CreateArrival)
+				r.Get("/firewood/arrivals", firewoodHandler.GetArrivals)
+				r.Post("/firewood/arrivals", firewoodHandler.CreateArrival)
 				r.Get("/sales", salesHandler.GetList)
 				r.Post("/sales", salesHandler.CreateSale)
 				r.Get("/orders", orderHandler.GetOrders)
