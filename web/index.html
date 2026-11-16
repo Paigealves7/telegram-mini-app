@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#121412">
+<meta name="theme-color" content="#0b0c0e">
 <meta name="color-scheme" content="dark">
 <title>Лесопилка</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* Лесопилка: тёмный «стеклянный» интерфейс. Фон: туман в оливково-серых тонах. Акцент: кремовый. */
 :root{--bg:#121412;--ink:#1a1c1a;--s1:rgba(255,255,255,.06);--s2:rgba(255,255,255,.08);--s3:rgba(255,255,255,.14);
 --line:rgba(255,255,255,.12);--line2:rgba(255,255,255,.22);
 --t1:#f5efe6;--t2:rgba(245,239,230,.6);--t3:rgba(245,239,230,.5);--wood:#f3e6d3;--err:#f0a99f;--ease:cubic-bezier(.2,.8,.2,1);
---font:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
---serif:'Cormorant Garamond','Playfair Display',Georgia,'Times New Roman',serif;
+--font:'Onest',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+--serif:var(--font);
 --blur:blur(22px) saturate(1.3);
 --fx:inset 0 1px 0 rgba(255,255,255,.1),0 12px 40px rgba(0,0,0,.28);
 --top:calc(var(--tg-content-safe-area-inset-top,0px) + var(--tg-safe-area-inset-top,0px) + env(safe-area-inset-top,0px));
@@ -263,6 +263,81 @@ button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:380px){.tv{font-size:24px}.lg{font-size:16px}}
 html.lite .sk{animation:none}
 html.lite .tile,html.lite .tt{-webkit-backdrop-filter:none;backdrop-filter:none}
+
+/* Flowstate / Lumber: единые темы и адаптивная компоновка. */
+:root,html[data-t="dark"]{--bg:#0b0c0e;--ink:#0b0c0e;--s1:#16181a;--s2:rgba(255,255,255,.06);--s3:rgba(255,255,255,.11);--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.2);--hair:var(--line);--t1:#fff;--t2:#a3a7af;--t3:#858a93;--wood:#fff;--ok:#86d4ae;--warn:#e8c27a;--bad:#e8a29a;--err:#e8a29a;--r-card:20px;--r-btn:999px;--r-fld:16px;--sp:16px;--gap:24px;--blur:blur(20px);--glass:rgba(22,24,26,.9);--fx:0 8px 28px rgba(0,0,0,.12);--active:#fff;--active-ink:#0b0c0e;color-scheme:dark}
+html[data-t="light"]{--bg:#f3f4f6;--s1:#fff;--s2:#eceef1;--s3:#e0e3e8;--line:rgba(20,25,35,.1);--line2:rgba(20,25,35,.22);--t1:#15181e;--t2:#565d69;--t3:#67707e;--wood:#15181e;--ink:#fff;--glass:rgba(255,255,255,.92);--ok:#167346;--warn:#866012;--bad:#ad3434;--err:#ad3434;--fx:0 8px 28px rgba(20,25,35,.04);color-scheme:light}
+body{color-scheme:inherit;background:var(--bg);font-size:15px}
+body::before{background:var(--bg)}body::after{display:none}
+.top{gap:8px;background:var(--glass);backdrop-filter:var(--blur);border-bottom:1px solid var(--line);padding:calc(var(--top) + 12px) var(--sp) 12px;flex-wrap:wrap}
+#title,body.sub #title{font-family:var(--font);font-size:28px;line-height:40px;font-weight:600;letter-spacing:-.04em}
+#hact{flex:none;max-width:100%;display:flex;flex-wrap:wrap;gap:6px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--s1)}
+#hact:empty{display:none}
+#hact .rbtn,#hact .avatar,#hact .hbtn{width:44px;height:44px;min-width:44px;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;backdrop-filter:none;color:var(--t2);font-size:16px}
+#hact svg{width:19px;height:19px}
+#hact .hbtn,#hact [aria-current="page"]{background:var(--active);color:var(--active-ink)}
+#hact .hbtn span{display:none}
+#hb{margin-left:-6px;border:0;background:transparent;box-shadow:none;width:36px;min-width:36px;height:44px}
+#view{padding-top:20px}
+.stock,.login,.tile,.tt,.li,.srow{border:1px solid var(--line);background:var(--s1);box-shadow:none;border-radius:var(--r-card)}
+.stock{padding:20px}.g-t,.bar,.pb{background:var(--s2);stroke:var(--line2)}
+.big,.tv,.tt-v,.pvr b{font-family:var(--font);letter-spacing:-.04em;font-weight:600}
+.gv .big{font-size:64px}.big{font-size:48px}.rev .big{font-size:48px}
+.qa-b{background:var(--s2);border:1px solid var(--line);border-radius:16px;padding:20px 6px 12px;min-height:96px;font-size:12px}
+.qa-b .dot{width:5px;height:5px;top:10px;margin-left:-2px}
+.tiles,.tots{gap:10px;grid-template-columns:repeat(var(--n),minmax(0,1fr))}
+.tile,.tt{min-height:116px;padding:16px;gap:5px}
+.tl,.tt-l{color:var(--t1);font-weight:500}.ts{order:1}.tv{order:2;margin-top:auto;font-size:28px}.tt-v{margin-top:auto;white-space:normal;overflow-wrap:anywhere;font-size:24px}
+.li{width:100%;margin:10px 0 0;padding:16px;gap:6px 12px;background-image:none;align-items:start}
+.li-t{font-weight:600}.li-v{font-size:20px;font-weight:600;letter-spacing:-.025em}.li-s{font-size:12px;line-height:1.6}
+.li-e{max-width:100%;white-space:normal}.li-v{white-space:normal;overflow-wrap:anywhere}
+.li-l{gap:0;margin-top:8px;padding-left:7px;font-size:13px}
+.li-l>span:not(.tag){position:relative;display:block;border-left:1px solid var(--line2);padding:2px 0 14px 16px}
+.li-l>span:not(.tag):last-child{padding-bottom:2px;border-color:transparent}
+.li-l>span:not(.tag)::before{content:"";position:absolute;left:-3px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--t2)}
+#rcn{margin-top:24px;border:1px solid var(--line);border-radius:20px;padding:16px;background:var(--s1)}
+#rcn:empty{display:none}#rcn>.sh{margin-top:0}
+.ra{position:relative;grid-template-columns:minmax(0,1fr) auto;margin-left:6px;padding:10px 0 18px 18px;gap:10px;border-left:1px solid var(--line2);box-shadow:none}
+.ra::before{content:"";position:absolute;left:-3px;top:18px;width:5px;height:5px;border-radius:50%;background:var(--t1)}
+.ra:last-child{border-color:transparent;padding-bottom:0}.ra-i{display:none}.ra-e b{font-size:14px}.ra-e{white-space:normal}
+.seg,.utabs,.chips{gap:4px;border:1px solid var(--line);border-radius:999px;background:var(--s1);padding:4px;margin:0 0 16px;box-shadow:none;overflow-x:auto;scrollbar-width:none}
+.seg button,.utab,.chip{border:0;border-radius:999px;min-height:44px;padding:0 16px;background:transparent;color:var(--t2);font-size:13px;white-space:nowrap}
+.seg button.on,.utab.on,.chip.on{background:var(--active);color:var(--active-ink);font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.utab.on::after{display:none}.utab.on .mut{color:inherit}.chips{width:fit-content;max-width:100%}.fld .chips{border:0;background:none}
+.tabs{left:0;right:0;bottom:0;height:calc(76px + var(--bot));padding:6px 12px calc(6px + var(--bot));gap:4px;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--glass);box-shadow:none;backdrop-filter:var(--blur)}
+.tab{display:flex;flex-direction:column;justify-content:center;gap:5px;height:60px;min-height:44px;padding:6px;border-radius:14px;color:var(--t3)}
+.tab span{font-size:10px;line-height:14px;font-weight:500}.tab svg{width:23px;height:23px}
+.tab.on{color:var(--t1);background:transparent;box-shadow:none}
+.act{background:linear-gradient(transparent,var(--bg) 35%);padding-top:24px}
+.btn{font-weight:600;box-shadow:none}.btn:active{background:var(--wood)}.btn.ghost:active{background:var(--s3)}
+.stackb{gap:12px;margin-top:20px}.stackb .btn{min-height:52px}
+.panel{background:var(--glass);border-radius:24px 24px 0 0;border-color:var(--line);box-shadow:var(--fx);max-height:88dvh;overscroll-behavior:contain}
+#toast{background:var(--glass);border-color:var(--line);box-shadow:var(--fx)}
+.fld select option{background:var(--s1);color:var(--t1)}
+.fld input:focus,.fld select:focus,.num:focus-within{border-color:var(--line2);box-shadow:0 0 0 3px var(--s2)}
+html.lite .stock,html.lite .tabs,html.lite .login,html.lite .hbtn,html.lite .avatar,html.lite .rbtn,html.lite .panel,html.lite #toast{background:var(--s1);backdrop-filter:none}
+@supports not (backdrop-filter:blur(1px)){.top,.tabs,.panel,#toast{background:var(--s1)}}
+@media(hover:hover){.btn:hover{background:var(--wood);filter:brightness(.9)}.btn.ghost:hover{background:var(--s3);filter:none}button.li:hover{background:var(--s2)}#hact .hbtn:hover{background:var(--active);color:var(--active-ink)}}
+@media(max-width:399px){#title,body.sub #title{font-size:24px}#hact{gap:2px}#hact .rbtn,#hact .avatar,#hact .hbtn{width:44px;min-width:44px}.top:has(#hact .hbtn) #hact{margin-left:auto}.tiles,.tots{grid-template-columns:repeat(2,minmax(0,1fr))}.tile:last-child:nth-child(odd),.tt:last-child:nth-child(odd){grid-column:1/-1}}
+@media(min-width:768px){
+ :root{--sp:28px;--sidebar:204px}
+ .tabs{top:0;bottom:0;left:0;right:auto;width:var(--sidebar);height:100dvh;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:108px 14px 24px;border:0;border-right:1px solid var(--line);border-radius:0;background:var(--s1)}
+ .tabs::before{content:'ЛЕСОПИЛКА';position:absolute;top:36px;left:24px;font-size:13px;font-weight:700;letter-spacing:.12em;color:var(--t1)}
+ .tab{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 16px;height:50px;border-radius:12px}.tab span{font-size:14px}.tab svg{width:20px;height:20px}.tab.on{background:var(--s3)}
+ .top{margin-left:var(--sidebar);padding:24px 32px;flex-wrap:nowrap}#title,body.sub #title{font-size:30px}
+ #view{margin-left:var(--sidebar);padding:28px 32px 64px;max-width:1440px}
+ body.form .tabs{display:flex}body.noauth .tabs{display:none}body.noauth #view{margin:0;max-width:none}
+ .act{left:var(--sidebar);padding:20px 32px;background:var(--glass);border-top:1px solid var(--line)}.act .btn{max-width:420px;margin-left:auto}
+ body.form #view{max-width:1064px;padding-bottom:120px}
+ .fgrid{column-gap:24px}
+ .sheet{display:grid;place-items:center;padding:32px}.panel{position:relative;left:auto;right:auto;bottom:auto;width:min(100%,600px);max-height:85dvh;padding:28px;border:1px solid var(--line);border-radius:24px;transform:translateY(16px) scale(.98);opacity:0;transition:transform .25s var(--ease),opacity .25s}.sheet.on .panel{transform:none;opacity:1}.grab{display:none}
+ .card-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:24px}.card-group>.grp{grid-column:1/-1;margin:0 0 2px}.card-group>.li{margin:0}
+ #sl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#sl>.li{margin:0}#sl>.card-group,#sl>.stackb,#sl>.empty{grid-column:1/-1}#sl>.stackb{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+ body[data-view="home"] #view{display:grid;grid-template-columns:minmax(240px,.85fr) minmax(0,1.4fr);gap:24px;align-items:start}#hd{margin:0;min-width:0}
+ .tiles,.tots{gap:12px}.tile,.tt{min-height:128px}.who{padding-top:24px}
+}
+@media(min-width:1280px){:root{--sidebar:232px}.card-group{grid-template-columns:repeat(3,minmax(0,1fr))}#sl{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
 </style>
 </head>
 <body class="noauth">
@@ -319,15 +394,35 @@ const ICP = {
   trend: '<path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>', trendDown: '<path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/>',
   sNew: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>', sProg: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   sDone: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>', sCanc: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
+  moon: '<path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/>',
   mark: '<path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17z"/><path d="M12 22v-3"/>',
 };
 const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICP[n] || ''}</svg>`;
 
 tg.ready(); tg.expand();
-/* тема: всегда midnight — кастомная палитра является основной темой приложения */
+/* Тема пользователя имеет приоритет над оформлением Telegram. */
+let chosenTheme = null;
+try { chosenTheme = localStorage.getItem('theme'); } catch (e) {}
+if (!['light', 'dark'].includes(chosenTheme)) chosenTheme = null;
 function theme() {
-  document.documentElement.dataset.t = 'dark';
-  try { tg.setHeaderColor('#121412'); tg.setBackgroundColor('#121412'); } catch (e) {}
+  const mode = chosenTheme || (inTg ? tg.colorScheme : 'dark') || 'dark';
+  document.documentElement.dataset.t = mode;
+  document.querySelector('meta[name="color-scheme"]').content = mode;
+  const bg = mode === 'light' ? '#f3f4f6' : '#0b0c0e';
+  document.querySelector('meta[name="theme-color"]').content = bg;
+  try { tg.setHeaderColor(bg); } catch (e) {}
+  try { tg.setBackgroundColor(bg); } catch (e) {}
+  $$('[data-a="theme"]').forEach(b => {
+    const dark = mode === 'dark';
+    if (b.getAttribute('role') === 'switch') b.setAttribute('aria-checked', String(dark));
+    else { b.innerHTML = ic(dark ? 'sun' : 'moon'); b.setAttribute('aria-label', dark ? 'Включить светлую тему' : 'Включить тёмную тему'); b.title = b.getAttribute('aria-label'); }
+  });
+}
+function toggleTheme() {
+  chosenTheme = document.documentElement.dataset.t === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem('theme', chosenTheme); } catch (e) {}
+  theme();
 }
 theme(); tg.onEvent('themeChanged', theme);
 try { tg.MainButton.hide(); } catch (e) {}
@@ -431,13 +526,16 @@ function buildTabs() {
   const t = [['home', 'home', 'Главная'], ['stock', 'box', 'Склад']];
   if (canOrd()) t.push(['orders', 'order', 'Заказы']);
   t.push(['journal', 'journal', 'Журнал']);
-  $('#tabs').innerHTML = t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}</button>`).join('');
+  $('#tabs').innerHTML = t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('');
 }
-const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}">${ic('plus')}${l}</button>`;
+const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-label="Создать: ${l}" title="Создать: ${l}">${ic('plus')}<span>${l}</span></button>`;
 function setAct(v) {
-  $('#hact').innerHTML = v === 'home' ? `${S.role === 'manager' ? `<button class="rbtn" data-a="go" data-v="stats" aria-label="Отчёты">${ic('chart')}<span>Отчёты</span></button>` : ''}<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль">${esc((S.name || '?')[0].toUpperCase())}</button>`
-    : v === 'orders' ? hbtn('order', 'Доски') + hbtn('fworder', 'Дрова')
+  const actions = v === 'orders' ? hbtn('order', 'Доски') + hbtn('fworder', 'Дрова')
     : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
+  $('#hact').innerHTML = '<button class="rbtn" data-a="theme" aria-label="Сменить тему"></button>' +
+    (S.role === 'manager' ? '<button class="rbtn" data-a="go" data-v="stats" aria-label="Отчёты" title="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
+    '<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль" title="Профиль">' + esc((S.name || '?')[0].toUpperCase()) + '</button>' + actions;
+  theme();
 }
 function go(v, p) {
   if (TABS.includes(v)) { S.tab = v; S.stack = []; } else S.stack.push(S.cur);
@@ -446,6 +544,7 @@ function go(v, p) {
 function back() { show(S.stack.pop() || S.tab); }
 function show(v, p) {
   S.cur = v;
+  document.body.dataset.view = v;
   const f = FORMS[v], sub = !!f || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog';
   document.body.classList.toggle('form', !!f);
   document.body.classList.toggle('sub', sub);
@@ -463,7 +562,7 @@ $('#hb').innerHTML = ic('back');
 const SPX = ['#d8c7a1', '#9fb3a0', '#c49a76', '#cfd3d8', '#8a7a5e', '#7c8799'], SPN = {'сосна': 0, 'ель': 1, 'лиственница': 2, 'берёза': 3, 'дуб': 4};
 const spc = (n, i) => SPX[SPN[String(n).toLowerCase()] ?? i % SPX.length];
 const li = (t, s, v, s2, o = {}) => { const tag = o.a ? 'button' : 'div'; return `<${tag} class="li"${o.a ? ` data-a="${o.a}" data-v="${esc(o.d)}"` : ''}><span class="li-m"><span class="li-t">${t}</span><span class="li-s">${s}</span></span><span class="li-e"><span class="li-v">${v}</span><span class="li-s">${s2}</span></span>${o.lines ? `<span class="li-l">${o.lines}</span>` : ''}</${tag}>`; };
-const grp = (h, b, rows) => `<section><h2 class="grp"><span>${h}</span>${b ? `<b>${b}</b>` : ''}</h2>${rows}</section>`;
+const grp = (h, b, rows) => `<section class="card-group"><h2 class="grp"><span>${h}</span>${b ? `<b>${b}</b>` : ''}</h2>${rows}</section>`;
 const fail = (m, v) => `<div class="empty"><span class="eic">${ic('warn')}</span><b>${m}</b><button class="btn ghost" data-a="go" data-v="${v}">Повторить</button></div>`;
 const none = (t, s) => `<div class="empty"><span class="eic">${ic('inbox')}</span><b>${t}</b>${s ? `<span>${s}</span>` : ''}</div>`;
 const dayKey = s => { if (!s) return ''; const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T00:00:00') : new Date(s); return isNaN(d) ? '' : ymd(d); };
@@ -512,7 +611,7 @@ const sQ = (a, b) => `/statistics?start_date=${encodeURIComponent(a)}&end_date=$
 /* Шкала индикатора: сколько м³ соответствует 100% дуги. null = подбирается автоматически. */
 const GAUGE_MAX = null;
 const gaugeMax = v => { if (GAUGE_MAX) return GAUGE_MAX; if (v <= 0) return 1; const p = 10 ** Math.floor(Math.log10(v)); return [1, 1.5, 2, 3, 5, 7.5, 10].map(k => k * p).find(x => x >= v) || 10 * p; };
-const QA = {arrival: ['tractor', '#f4a261'], sawing: ['sawing', '#7b82f0'], order: ['cart', '#7fd18b']};
+const QA = {arrival: ['arrival', '#f4a261'], sawing: ['sawing', '#7b82f0'], order: ['order', '#7fd18b']};
 
 async function vHome() {
   const v = $('#view'), m = S.role === 'manager';
@@ -650,7 +749,7 @@ function stockList() {
     const f = D.fw || {raw_m3: 0};
     $('#ssum').innerHTML = tots([['Сырьё, м³', fmt(f.raw_m3, 3)]]);
     $('#sl').innerHTML = li('Дрова, берёза (сырьё)', 'Приходы дров общим объёмом', `${fmt(f.raw_m3, 3)} м³`, '', {});
-    $('#sl').innerHTML += Object.entries(FW_NAMES).map(([k,n])=>li(n,'Готовые дрова',`${fmt(f[k+'_m3']||0,3)} м³`,'',{})).join('') + `${S.role==='manager'||S.role==='worker'?'<button class="btn" data-a="mk" data-v="fwproc">Напилили / Накололи</button>':''}<button class="btn ghost" data-a="fwhistory">История переработки</button>${S.role==='manager'?'<button class="btn ghost" data-a="mk" data-v="fwsettings">Коэффициенты</button>':''}`;    return;
+    $('#sl').innerHTML += Object.entries(FW_NAMES).map(([k,n])=>li(n,'Готовые дрова',`${fmt(f[k+'_m3']||0,3)} м³`,'',{})).join('') + `<div class="stackb">${S.role==='manager'||S.role==='worker'?'<button class="btn" data-a="mk" data-v="fwproc">Напилили / Накололи</button>':''}<button class="btn ghost" data-a="fwhistory">История переработки</button>${S.role==='manager'?'<button class="btn ghost" data-a="mk" data-v="fwsettings">Коэффициенты</button>':''}</div>`;    return;
   }
   const t = S.wt, q = S.wq.toLowerCase().replace(/(\d)\s*[*xх]\s*(\d)/g, '$1×$2');
   const list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
@@ -766,6 +865,7 @@ async function loadStats() {
 function vProfile() {
   const j = jwt() || {};
   $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><h2>${esc(S.name)}</h2><p class="mut">${esc(ROLE[S.role] || S.role)}</p></div>
+    <div class="ld"><div><span>Тёмная тема</span><p class="mut sm">Оформление приложения</p></div><button class="sw" role="switch" aria-checked="${document.documentElement.dataset.t === 'dark'}" aria-label="Тёмная тема" data-a="theme"></button></div>
     <div class="ld"><span>ID сотрудника</span><b>${esc(j.user_id || '—')}</b></div>
     <div class="ld"><div><span>Экономный режим</span><p class="mut sm">Меньше анимаций, телефон меньше греется</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
     ${S.role === 'manager' ? '<button class="btn" style="margin-top:24px" data-a="go" data-v="staff">Сотрудники</button><button class="btn" style="margin-top:12px" data-a="go" data-v="cons">Контрагенты</button><button class="btn" style="margin-top:12px" data-a="go" data-v="adjlog">Корректировки склада</button>' : ''}
@@ -914,17 +1014,18 @@ const FORMS = {
   order: {
     t: 'Новый заказ', e: 'order', ok: 'Создать заказ', path: '/orders', done: 'Заказ создан', after: 'orders', need: ['con', 'boards'],
     f: [{k: 'con', l: 'Клиент', t: 'sel', src: 'cli', m: 1}, {k: 'board', l: 'Доска со склада', t: 'sel', src: 'boards'},
-      {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1}, {k: 'price', l: 'Цена за 1 м³, ₽', t: 'num', v: 9000, s: 500, half: 1, m: 1}],
+      {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1}, {k: 'price', l: 'Цена за 1 м³, ₽', t: 'num', v: 9000, s: 500, half: 1, m: 1},
+      {k: 'delivery', l: 'Доставка, ₽', t: 'num', v: 0, s: 100, half: 1}, {k: 'extra', l: 'Дополнительно, ₽', t: 'num', v: 0, s: 100, half: 1}],
     pv: v => {
       const b = D.boards.find(x => x.id == v.board); if (!b || !(b.count > 0)) return '<span class="hint">Выберите доску со склада</span>';
       const vol = v.cnt === b.count ? b.volume_m3 : b.volume_m3 / b.count * v.cnt;
-      return `<div class="pvr"><span class="hint">Объём заказа</span><b>${fmt(vol, 3)} м³</b></div><div class="pvr"><span class="hint">Сумма</span><b>${fmt(vol * v.price, 0)} ₽</b></div>
+      return `<div class="pvr"><span class="hint">Объём заказа</span><b>${fmt(vol, 3)} м³</b></div><div class="pvr"><span class="hint">Сумма</span><b>${fmt(Math.round(vol * v.price * 100) / 100 + v.delivery + v.extra, 2)} ₽</b></div>
         <div class="pvr"><span class="hint">На складе</span><b style="font-size:16px;color:${v.cnt > b.count ? 'var(--err)' : 'inherit'}">${b.count} шт${v.cnt > b.count ? ' · не хватает' : ''}</b></div>`;
     },
-    req: v => !Object.keys(D.con).length ? 'Не загружен список клиентов' : !v.con ? 'Выберите клиента' : !v.board ? 'Выберите доску' : v.cnt <= 0 ? 'Укажите количество' : null,
-    sum: v => { const b = D.boards.find(x => x.id == v.board); return `${b ? boardTitle(b) + ' · ' + lenM(b.length_mm) + ': ' : ''}${fmt(v.cnt, 0)} шт по ${fmt(v.price, 0)} ₽ за м³, клиент: ${D.con[v.con] || 'не выбран'}`; },
+    req: v => !Object.keys(D.con).length ? 'Не загружен список клиентов' : !v.con ? 'Выберите клиента' : !v.board ? 'Выберите доску' : v.cnt <= 0 ? 'Укажите количество' : v.price < 0 || v.delivery < 0 || v.extra < 0 ? 'Цена не может быть отрицательной' : null,
+    sum: v => { const b = D.boards.find(x => x.id == v.board); return `${b ? boardTitle(b) + ' · ' + lenM(b.length_mm) + ': ' : ''}${fmt(v.cnt, 0)} шт по ${fmt(v.price, 0)} ₽ за м³, клиент: ${D.con[v.con] || 'не выбран'}, доставка: ${fmt(v.delivery, 2)} ₽, дополнительно: ${fmt(v.extra, 2)} ₽`; },
     mem: ['con', 'price'],
-    body: v => ({contractor_id: +v.con, status: 'new', delivery_price: 0, extra_price: 0, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
+    body: v => ({contractor_id: +v.con, status: 'new', delivery_price: v.delivery, extra_price: v.extra, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
   }
 };
 const FW_NAMES = {split: 'Колотые', round: 'Чурбаки (пиленые)'};
@@ -1022,6 +1123,7 @@ const find = (t, id) => (t === 'boards' ? D.boards : D.logs).find(x => x.id == i
 const ACT = {
  fwhistory:v=>fwHistory(+v||0),
  fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){toast(e.message,'err')}},
+  theme: toggleTheme,
   go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK),
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
   new: v => { closeSheet(); go(v); },
