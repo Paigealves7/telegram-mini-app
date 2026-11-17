@@ -12,15 +12,16 @@ func checkFirewoodOrderStock(ctx context.Context, tx pgx.Tx, items []domain.Fire
 	for _, p := range items {
 		requested[p.Kind] += p.VolumeM3
 	}
-	for kind, volume := range requested {
-		var stock float64
-		err := tx.QueryRow(ctx, `SELECT (SELECT COALESCE(SUM(volume_m3),0) FROM firewood_processing WHERE kind=$1)-(SELECT COALESCE(SUM(f.volume_m3),0) FROM order_firewood f JOIN orders o ON o.id=f.order_id WHERE f.kind=$1 AND o.status='completed')`, kind).Scan(&stock)
-		if err != nil {
-			return err
-		}
-		if volume > stock+1e-9 {
-			return ErrInsufficientStock
-		}
+	if len(requested) == 0 {
+		return nil
+	}
+	stock, err := readFirewoodStock(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if requested["split"] > 0 && requested["split"] > stock.SplitM3+1e-9 ||
+		requested["round"] > 0 && requested["round"] > stock.RoundM3+1e-9 {
+		return ErrInsufficientStock
 	}
 	return nil
 }

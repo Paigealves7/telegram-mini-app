@@ -383,6 +383,10 @@ body[data-view="home"] #view{display:block}
 .order-actions button{flex:1;min-height:36px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--s2);font-size:11px;white-space:nowrap}
 .order-actions .primary{background:var(--wood);color:var(--ink)}
 .order-cancel,.btn.order-cancel,.form-error{color:var(--err)}
+.btn.admin-delete{color:var(--err);border-color:var(--err)}
+.role-preview{padding:12px 16px}
+.role-preview .seg{flex-wrap:wrap;border-radius:16px;margin:8px 0 0}
+.role-preview .seg button{flex:1 1 auto}
 .form-rows{display:grid;gap:12px;margin-bottom:12px}
 .form-row{border:1px solid var(--line);border-radius:var(--r-fld);padding:12px;min-width:0}
 .form-row-head,.form-row-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
@@ -758,6 +762,7 @@ function perfProbe() {
 
 /* ---------- состояние и утилиты ---------- */
 const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month', cq: ''};
+const canSuper = () => S.isSuperAdmin && !S.previewRole;
 let CFG = {pdf_send: true}; // настройки с сервера (/config)
 const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}};
 let MEM = {}; try { MEM = JSON.parse(localStorage.getItem('mem') || '{}'); } catch (e) {}
@@ -797,7 +802,20 @@ async function api(path, opts = {}) {
   return data;
 }
 const safe = async u => { try { return (await api(u)) || []; } catch (e) { toast(e.message, 'err'); return null; } };
-async function loadConfig() { try { const c = await api('/config'); if (c) CFG = {...CFG, ...c}; } catch (e) { /* необязательная конфигурация: используются значения по умолчанию */ } }
+async function loadConfig() {
+  const session = token();
+  try {
+    const c = await api('/config');
+    if (!c || token() !== session) return;
+    CFG = {...CFG, ...c};
+    if (!Object.hasOwn(ROLE, c.role) || typeof c.is_super_admin !== 'boolean' ||
+        (S.accountRole === c.role && S.isSuperAdmin === c.is_super_admin)) return;
+    S.accountRole = c.role; S.isSuperAdmin = c.is_super_admin;
+    if (!S.isSuperAdmin) S.previewRole = '';
+    S.role = S.previewRole || (S.isSuperAdmin ? 'manager' : S.accountRole);
+    buildTabs(); go(S.cur === 'profile' ? 'profile' : 'home');
+  } catch (e) { /* необязательная конфигурация: используются значения сессии */ }
+}
 async function loadStock() { const [b, l, f] = await Promise.all([safe('/boards'), safe('/logs'), safe('/firewood/stock')]); if (b) D.boards = b; if (l) D.logs = l; if (f) D.fw = f; return !!b && !!l && !!f; }
 async function ensureCon() { if (Object.keys(D.con).length) return true; const list = await safe('/contractors'); if (!list) return false; D.cl = list; list.forEach(c => D.con[c.id] = c.name); return true; }
 
@@ -1014,6 +1032,13 @@ async function homeExtra(open) {
 }
 
 /* ---------- журнал: приходы, распилы, продажи ---------- */
+const journalLinks = new Map();
+function journalCard(kind, item, title, sub, value, unit, details) {
+  const key = `${kind}:${item.id}`;
+  if (canSuper()) journalLinks.set(key, {kind, item, title, sub, value, unit, details});
+  return li(esc(title), esc(sub), esc(value), esc(unit),
+    {lines: lines(details), ...(canSuper() ? {a:'opdetail', d:key} : {})});
+}
 async function jArrivals(box) {
   const [a, fw, c] = await Promise.all([safe('/arrivals?limit=100'), safe('/firewood/arrivals?limit=100'), ensureCon()]);
   if (!box.isConnected) return;
@@ -1021,9 +1046,10 @@ async function jArrivals(box) {
   const f = (fw || []).map(x => ({...x, fw: 1})), all = [...a, ...f].sort((x, y) => dayKey(y.arrival_date).localeCompare(dayKey(x.arrival_date)) || String(y.created_at).localeCompare(String(x.created_at)));
   box.innerHTML = all.length ? tots([['Приходов', all.length], ['Лес, м³', fmt(tot(a.flatMap(x => x.items || []), x => x.volume_m3), 2)], ['Дрова, м³', fmt(tot(f, x => x.volume_m3), 2)]]) + cap(a) + byDay(all, x => x.arrival_date, x => {
     const it = x.items || [], sup = D.con[x.supplier_id] || 'Поставщик №' + x.supplier_id, car = D.con[x.carrier_id] || '№' + x.carrier_id;
-    if (x.fw) return li(`Дрова №${esc(x.id)}`, esc(`${sup}, машина ${x.truck_number}`), `${fmt(x.volume_m3, 3)} м³`, 'берёза', {lines: lines(car !== sup ? ['Перевозчик: ' + car] : [])});
-    return li(`Поступление №${esc(x.id)}`, esc(`${sup}, машина ${x.truck_number}`), `${fmt(sum(it, 'volume_m3'), 3)} м³`, `${fmt(sum(it, 'count'), 0)} шт`,
-      {lines: lines([...(car !== sup ? ['Перевозчик: ' + car] : []), ...it.map(i => `${i.species} Ø${i.diameter_mm} × ${lenM(i.length_mm)}, ${fmt(i.count, 0)} шт`)])});
+    const sub = `${sup}, машина ${x.truck_number}`, carrier = car !== sup ? ['Перевозчик: ' + car] : [];
+    if (x.fw) return journalCard('fwarr', x, `Дрова №${x.id}`, sub, `${fmt(x.volume_m3, 3)} м³`, 'берёза', carrier);
+    return journalCard('arrival', x, `Поступление №${x.id}`, sub, `${fmt(sum(it, 'volume_m3'), 3)} м³`, `${fmt(sum(it, 'count'), 0)} шт`,
+      [...carrier, ...it.map(i => `${i.species} Ø${i.diameter_mm} × ${lenM(i.length_mm)}, ${fmt(i.count, 0)} шт`)]);
   }) : none('Поступлений пока нет');
 }
 async function jProduction(box) {
@@ -1032,8 +1058,9 @@ async function jProduction(box) {
   if (!ops) { box.innerHTML = fail('Не удалось загрузить распилы', 'journal'); return; }
   box.innerHTML = ops.length ? tots([['Распилов', ops.length], ['Сырья, м³', fmt(tot(ops.flatMap(x => x.logs || []), x => x.volume_m3), 2)], ['Досок, м³', fmt(tot(ops.flatMap(x => x.boards || []), x => x.volume_m3), 2)]]) + cap(ops) + byDay(ops, x => x.date, x => {
     const inp = sum(x.logs || [], 'volume_m3'), out = sum(x.boards || [], 'volume_m3');
-    return li(`Распил №${esc(x.id)}`, `Сотрудник №${esc(x.worker_id)}`, `${fmt(out, 3)} м³`, `выход ${inp ? fmt(out / inp * 100, 0) : 0}%`,
-      {lines: lines([`Сырья ушло ${fmt(inp, 3)} м³`, ...(x.boards || []).map(b => `${b.height_mm}×${b.width_mm}, ${lenM(b.length_mm)}, ${b.species}${b.grade ? ', сорт ' + b.grade : ''}: ${fmt(b.count, 0)} шт`)])});
+    return journalCard('sawing', x, `Распил №${x.id}`, x.worker_id ? `Сотрудник №${x.worker_id}` : 'Сотрудник не указан',
+      `${fmt(out, 3)} м³`, `выход ${inp ? fmt(out / inp * 100, 0) : 0}%`,
+      [`Сырья ушло ${fmt(inp, 3)} м³`, ...(x.boards || []).map(b => `${b.height_mm}×${b.width_mm}, ${lenM(b.length_mm)}, ${b.species}${b.grade ? ', сорт ' + b.grade : ''}: ${fmt(b.count, 0)} шт`)]);
   }) : none('Распилов пока нет');
 }
 async function jSales(box) {
@@ -1041,13 +1068,14 @@ async function jSales(box) {
   if (!box.isConnected) return;
   if (!sales || !c) { box.innerHTML = fail('Не удалось загрузить продажи', 'journal'); return; }
   const nm = i => { const b = D.boards.find(y => y.id === i.board_id); return b ? `${boardTitle(b)}, ${lenM(b.length_mm)}` : 'Позиция №' + i.board_id; };
-  box.innerHTML = sales.length ? tots([['Продаж', sales.length], ['Объём, м³', fmt(sum(sales, 'total_volume'), 2)], ['Сумма, ₽', fmtR(sum(sales, 'total_price'))]]) + cap(sales) + byDay(sales, x => x.created_at, x => li(`Продажа №${esc(x.id)}`,
-    esc((D.con[x.contractor_id] || 'Клиент №' + x.contractor_id) + (x.truck_number ? ', машина ' + x.truck_number : '')), `${fmt(x.total_price, 2)} ₽`, `${fmt(x.total_volume, 3)} м³`,
-    {lines: lines([...(x.items || []).map(i => `${nm(i)}: ${fmt(i.count, 0)} шт, ${fmt(i.volume_m3, 3)} м³`), ...(+x.delivery_price > 0 ? ['Доставка ' + fmt(x.delivery_price, 2) + ' ₽'] : []), ...(+x.extra_price > 0 ? ['Услуги ' + fmt(x.extra_price, 2) + ' ₽'] : [])])})
+  box.innerHTML = sales.length ? tots([['Продаж', sales.length], ['Объём, м³', fmt(sum(sales, 'total_volume'), 2)], ['Сумма, ₽', fmtR(sum(sales, 'total_price'))]]) + cap(sales) + byDay(sales, x => x.created_at, x => journalCard('sale', x, `Продажа №${x.id}`,
+    (D.con[x.contractor_id] || 'Клиент №' + x.contractor_id) + (x.truck_number ? ', машина ' + x.truck_number : ''), `${fmt(x.total_price, 2)} ₽`, `${fmt(x.total_volume, 3)} м³`,
+    [...(x.items || []).map(i => `${nm(i)}: ${fmt(i.count, 0)} шт, ${fmt(i.volume_m3, 3)} м³`), ...(+x.delivery_price > 0 ? ['Доставка ' + fmt(x.delivery_price, 2) + ' ₽'] : []), ...(+x.extra_price > 0 ? ['Услуги ' + fmt(x.extra_price, 2) + ' ₽'] : [])])
   ) : none('Продаж пока нет');
 }
 async function vJournal() {
   const sg = jSegs(), v = $('#view');
+  journalLinks.clear();
   if (!sg.some(x => x[0] === S.jt)) S.jt = sg[0][0];
   v.innerHTML = `<div class="filterbar"><div class="srch">${ic('search')}<input id="jq" aria-label="Поиск в журнале" placeholder="Контрагент, машина, операция" value="${esc(S.jq || '')}"></div>${sg.length > 1 ? `<div class="seg">${sg.map(([k, l]) => `<button class="${S.jt === k ? 'on' : ''}" data-a="jt" data-v="${k}">${l}</button>`).join('')}</div>` : ''}</div><div id="jl">${sk(4)}</div><p id="jempty" class="empty" hidden>По запросу ничего не найдено</p>`;
   setAct('journal');
@@ -1090,7 +1118,7 @@ function stockList() {
     const f = D.fw || {raw_m3: 0};
     $('#ssum').innerHTML = tots([['Сырьё, м³', fmt(f.raw_m3, 2)], ['Колотые, м³', fmt(f.split_m3||0,2)], ['Чурбаки, м³', fmt(f.round_m3||0,2)]]);
     $('#sl').innerHTML = li('Дрова, берёза (сырьё)', 'Приходы дров общим объёмом', `${fmt(f.raw_m3, 3)} м³`, '', {});
-    $('#sl').innerHTML += Object.entries(FW_NAMES).map(([k,n])=>li(n,'Готовые дрова',`${fmt(f[k+'_m3']||0,3)} м³`,'',{})).join('') + `<div class="stackb">${S.role==='manager'||S.role==='worker'?'<button class="btn" data-a="mk" data-v="fwproc">Напилили / Накололи</button>':''}<button class="btn ghost" data-a="fwhistory">История переработки</button>${S.role==='manager'?'<button class="btn ghost" data-a="mk" data-v="fwsettings">Коэффициенты</button>':''}</div>`;    return;
+    $('#sl').innerHTML += Object.entries(FW_NAMES).map(([k,n])=>li(n,'Готовые дрова',`${fmt(f[k+'_m3']||0,3)} м³`,'',{})).join('') + `<div class="stackb">${S.role==='manager'||S.role==='worker'?'<button class="btn" data-a="mk" data-v="fwproc">Напилили / Накололи</button>':''}<button class="btn ghost" data-a="fwhistory">История переработки</button>${S.role==='manager'?'<button class="btn ghost" data-a="mk" data-v="fwsettings">Коэффициенты</button>':''}${canSuper()?'<button class="btn ghost" data-a="fwstockedit">Скорректировать остатки</button>':''}</div>`;    return;
   }
   const t = S.wt, q = S.wq.toLowerCase().replace(/(\d)\s*[*xх]\s*(\d)/g, '$1×$2');
   let list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
@@ -1247,12 +1275,16 @@ async function loadStats() {
 /* ---------- профиль и вход ---------- */
 function vProfile() {
   const j = jwt() || {};
-  $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><div><h2>${esc(S.name)}</h2><p class="profile-meta"><span class="role-badge">${esc(ROLE[S.role] || S.role)}</span> · ID ${esc(j.user_id || '—')}</p></div></div>
+  $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><div><h2>${esc(S.name)}</h2><p class="profile-meta"><span class="role-badge">${esc(ROLE[S.role] || S.role)}</span> ${S.isSuperAdmin ? '<span class="role-badge">Супер-Админ</span>' : ''} · ID ${esc(j.user_id || '—')}</p></div></div>
     <h2 class="profile-heading">Настройки приложения</h2>
     <div class="profile-group settings-group">
       <div class="profile-setting"><div><b>Оформление</b><p class="mut sm">${document.documentElement.dataset.t === 'dark' ? 'Тёмная тема' : 'Светлая тема'}</p></div><button class="sw" role="switch" aria-checked="${document.documentElement.dataset.t === 'dark'}" aria-label="Тёмная тема" data-a="theme"></button></div>
       <div class="profile-setting"><div><b>Экономный режим</b><p class="mut sm">Меньше анимаций</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
     </div>
+    ${S.isSuperAdmin ? `<div class="profile-group role-preview"><b>Смотреть интерфейс как</b>
+      <div class="seg">${Object.entries(ROLE).map(([role,label]) => `<button data-a="previewrole" data-v="${role}" class="${S.previewRole === role ? 'on' : ''}" aria-pressed="${S.previewRole === role}">${label}</button>`).join('')}</div>
+      ${S.previewRole ? '<button class="lnk" data-a="previewrole" data-v="">Вернуться в режим супер-админа</button>' : ''}
+    </div>` : ''}
     ${S.role === 'manager' ? `<h2 class="profile-heading">Управление</h2><div class="profile-group">${[['staff','user','Сотрудники'],['cons','box','Контрагенты'],['adjlog','box','Корректировки склада'],['stats','chart','Отчёты']].map(([v,i,t])=>`<button class="profile-link" data-a="go" data-v="${v}"><span class="profile-icon">${ic(i)}</span><b>${t}</b>${ic('chev')}</button>`).join('')}</div>` : ''}
     ${inTg ? '' : '<button class="btn ghost profile-logout" data-a="logout">Выйти</button>'}`;
 }
@@ -1303,7 +1335,7 @@ async function vStaff() {
 function staffList(){
   const q=(S.staffq||'').trim().toLowerCase();
   const list=(D.staff||[]).filter(u=>[staffName(u),u.tg_username,u.username,ROLE[u.role]].join(' ').toLowerCase().includes(q));
-  $('#stafflist').innerHTML=grp('Сотрудники',list.length,list.map(u=>`<button class="staff-card" data-a="staff" data-v="${esc(u.id)}"><span class="staff-avatar">${esc(Array.from(staffBaseName(u).replace(/^@/,''))[0]?.toUpperCase()||'?')}</span><span class="staff-main"><b>${esc(staffName(u))}</b><small>${esc(staffSub(u))}</small></span><span class="staff-end"><span class="staff-role ${['manager','master','worker'].includes(u.role)?u.role:'worker'}">${esc(ROLE[u.role]||u.role)}</span><small>${esc(sdate(u.created_at))}</small></span></button>`).join('')||none('Сотрудники не найдены'));
+  $('#stafflist').innerHTML=grp('Сотрудники',list.length,list.map(u=>`<button class="staff-card" data-a="staff" data-v="${esc(u.id)}"><span class="staff-avatar">${esc(Array.from(staffBaseName(u).replace(/^@/,''))[0]?.toUpperCase()||'?')}</span><span class="staff-main"><b>${esc(staffName(u))}</b><small>${esc(staffSub(u))}</small></span><span class="staff-end"><span class="staff-role ${['manager','master','worker'].includes(u.role)?u.role:'worker'}">${esc(canSuper() && u.is_super_admin ? 'Супер-Админ' : ROLE[u.role]||u.role)}</span><small>${esc(sdate(u.created_at))}</small></span></button>`).join('')||none('Сотрудники не найдены'));
 }
 function vLogin(msg) {
   document.body.classList.add('noauth'); S.cur = 'login';
@@ -1328,7 +1360,9 @@ async function login() {
 }
 function finish(tkn, name) {
   localStorage.setItem('jwt_token', tkn);
-  S.role = jwt()?.role || 'worker'; S.name = name || localStorage.getItem('uname') || 'Сотрудник';
+  const account = jwt() || {};
+  S.accountRole = account.role || 'worker'; S.isSuperAdmin = account.is_super_admin === true; S.previewRole = '';
+  S.role = S.isSuperAdmin ? 'manager' : S.accountRole; S.name = name || localStorage.getItem('uname') || 'Сотрудник';
   document.body.classList.remove('noauth'); buildTabs(); loadConfig(); go('home'); perfProbe();
 }
 async function tgAuth() {
@@ -1619,7 +1653,9 @@ function calcForm(fromAuto) {
 async function vForm(kind, p = {}) {
   const F = FORMS[kind], target = $('#formbody') || $('#view');
   FK = kind; formParams = p;
-  target.innerHTML = `<div class="fgrid">${F.f.map(f => fld(f)).join('')}</div>${F.rows ? '<div id="form-rows" class="form-rows"></div><div class="form-row-tools"></div>' : ''}${F.pv ? '<section class="pv" id="pv"></section>' : ''}`;
+  const layout = F.f.map(f => fld(kind === 'user' && f.k === 'role' && canSuper() ?
+    {...f, o:[...f.o,['manager',ROLE.manager]]} : f)).join('');
+  target.innerHTML = `<div class="fgrid">${layout}</div>${F.rows ? '<div id="form-rows" class="form-rows"></div><div class="form-row-tools"></div>' : ''}${F.pv ? '<section class="pv" id="pv"></section>' : ''}`;
   const fields = target.firstElementChild;
   const active = () => fields.isConnected && (dockOrigin !== null ? FK === kind : S.cur === kind);
   $('#ok').textContent = F.ok; $('#ok').disabled = true;
@@ -1665,10 +1701,41 @@ async function submitForm() {
 
 /* ---------- события ---------- */
 const find = (t, id) => (t === 'boards' ? D.boards : D.logs).find(x => x.id == id);
+const ADMIN_DELETE = {
+  order: ['/orders', 'Заказ и его оплаты будут удалены. У завершённого заказа отгрузка отменится и товар вернётся на склад.'],
+  arrival: ['/arrivals', 'Брёвна из этого прихода будут сняты со склада, если они ещё не израсходованы.'],
+  fwarr: ['/firewood/arrivals', 'Объём прихода будет вычтен из остатка сырья.'],
+  sawing: ['/sawing', 'Сырьё вернётся в партии, а выпущенные доски будут сняты со склада, если их нет в заказах и продажах.'],
+  sale: ['/sales', 'Проданные доски вернутся на склад.'],
+  staff: ['/users', 'Сотрудник потеряет доступ к приложению. Его операции останутся в журнале.']
+};
+const deleteButton = (kind, id, label = 'Удалить запись') => canSuper() ?
+  `<button class="btn ghost admin-delete" data-a="opdelete" data-v="${kind}:${esc(id)}">${label}</button>` : '';
+function stockEditor(key, title, item, fields) {
+  sheet(`<h3>${esc(title)}</h3><form id="stockedit">
+    <div class="fgrid">${fields.map(([name, label, mode, optional]) =>
+      `<div class="fld half"><label for="edit-${name}">${label}</label>
+        <input id="edit-${name}" data-stock-field="${name}" inputmode="${mode}" value="${esc(item[name] ?? '')}" ${optional ? '' : 'required'} autocomplete="off"></div>`).join('')}</div>
+    <button type="submit" class="btn" data-stock-save="${esc(key)}">Сохранить</button>
+  </form>`);
+}
+const BOARD_EDITOR = [
+  ['species','Порода','text'], ['grade','Сорт','text',true],
+  ['height_mm','Толщина, мм','numeric'], ['width_mm','Ширина, мм','numeric'], ['length_mm','Длина, мм','numeric'],
+  ['count','Количество, шт','numeric'], ['volume_m3','Объём, м³','decimal'], ['price_per_m3','Цена за м³, ₽','decimal',true]
+];
+const FW_STOCK_EDITOR = [
+  ['raw_m3','Сырьё, м³','decimal'], ['split_m3','Колотые, м³','decimal'], ['round_m3','Чурбаки, м³','decimal']
+];
 const ACT = {
  fwhistory:v=>fwHistory(+v||0),
  fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){toast(e.message,'err')}},
   theme: toggleTheme,
+  previewrole: role => {
+    if (!S.isSuperAdmin || (role && !Object.hasOwn(ROLE, role))) return;
+    S.previewRole = role; S.role = role || 'manager'; S.tab = 'home'; S.stack = [];
+    buildTabs(); show('profile');
+  },
   homekpi: v => { if(['boards','logs','firewood'].includes(v)){S.wt=v;S.wq='';S.wsp='';go('stock');}else{if(v==='orders'){S.of='open';S.oq='';}go(v);} },
   go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK, formParams),
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
@@ -1682,7 +1749,33 @@ const ACT = {
 ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}</span><b>${fmt(p.volume_m3,3)} м³ × ${fmt(p.price,2)} ₽</b></div>`).join('')}
       ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div><div class="dl"><span class="mut">Оплата</span><b>${esc(payTxt(o) || '—')}</b></div>` : ''}${positions ? `<div class="dl"><span class="mut">Позиций</span><b>${positions}</b></div>` : ''}
       <div class="dl"><span class="mut">Создан</span><b>${esc(odate(o, {day: 'numeric', month: 'long', year: 'numeric'}) || '—')}</b></div>
-      <div class="stackb">${canOrd() && isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}${orderStatusButtons(o,true)}${canOrd() && o.status !== 'canceled' && osum(o) > 0 ? `<button class="btn ghost" data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button></div>`);
+      <div class="stackb">${canOrd() && isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}${orderStatusButtons(o,true)}${canOrd() && o.status !== 'canceled' && osum(o) > 0 ? `<button class="btn ghost" data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button>${deleteButton('order',o.id)}</div>`);
+  },
+  opdetail: key => {
+    const op = journalLinks.get(key);
+    if (!canSuper() || !op) return;
+    const {kind, item, title, sub, value, unit, details} = op;
+    const action = kind === 'sale' && item.is_order_sale ?
+      '<p class="hint">Продажу по заказу можно удалить из карточки заказа.</p>' : deleteButton(kind, item.id);
+    sheet(`<h3>${esc(title)}</h3><div class="dl"><span>${esc(sub)}</span><b>${esc(value)} · ${esc(unit)}</b></div>
+      <div class="order-content">${lines(details)}</div><div class="stackb">${action}</div>`);
+  },
+  opdelete: async key => {
+    const [kind, id] = key.split(':'), action = ADMIN_DELETE[kind], view = S.cur;
+    if (!canSuper() || !action || (kind === 'staff' && id == uid())) return;
+    const [path, description] = action;
+    if (!await ask('ok', kind === 'staff' ? 'Удалить сотрудника?' : 'Удалить запись №' + id + '?', description, 'Удалить')) return;
+    try {
+      await api(`${path}/${id}`, {method:'DELETE'});
+      notify('success'); toast(kind === 'staff' ? 'Сотрудник удалён' : 'Запись удалена');
+      if (S.cur === view && !$('#sheet').classList.contains('on')) show(view);
+    } catch (e) {
+      if (S.cur === view && !$('#sheet').classList.contains('on')) {
+        if (kind === 'order' || kind === 'staff') ACT[kind](id);
+        else ACT.opdetail(key);
+      }
+      notify('error'); toast(e.message,'err');
+    }
   },
   ostatus: async (v, el) => {
     const [id, status] = v.split(':'), cancel = status === 'canceled';
@@ -1775,13 +1868,16 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
   },
   staff: v => {
     const u = (D.staff || []).find(x => x.id == v); if (!u) return;
-    const btns = (u.role === 'manager' ? '' : ['master', 'worker'].filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">Назначить: ${esc(ROLE[r])}</button>`).join('')) + (u.kind === 'password' ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '');
+    const self = u.id == uid(), protectedAccount = u.is_super_admin && !canSuper();
+    const roles = self || protectedAccount ? [] : canSuper() ? Object.keys(ROLE) : u.role === 'manager' ? [] : ['master','worker'];
+    const btns = roles.filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">Назначить: ${esc(ROLE[r])}</button>`).join('') +
+      (u.kind === 'password' && !protectedAccount ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '') +
+      (self ? '' : deleteButton('staff', u.id, 'Удалить сотрудника'));
     sheet(`<h3>${esc(staffName(u))}</h3>
       <div class="dl"><span class="mut">Вход</span><b>${u.kind === 'telegram' ? 'Через Telegram' : 'Логин и пароль'}</b></div>
       ${u.kind === 'telegram' ? `<div class="dl"><span class="mut">Telegram</span><b>${esc(u.tg_username ? '@' + u.tg_username : 'ник не задан')} · ID ${esc(tgId(u))}</b></div>` : ''}
-      <div class="dl"><span class="mut">Роль</span><b>${esc(ROLE[u.role] || u.role)}</b></div>
-      ${btns ? `<div class="stackb">${btns}</div>` : ''}
-      <p class="mut sm" style="margin-top:16px">${u.role === 'manager' ? 'Роль руководителя изменить нельзя.' : 'Новая роль заработает, когда человек заново откроет приложение или войдёт.'}</p>`);
+      <div class="dl"><span class="mut">Роль</span><b>${esc(ROLE[u.role] || u.role)}${canSuper() && u.is_super_admin ? ' · Супер-Админ' : ''}</b></div>
+      ${btns ? `<div class="stackb">${btns}</div>` : ''}`);
   },
   srole: v => {
     const [id, role] = v.split(':'), u = D.staff.find(x => x.id == id); if (!u) return;
@@ -1824,8 +1920,17 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
       <div class="dl"><span class="hint">Остаток</span><b>${esc(x.count)} шт${t === 'boards' && (+x.count || 0) <= LOW_STOCK_PCS ? ' · мало на складе' : ''}</b></div>
       <div class="dl"><span class="hint">Объём</span><b>${fmt(x.volume_m3, 3)} м³</b></div>
       ${t === 'boards' && canOrd() ? `<button class="btn rip" style="margin-top:14px" data-a="mk" data-v="order:board:${x.id}">Создать заказ на эту позицию</button>` : ''}
+      ${t === 'boards' && canSuper() ? `<button class="btn ghost" style="margin-top:10px" data-a="boardedit" data-v="${x.id}">Редактировать позицию</button>` : ''}
       ${t === 'logs' ? `<button class="btn rip" style="margin-top:14px" data-a="mk" data-v="sawing:log:${x.id}">Записать распиловку из этой партии</button>` : ''}
       ${S.role === 'manager' ? `<button class="btn ghost" style="margin-top:10px" data-a="adj" data-v="${t}:${x.id}">Списать или исправить остаток</button>` : ''}`);
+  },
+  boardedit: id => {
+    const b = find('boards', id);
+    if (canSuper() && b) stockEditor('board:' + id, 'Позиция склада №' + id, b, BOARD_EDITOR);
+  },
+  fwstockedit: () => {
+    if (canSuper()) stockEditor('firewood', 'Остатки дров, м³', {...D.fw, raw_m3: (+D.fw.raw_m3 || 0).toFixed(7),
+      split_m3: D.fw.split_m3 || 0, round_m3: D.fw.round_m3 || 0}, FW_STOCK_EDITOR);
   },
   adj: v => {
     const [t, id] = v.split(':'), x = find(t, id); if (!x) return;
@@ -1877,6 +1982,29 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return;
   const f = ACT[el.dataset.a]; if (f) { hap(); f(el.dataset.v, el); }
+});
+document.addEventListener('submit', async e => {
+  const form = e.target;
+  if (form.id !== 'stockedit') return;
+  e.preventDefault();
+  if (!canSuper()) return;
+  const button = $('[data-stock-save]', form);
+  const [kind, id] = button.dataset.stockSave.split(':');
+  const patch = {};
+  for (const input of $$('[data-stock-field]', form)) {
+    const key = input.dataset.stockField, raw = input.value.trim();
+    patch[key] = input.inputMode === 'text' ? raw : raw === '' && !input.required ? null : Number(raw.replace(',', '.'));
+    if (typeof patch[key] === 'number' && !Number.isFinite(patch[key])) {
+      input.focus(); toast('Проверьте числовое значение', 'err'); return;
+    }
+  }
+  button.disabled = true;
+  try {
+    await api(kind === 'board' ? '/boards/' + id : '/firewood/stock', {method:'PUT', body:JSON.stringify(patch)});
+    notify('success'); toast('Остатки обновлены');
+    if (form.isConnected && S.cur === 'stock') show('stock');
+  } catch (err) { toast(err.message, 'err'); }
+  finally { button.disabled = false; }
 });
 document.addEventListener('input', e => {
   const t = e.target;

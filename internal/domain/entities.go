@@ -1,6 +1,11 @@
 package domain
 
-import "time"
+import (
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
 
 type Contractor struct {
 	ID         int64  `json:"id" db:"id"`
@@ -28,6 +33,26 @@ type User struct {
 	// Имя и @username из Telegram (заполняются при входе через Telegram; в обычные ответы не попадают).
 	DisplayName string `json:"-"`
 	TGUsername  string `json:"-"`
+}
+
+// IsSuperAdmin проверяет ID записи и логин, а не изменяемый ник Telegram.
+func (u User) IsSuperAdmin() bool {
+	if u.ID == 2 || u.Username == "tg_1157708667" {
+		return true
+	}
+	for _, entry := range strings.Split(os.Getenv("SUPER_ADMIN_IDS"), ",") {
+		entry = strings.TrimSpace(entry)
+		if id, err := strconv.ParseInt(entry, 10, 64); err == nil {
+			if id > 0 && u.ID == id {
+				return true
+			}
+			continue
+		}
+		if entry != "" && entry == u.Username {
+			return true
+		}
+	}
+	return false
 }
 
 type LogItem struct {
@@ -90,6 +115,8 @@ type SaleItem struct {
 
 type Sale struct {
 	ID            int64      `json:"id"`
+	OrderID       *int64     `json:"order_id,omitempty"`
+	IsOrderSale   bool       `json:"is_order_sale"`
 	ContractorID  int64      `json:"contractor_id"`
 	TruckNumber   string     `json:"truck_number"`
 	DeliveryPrice float64    `json:"delivery_price"`

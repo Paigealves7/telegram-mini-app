@@ -13,17 +13,17 @@ func (r *Repository) CreateFirewoodProcessing(ctx context.Context, p *domain.Fir
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(900009)`); err != nil {
+	if err = lockFirewood(ctx, tx); err != nil {
 		return err
 	}
-	var available float64
-	if err = tx.QueryRow(ctx, `SELECT (SELECT COALESCE(SUM(volume_m3),0) FROM firewood_arrivals) - (SELECT COALESCE(SUM(raw_m3),0) FROM firewood_processing)`).Scan(&available); err != nil {
+	stock, err := readFirewoodStock(ctx, tx)
+	if err != nil {
 		return err
 	}
 	if err = tx.QueryRow(ctx, `SELECT coefficient FROM firewood_settings WHERE kind=$1 FOR SHARE`, p.Kind).Scan(&p.Coefficient); err != nil {
 		return err
 	}
-	if p.VolumeM3*p.Coefficient > available+1e-9 {
+	if p.VolumeM3*p.Coefficient > stock.RawM3+1e-9 {
 		return ErrInsufficientStock
 	}
 	err = tx.QueryRow(ctx, `INSERT INTO firewood_processing(kind,volume_m3,coefficient,raw_m3,performer,date,comment,created_by) VALUES($1,$2,$3,$2::numeric*$3::numeric,$4,$5::date,$6,$7) RETURNING id,raw_m3`, p.Kind, p.VolumeM3, p.Coefficient, p.Performer, p.Date, p.Comment, userID).Scan(&p.ID, &p.RawM3)
@@ -55,7 +55,7 @@ func (r *Repository) DeleteFirewoodProcessing(ctx context.Context, id int64) err
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(900009)`); err != nil {
+	if err = lockFirewood(ctx, tx); err != nil {
 		return err
 	}
 	var kind string

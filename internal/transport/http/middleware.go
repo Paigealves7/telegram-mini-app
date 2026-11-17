@@ -2,11 +2,14 @@ package http
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"telegram-mini-app/internal/domain"
+	"telegram-mini-app/internal/repository"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 type contextKey string
@@ -47,7 +50,41 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 	}
 }
 
-// RequireRoles остается без изменений
+// RefreshUser применяет изменения прав и удаление аккаунта к уже выданным токенам.
+func RefreshUser(repo *repository.Repository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := currentUser(r)
+			if !ok {
+				http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
+				return
+			}
+			user, err := repo.GetUserByID(r.Context(), claims.UserID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "аккаунт удалён, войдите снова", http.StatusUnauthorized)
+				return
+			}
+			if err != nil {
+				serverError(w, r, "не удалось проверить права пользователя", err)
+				return
+			}
+			claims.setUser(user)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func RequireSuperAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := currentUser(r)
+		if !ok || !claims.IsSuperAdmin {
+			http.Error(w, "действие доступно только супер-админу", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func RequireRoles(allowedRoles ...domain.Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +95,7 @@ func RequireRoles(allowedRoles ...domain.Role) func(http.Handler) http.Handler {
 			}
 
 			userRole := domain.Role(claims.Role)
-			isAllowed := false
+			isAllowed := claims.IsSuperAdmin
 
 			for _, role := range allowedRoles {
 				if userRole == role {

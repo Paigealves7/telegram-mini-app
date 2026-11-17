@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"telegram-mini-app/internal/repository"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -25,13 +27,14 @@ func NewStaffHandler(repo *repository.Repository) *StaffHandler {
 }
 
 type staffItem struct {
-	ID        int64       `json:"id"`
-	Username  string      `json:"username"`
-	Role      domain.Role `json:"role"`
-	Kind      string      `json:"kind"`        // "telegram" или "password"
-	Name      string      `json:"name"`        // имя из Telegram (пусто, пока человек не открыл приложение после обновления)
-	TGUser    string      `json:"tg_username"` // @username без «@»
-	CreatedAt time.Time   `json:"created_at"`
+	ID           int64       `json:"id"`
+	Username     string      `json:"username"`
+	Role         domain.Role `json:"role"`
+	Kind         string      `json:"kind"`        // "telegram" или "password"
+	Name         string      `json:"name"`        // имя из Telegram (пусто, пока человек не открыл приложение после обновления)
+	TGUser       string      `json:"tg_username"` // @username без «@»
+	CreatedAt    time.Time   `json:"created_at"`
+	IsSuperAdmin bool        `json:"is_super_admin"`
 }
 
 func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +49,7 @@ func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(u.PasswordHash, tgPasswordPrefix) {
 			kind = "telegram"
 		}
-		out = append(out, staffItem{ID: u.ID, Username: u.Username, Role: u.Role, Kind: kind, Name: u.DisplayName, TGUser: u.TGUsername, CreatedAt: u.CreatedAt})
+		out = append(out, staffItem{ID: u.ID, Username: u.Username, Role: u.Role, Kind: kind, Name: u.DisplayName, TGUser: u.TGUsername, CreatedAt: u.CreatedAt, IsSuperAdmin: u.IsSuperAdmin()})
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
@@ -61,7 +64,6 @@ func staffID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	return id, true
 }
 
-// SetRole: менеджер может назначить роль мастера или сотрудника. Назначить или изменить роль руководителя нельзя.
 func (h *StaffHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 	id, ok := staffID(w, r)
 	if !ok {
@@ -75,17 +77,30 @@ func (h *StaffHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
 		return
 	}
-	if req.Role != domain.RoleMaster && req.Role != domain.RoleWorker {
-		http.Error(w, "можно назначить только роль мастера или сотрудника", http.StatusBadRequest)
+	if req.Role != domain.RoleManager && req.Role != domain.RoleMaster && req.Role != domain.RoleWorker {
+		http.Error(w, "неизвестная роль", http.StatusBadRequest)
 		return
 	}
-	updated, err := h.repo.UpdateUserRole(r.Context(), id, req.Role)
+	actor, _ := currentUser(r)
+	if actor.UserID == id {
+		http.Error(w, "нельзя изменить собственную роль", http.StatusForbidden)
+		return
+	}
+	target := h.staffTarget(w, r, id)
+	if target == nil {
+		return
+	}
+	if !actor.IsSuperAdmin && (req.Role == domain.RoleManager || target.Role == domain.RoleManager) {
+		http.Error(w, "управление ролями руководителей доступно только супер-админу", http.StatusForbidden)
+		return
+	}
+	updated, err := h.repo.UpdateUserRole(r.Context(), id, req.Role, actor.IsSuperAdmin)
 	if err != nil {
 		serverError(w, r, "не удалось изменить роль", err)
 		return
 	}
 	if !updated {
-		http.Error(w, "сотрудник не найден или это руководитель (его роль не меняется)", http.StatusNotFound)
+		http.Error(w, "роль не изменена: данные сотрудника обновились", http.StatusConflict)
 		return
 	}
 	if claims, ok := r.Context().Value(UserContextKey).(*Claims); ok {
@@ -94,10 +109,44 @@ func (h *StaffHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *StaffHandler) staffTarget(w http.ResponseWriter, r *http.Request, id int64) *domain.User {
+	target, err := h.repo.GetUserByID(r.Context(), id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "сотрудник не найден", http.StatusNotFound)
+		return nil
+	}
+	if err != nil {
+		serverError(w, r, "не удалось получить данные сотрудника", err)
+		return nil
+	}
+	actor, _ := currentUser(r)
+	if target.IsSuperAdmin() && !actor.IsSuperAdmin {
+		http.Error(w, "управление аккаунтом супер-админа запрещено", http.StatusForbidden)
+		return nil
+	}
+	return target
+}
+
+func (h *StaffHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, ok := staffID(w, r)
+	if !ok {
+		return
+	}
+	actor, _ := currentUser(r)
+	if actor.UserID == id {
+		http.Error(w, "нельзя удалить собственный аккаунт", http.StatusForbidden)
+		return
+	}
+	adminResult(w, r, "не удалось удалить сотрудника", h.repo.DeleteUser(r.Context(), id))
+}
+
 // SetPassword: новый пароль для аккаунта с паролем. У Telegram-аккаунтов пароля нет.
 func (h *StaffHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	id, ok := staffID(w, r)
 	if !ok {
+		return
+	}
+	if h.staffTarget(w, r, id) == nil {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)

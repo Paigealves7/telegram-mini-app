@@ -24,9 +24,16 @@ const (
 )
 
 type Claims struct {
-	UserID int64  `json:"user_id"`
-	Role   string `json:"role"`
+	UserID       int64  `json:"user_id"`
+	Role         string `json:"role"`
+	IsSuperAdmin bool   `json:"is_super_admin"`
 	jwt.RegisteredClaims
+}
+
+func (c *Claims) setUser(u *domain.User) {
+	c.UserID = u.ID
+	c.Role = string(u.Role)
+	c.IsSuperAdmin = u.IsSuperAdmin()
 }
 
 type AuthHandler struct {
@@ -85,6 +92,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "неизвестная роль", http.StatusBadRequest)
 		return
 	}
+	actor, _ := currentUser(r)
+	if (req.Role == domain.RoleManager || (domain.User{Username: req.Username}).IsSuperAdmin()) &&
+		(actor == nil || !actor.IsSuperAdmin) {
+		http.Error(w, "действие доступно только супер-админу", http.StatusForbidden)
+		return
+	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -127,10 +140,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims := &Claims{
-		UserID: user.ID,
-		Role:   string(user.Role),
-	}
+	claims := &Claims{}
+	claims.setUser(user)
 
 	tokenString, err := generateToken(claims, h.jwtSecret, passwordSessionTTL)
 	if err != nil {

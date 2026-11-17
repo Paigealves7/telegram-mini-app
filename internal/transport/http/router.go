@@ -147,6 +147,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		r.Group(func(r chi.Router) {
 			// 3. Прокидываем секрет в Middleware
 			r.Use(AuthMiddleware(jwtSecret))
+			r.Use(RefreshUser(repo))
 
 			r.Get("/boards", boardHandler.GetList)
 			r.Get("/logs", logHandler.GetList)
@@ -155,6 +156,19 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			r.Get("/firewood/processing", firewoodHandler.GetProcessing)
 			r.Get("/contractors", dictHandler.GetContractors)
 			r.Get("/config", ConfigHandler)
+
+			r.Group(func(r chi.Router) {
+				r.Use(RequireSuperAdmin)
+				admin := AdminHandler{repo: repo}
+				r.Delete("/users/{id}", staffHandler.Delete)
+				r.Delete("/orders/{id}", deleteOperation(repo.DeleteOrder))
+				r.Delete("/arrivals/{id}", deleteOperation(repo.DeleteLogArrival))
+				r.Delete("/firewood/arrivals/{id}", deleteOperation(repo.DeleteFirewoodArrival))
+				r.Delete("/sawing/{id}", deleteOperation(repo.DeleteSawing))
+				r.Delete("/sales/{id}", deleteOperation(repo.DeleteSale))
+				r.Put("/boards/{id}", admin.UpdateBoard)
+				r.Put("/firewood/stock", admin.SetFirewoodStock)
+			})
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleMaster))
