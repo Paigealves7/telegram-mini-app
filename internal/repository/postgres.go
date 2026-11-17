@@ -907,9 +907,9 @@ func (r *Repository) UpdateOrderStatus(ctx context.Context, id int64, status dom
 }
 
 func (r *Repository) GetUserByID(ctx context.Context, id int64) (*domain.User, error) {
-	query := `SELECT id, username, password_hash, role, created_at FROM users WHERE id = $1`
+	query := `SELECT id, username, password_hash, role, created_at, COALESCE(display_name, ''), COALESCE(tg_username, '') FROM users WHERE id = $1`
 	var user domain.User
-	err := r.db.QueryRow(ctx, query, id).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt)
+	err := r.db.QueryRow(ctx, query, id).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.DisplayName, &user.TGUsername)
 	return &user, err
 }
 

@@ -73,21 +73,7 @@ func itemTitle(l domain.OrderLine) string {
 	if g := strings.TrimSpace(l.Grade); g != "" {
 		t += ", сорт " + g
 	}
-	return t
-}
-
-var statusLabels = map[domain.OrderStatus]string{
-	domain.OrderStatusNew:        "Новый",
-	domain.OrderStatusInProgress: "В работе",
-	domain.OrderStatusCompleted:  "Завершён",
-	domain.OrderStatusCanceled:   "Отменён",
-}
-
-func statusLabel(s domain.OrderStatus) string {
-	if l, ok := statusLabels[s]; ok {
-		return l
-	}
-	return string(s)
+	return "Доска обрезная " + t
 }
 
 // ---------- сумма прописью ----------

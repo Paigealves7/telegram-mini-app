@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"telegram-mini-app/internal/repository"
+	"telegram-mini-app/pkg/telegram"
 	"time"
 )
 
@@ -22,14 +23,17 @@ var (
 )
 
 type BotService struct {
-	botToken string
-	repo     *repository.Repository
-	client   *http.Client
+	botToken  string
+	repo      *repository.Repository
+	client    *http.Client
+	base      string
+	configErr error
 }
 
 func NewBotService(token string, repo *repository.Repository) *BotService {
 	// Таймаут обязателен: без него зависший Telegram держит горутину и соединение бесконечно.
-	return &BotService{botToken: token, repo: repo, client: &http.Client{Timeout: 20 * time.Second}}
+	client, base, err := telegram.BotHTTPClient(20 * time.Second)
+	return &BotService{botToken: token, repo: repo, client: client, base: base, configErr: err}
 }
 
 type tgResponse struct {
@@ -56,7 +60,7 @@ func chatUnavailable(status int, description string) bool {
 
 // call — один запрос к Bot API. Тексты ошибок без URL: в нём токен бота.
 func (s *BotService) call(ctx context.Context, method, contentType string, body []byte) (*tgResponse, int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.telegram.org/bot"+s.botToken+"/"+method, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.base+"/bot"+s.botToken+"/"+method, bytes.NewReader(body))
 	if err != nil {
 		return nil, 0, errors.New("не удалось подготовить запрос к Telegram")
 	}
@@ -76,6 +80,9 @@ func (s *BotService) call(ctx context.Context, method, contentType string, body 
 // send повторяет запрос при сбоях сети, ошибках 5xx и лимите 429 (до 3 попыток).
 // Постоянные ошибки (400 и т.п.) не повторяются.
 func (s *BotService) send(ctx context.Context, method, contentType string, body []byte) error {
+	if s.configErr != nil {
+		return s.configErr
+	}
 	const attempts = 3
 	var lastErr error
 	for attempt := 1; attempt <= attempts; attempt++ {

@@ -49,6 +49,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET не задан в .env}
       SUPER_ADMIN_IDS: ${SUPER_ADMIN_IDS:-2,tg_1157708667}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN не задан в .env}
+      TELEGRAM_PROXY: ${TELEGRAM_PROXY:-}
+      TELEGRAM_API_BASE: ${TELEGRAM_API_BASE:-https://api.telegram.org}
       # Адрес сайта для ссылок на PDF, например https://sawmill.example.com (без слэша в конце)
       PUBLIC_URL: ${PUBLIC_URL:-}
       # Часовой пояс для дат в накладных, например Europe/Moscow или Europe/Tallinn
