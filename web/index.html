@@ -609,6 +609,32 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
  body:has(#sheet.on) #view{overflow:hidden}
 }
 
+
+@media(min-width:768px){
+ #workspace{grid-column:2;grid-row:2;min-width:0;min-height:0;width:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) transparent}
+ #workspace::-webkit-scrollbar{width:6px}#workspace::-webkit-scrollbar-track{background:transparent}#workspace::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:999px}
+ #view,body.form #view,body[data-view="stats"] #view{width:100%;max-width:1120px;overflow:visible;min-height:100%;margin:0 auto;padding:20px 24px 40px}
+ body[data-view="profile"] #view{max-width:640px}
+ body:has(#sheet.on) #workspace{overflow:hidden}
+ body.noauth #workspace{width:100%;overflow:visible}
+ .filterbar{position:static;top:auto;margin:0 0 16px;padding:0 0 4px;border:0;background:transparent;box-shadow:none}
+ .side-create .quick-btn{position:relative;justify-content:flex-start;min-height:42px;padding:10px 30px 10px 12px;border-radius:12px;background:var(--s2);border:1px solid var(--line);cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease,transform .15s ease}
+ .side-create .quick-btn::after{content:'+';position:absolute;right:12px;opacity:0;color:var(--t1);transition:opacity .15s}
+ .side-create .quick-btn:hover,.side-create .quick-btn:focus-visible{background:var(--s3);border-color:var(--line2);color:var(--t1)}
+ .side-create .quick-btn:hover svg,.side-create .quick-btn:focus-visible svg{color:var(--t1)}
+ .side-create .quick-btn:hover::after,.side-create .quick-btn:focus-visible::after{opacity:1}
+ .side-create .quick-btn:active{transform:scale(.97)}
+ body[data-active-form="arrival"] .side-create [data-v="arrival"],body[data-active-form="fwarr"] .side-create [data-v="fwarr"],body[data-active-form="sawing"] .side-create [data-v="sawing"],body[data-active-form="order"] .side-create [data-v="order"],body[data-active-form="fwproc"] .side-create [data-v="fwproc"]{background:var(--s3);border-color:var(--line2);color:var(--t1)}
+ .side-footer{padding-top:24px}
+ .side-profile{display:flex;gap:10px;width:100%;min-width:0;padding:10px 12px;background:var(--s1);border:1px solid var(--line);border-radius:14px;transition:background .15s,border-color .15s}
+ .side-profile:hover,.side-profile.on{background:var(--s2);border-color:var(--line2);box-shadow:none}
+ .side-avatar{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:50%;background:var(--s3);font-weight:600}
+ .side-profile>span:nth-child(2){flex:1;min-width:0}
+ .side-profile small{display:inline-block;padding:2px 6px;margin-top:3px;border-radius:999px;background:var(--s2)}
+ .side-profile>svg{width:16px;height:16px;color:var(--t2)}
+ #jl>.card-group>.li:only-of-type{grid-column:1/-1}
+}
+
 </style>
 </head>
 <body class="noauth">
@@ -617,7 +643,7 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
   <h1 id="title">Лесопилка</h1>
   <div id="hact"></div>
 </header>
-<main id="view"></main>
+<div id="workspace"><main id="view"></main></div>
 <nav class="tabs" id="tabs" aria-label="Разделы"></nav>
 <div class="act"><button class="btn" id="ok" data-a="ok"></button></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="scrim" data-a="no"></div><div class="panel"><div class="grab"></div><div class="inspector-heading"><span>Детали и действия</span><button data-a="no" aria-label="Закрыть панель">×</button></div><div class="inspector-empty"><span>Выберите объект</span><p>Откройте заказ или позицию склада, чтобы увидеть детали и доступные действия.</p></div><div id="sb"></div></div></div>
@@ -791,7 +817,7 @@ function closeSheet() {
   if(dockOrigin !== null) {
     document.body.append($('.act'));
     S.cur=dockOrigin; dockOrigin=null; FK=null;
-    document.body.classList.remove('dock-form');
+    document.body.classList.remove('dock-form'); document.body.removeAttribute('data-active-form');
   }
   $('#sheet').classList.remove('on');
   $('#sb').replaceChildren();
@@ -825,7 +851,7 @@ function buildTabs() {
   if (canOrd()) t.push(['orders', 'order', 'Заказы']);
   t.push(['journal', 'journal', 'Журнал']);
   if(S.role==='manager') t.push(['stats','chart','Отчёты']);
-  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+'<span>Лесопилка<small>Рабочее пространство</small></span></div>' + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile">${ic('user')}<span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span></button></div>`;
+  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+'<span>Лесопилка<small>Рабочее пространство</small></span></div>' + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile"><span class="side-avatar">${esc((S.name || '?')[0].toUpperCase())}</span><span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span>${ic('chev')}</button></div>`;
   theme();
 }
 const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-label="Создать: ${l}" title="Создать: ${l}">${ic('plus')}<span>${l}</span></button>`;
@@ -841,7 +867,7 @@ function go(v, p) {
   if(ASK) settle(false);
   if(FORMS[v] && desktop()) {
     closeSheet(); dockOrigin=S.cur;
-    document.body.classList.add('dock-form');
+    document.body.classList.add('dock-form'); document.body.dataset.activeForm=v;
     sheet(`<h3>${esc(FORMS[v].t)}</h3><div id="formbody"></div>`);
     $('#sb').append($('.act'));
     vForm(v,p); return;
@@ -864,7 +890,7 @@ function show(v, p) {
   const profileButton=$('.side-profile'); if(profileButton){profileButton.classList.toggle('on',v==='profile');v==='profile'?profileButton.setAttribute('aria-current','page'):profileButton.removeAttribute('aria-current');}
   $$('.tab').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
   try { sub ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {}
-  scrollTo(0, 0); $('#view').scrollTop=0;
+  scrollTo(0, 0); $('#workspace').scrollTop=0; $('#view').scrollTop=0;
   if (f) vForm(v, p); else ({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff, cons: vCons, adjlog: vAdjLog}[v] || (() => {}))();
 }
 tg.BackButton.onClick(back);
