@@ -21,7 +21,7 @@
 --blur:blur(22px) saturate(1.3);
 --fx:inset 0 1px 0 rgba(255,255,255,.1),0 12px 40px rgba(0,0,0,.28);
 --top:calc(var(--tg-content-safe-area-inset-top,0px) + var(--tg-safe-area-inset-top,0px) + env(safe-area-inset-top,0px));
---bot:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px))}
+--bot:max(var(--tg-safe-area-inset-bottom,0px),env(safe-area-inset-bottom,0px))}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0}
 body{background:var(--bg);color:var(--t1);font:16px/1.5 var(--font);font-variant-numeric:tabular-nums;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;color-scheme:dark}
@@ -470,6 +470,7 @@ body.noauth #sheet{display:none}
 @media(min-width:1024px){.metric{min-height:76px;padding:9px 10px}}
 @media(max-width:359px){.top:has(#hact .hbtn){gap:4px}#hact .hbtn{padding:0 9px}#hact .hbtn span{font-size:11px}}
 
+@media(max-width:767px){.tabs{left:0;right:0;bottom:0;border:0;border-top:1px solid var(--line);border-radius:0;height:auto;padding:8px 8px calc(var(--bot) + 6px)}}
 </style>
 </head>
 <body class="noauth">
@@ -756,7 +757,7 @@ const sdate = s => { const d = s ? new Date(s) : null; return d && !isNaN(d) ? d
 const oPaid = o => +o.paid_amount || 0;
 const oDue = o => Math.max(osum(o) - oPaid(o), 0);
 const payTxt = o => { const t = osum(o); if (t <= 0 || o.status === 'canceled') return ''; return oPaid(o) >= t - .005 ? 'оплачен' : oPaid(o) > 0 ? 'долг ' + fmt(oDue(o), 0) + ' ₽' : 'не оплачен'; };
-const orderContents = o => [...(o.items || []).map(p => { const b = D.boards.find(x=>x.id==p.board_id) || p; return `${b.height_mm ? boardTitle(b) + ' · ' + lenM(b.length_mm) : 'Доски · позиция №' + p.board_id} — ${fmt(p.count,0)} шт`; }), ...(o.firewood_items || []).map(p=>`${FW_NAMES[p.kind] || 'Дрова'} — ${fmt(p.volume_m3,3)} м³`)];
+const orderContents = o => [...(o.items || []).map(p => { const b = D.boards.find(x=>x.id==p.board_id) || p; return `${b.height_mm ? boardTitle(b) + ' · ' + lenM(b.length_mm) : 'Доски · позиция №' + p.board_id} — ${fmt(p.count,0)} шт${p.volume_m3 != null ? ' · '+fmt(p.volume_m3,3)+' м³' : ''}`; }), ...(o.firewood_items || []).map(p=>`${FW_NAMES[p.kind] || 'Дрова'} — ${fmt(p.volume_m3,3)} м³`)];
 const oRow = o => { const t = osum(o), paid=oPaid(o), contents=orderContents(o); return `<article class="order-card">
 <button class="order-head" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(o.id)}</b><small>${esc(D.con[o.contractor_id] || 'Клиент №'+o.contractor_id)}</small></span>${stl(o.status)}</button>
 ${contents.length ? `<div class="order-content">${contents.map(x=>`<span>${esc(x)}</span>`).join('')}</div>` : ''}
@@ -916,6 +917,7 @@ const skey = x => {
   return k;
 };
 let DEB;
+const boardGroupKey = x => JSON.stringify([x.species,x.height_mm,x.width_mm,x.length_mm,x.grade]);
 function stockList() {
   if (S.wt === 'firewood') {
     const f = D.fw || {raw_m3: 0};
@@ -924,14 +926,23 @@ function stockList() {
     $('#sl').innerHTML += Object.entries(FW_NAMES).map(([k,n])=>li(n,'Готовые дрова',`${fmt(f[k+'_m3']||0,3)} м³`,'',{})).join('') + `<div class="stackb">${S.role==='manager'||S.role==='worker'?'<button class="btn" data-a="mk" data-v="fwproc">Напилили / Накололи</button>':''}<button class="btn ghost" data-a="fwhistory">История переработки</button>${S.role==='manager'?'<button class="btn ghost" data-a="mk" data-v="fwsettings">Коэффициенты</button>':''}</div>`;    return;
   }
   const t = S.wt, q = S.wq.toLowerCase().replace(/(\d)\s*[*xх]\s*(\d)/g, '$1×$2');
-  const list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
+  let list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
+  if(t === 'boards') {
+    const groups = new Map();
+    list.forEach(x=>{
+      const key=boardGroupKey(x);
+      if(!groups.has(key)) groups.set(key,{...x,count:0,volume_m3:0,batches:[]});
+      const g=groups.get(key);g.count+=+x.count||0;g.volume_m3+=+x.volume_m3||0;g.batches.push(x);
+    });
+    list=[...groups.values()].sort((a,b)=>b.volume_m3-a.volume_m3);
+  }
   $('#ssum').innerHTML = tots([['Позиций', fmt(list.length, 0)], ['Штук', fmt(sum(list, 'count'), 0)], ['Объём, м³', fmt(sum(list, 'volume_m3'), 2)]]);
   const g = {}; list.forEach(x => (g[x.species || '—'] = g[x.species || '—'] || []).push(x));
   const row = x => {
     const low = t === 'boards' && (+x.count || 0) <= LOW_STOCK_PCS, d = sdate(x.created_at || x.updated_at);
     return li((t === 'boards' ? esc(boardTitle(x)) : `Бревно Ø${esc(x.diameter_mm)}`),
-      esc([lenM(x.length_mm), t === 'boards' ? [x.grade ? 'сорт ' + x.grade : '', 'Позиция №' + x.id].filter(Boolean).join(' · ') : 'партия №' + x.arrival_id, d].filter(Boolean).join(' · ')),
-      `${fmt(x.volume_m3, 3)} м³`, `${fmt(x.count, 0)} шт`, {a: 'item', d: `${t}:${x.id}`, lines: low ? lowTag('Мало на складе') : ''});
+      esc([lenM(x.length_mm), t === 'boards' ? [x.grade ? 'сорт ' + x.grade : '', x.batches?.length > 1 ? x.batches.length + ' ' + pl(x.batches.length,['партия','партии','партий']) : 'Позиция №' + x.id].filter(Boolean).join(' · ') : 'партия №' + x.arrival_id, d].filter(Boolean).join(' · ')),
+      `${fmt(x.volume_m3, 3)} м³`, `${fmt(x.count, 0)} шт`, {a: t === 'boards' && x.batches.length > 1 ? 'boardgroup' : 'item', d: t === 'boards' && x.batches.length > 1 ? boardGroupKey(x) : `${t}:${x.id}`, lines: low ? lowTag('Мало на складе') : ''});
   };
   $('#sl').innerHTML = list.length ? Object.entries(g).sort((a, b) => sum(b[1], 'volume_m3') - sum(a[1], 'volume_m3')).map(([n, a]) =>
     grp(esc(n), fmt(sum(a, 'volume_m3'), 2) + ' м³', a.map(row).join(''))).join('')
@@ -1420,6 +1431,11 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
   sp: v => { S.wsp = v; vStock(false); },
   of: v => { S.of = v; vOrders(false); },
   range: v => { S.range = v; vStats(); },
+  boardgroup: key => {
+    const batches=D.boards.filter(x=>boardGroupKey(x)===key);
+    if(!batches.length)return;
+    sheet(`<h3>${esc(boardTitle(batches[0]))}</h3><p class="mut">${fmt(sum(batches,'count'),0)} шт · ${fmt(sum(batches,'volume_m3'),3)} м³</p><p class="mut sm">Выберите партию для заказа или корректировки остатка.</p>${batches.map(x=>li('Позиция №'+esc(x.id),esc([lenM(x.length_mm),sdate(x.created_at)].filter(Boolean).join(' · ')),fmt(x.volume_m3,3)+' м³',fmt(x.count,0)+' шт',{a:'item',d:'boards:'+x.id})).join('')}`);
+  },
   item: v => {
     const [t, id] = v.split(':'), x = find(t, id); if (!x) return;
     sheet(`<h3>${t === 'boards' ? esc(boardTitle(x)) : `Бревно Ø${esc(x.diameter_mm)}`}</h3>

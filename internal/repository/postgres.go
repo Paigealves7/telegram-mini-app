@@ -586,6 +586,11 @@ func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain
 	}
 	rows.Close()
 	for i := range orders {
+		items, err := r.GetOrderItems(ctx, orders[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		orders[i].Items = items
 		fr, err := r.db.Query(ctx, `SELECT kind,volume_m3,price FROM order_firewood WHERE order_id=$1 ORDER BY id`, orders[i].ID)
 		if err != nil {
 			return nil, err
