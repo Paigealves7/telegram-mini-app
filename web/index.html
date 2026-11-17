@@ -471,6 +471,29 @@ body.noauth #sheet{display:none}
 @media(max-width:359px){.top:has(#hact .hbtn){gap:4px}#hact .hbtn{padding:0 9px}#hact .hbtn span{font-size:11px}}
 
 @media(max-width:767px){.tabs{left:0;right:0;bottom:0;border:0;border-top:1px solid var(--line);border-radius:0;height:auto;padding:8px 8px calc(var(--bot) + 6px)}}
+
+html[data-t="light"]{--bg:#f2f4f7;--line:#e2e6ee}
+html[data-t="light"] #hact .hbtn{background:#111315;color:#fff;border:1px solid #111315}
+html[data-t="light"] .srch,html[data-t="light"] .li,html[data-t="light"] .tt,html[data-t="light"] .tile{background:#fff;border:1px solid #e2e6ee;box-shadow:0 2px 8px rgba(20,25,35,.04)}
+html[data-t="light"] .seg,html[data-t="light"] .utabs{background:#e4e7ee;border:1px solid #cfd5df}
+html[data-t="light"] .seg button.on,html[data-t="light"] .utab.on{background:#fff;color:#111315;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.utab .tab-count{letter-spacing:0!important;font-feature-settings:"tnum" 1}
+@media(max-width:767px){.tabs{bottom:0;left:0;right:0;border-radius:0;border:0;border-top:1px solid var(--line);padding:6px 8px calc(env(safe-area-inset-bottom,0px)*.55 + 4px)}}
+#sr{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+#sr>.tots{grid-column:1/-1;margin:0}
+#sr .rev{padding:16px}#sr .rev .big{font-size:32px;margin:6px 0}
+#sr .rv-d{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+.stats-filter .utabs{flex-basis:100%}.stats-filter .dates{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stats-production h2,.stats-firewood h2{font-size:16px}
+.stat-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:14px 0;border-bottom:1px solid var(--line)}
+.stat-row-head{display:flex;justify-content:space-between;gap:8px;grid-column:1/-1;font-size:13px}
+.stat-row-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;grid-column:1/-1}
+.stat-row .bar{grid-column:1/-1;height:5px}
+.efficiency{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}
+.efficiency>div{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:10px;background:var(--s2);font-size:11px}
+.efficiency b{font-size:20px}.stats-firewood .dl{font-size:13px;padding:10px 0}
+@media(min-width:1440px){#sr{grid-template-columns:repeat(2,minmax(0,1fr))}#sr>.rev{grid-column:1/-1}}
+
 </style>
 </head>
 <body class="noauth">
@@ -542,7 +565,7 @@ function theme() {
   const mode = chosenTheme || (inTg ? tg.colorScheme : 'dark') || 'dark';
   document.documentElement.dataset.t = mode;
   document.querySelector('meta[name="color-scheme"]').content = mode;
-  const bg = mode === 'light' ? '#f3f4f6' : '#0b0c0e';
+  const bg = mode === 'light' ? '#f2f4f7' : '#0b0c0e';
   document.querySelector('meta[name="theme-color"]').content = bg;
   try { tg.setHeaderColor(bg); } catch (e) {}
   try { tg.setBackgroundColor(bg); } catch (e) {}
@@ -710,13 +733,13 @@ function go(v, p) {
   if (TABS.includes(v)) { S.tab = v; S.stack = []; } else S.stack.push(S.cur);
   show(v, p);
 }
-function back() { if(dockOrigin!==null){ const origin=dockOrigin; closeSheet(); show(origin); return; } show(S.stack.pop() || S.tab); }
+function back() { if(S.cur==='stats'){go('home');return;} if(dockOrigin!==null){ const origin=dockOrigin; closeSheet(); show(origin); return; } show(S.stack.pop() || S.tab); }
 function show(v, p) {
   if(ASK) settle(false);
   closeSheet();
   S.cur = v;
   document.body.dataset.view = v;
-  const f = FORMS[v], sub = !!f || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog';
+  const f = FORMS[v], sub = !!f || v === 'stats' || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog';
   document.body.classList.toggle('form', !!f);
   document.body.classList.toggle('sub', sub);
   $('#title').textContent = f ? f.t : v === 'home' ? 'Лесопилка' : TT[v] || 'Лесопилка';
@@ -1023,25 +1046,45 @@ async function vStats() {
 const addD = (k, n) => { const d = new Date(k + 'T00:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
 const prevRange = (a, b) => { const x = new Date(a + 'T00:00:00'), y = new Date(b + 'T00:00:00'); if (isNaN(x) || isNaN(y) || y < x) return null; const n = Math.round((y - x) / 864e5) + 1; return [addD(a, -n), addD(a, -1)]; };
 const dchip = (c, p) => { if (!(p > 0)) return ''; const x = (c - p) / p * 100, z = Math.abs(x) < 0.5; return `<span class="dc ${z ? '' : x > 0 ? 'up' : 'dn'}">${x >= 0 ? '+' : '−'}${fmt(Math.abs(x), 0)}%</span>`; };
-const cmpRow = (l, c, p, mx) => `<div class="vb"><div class="vb-h"><span>${l}</span><b>${fmt(c, 2)} м³</b></div><div class="bar"><i style="--w:${c / mx * 100}%"></i></div>${p != null ? `<div class="bar prev"><i style="--w:${p / mx * 100}%"></i></div><div class="vb-f"><span>Было ${fmt(p, 2)} м³</span>${dchip(c, p)}</div>` : ''}</div>`;
+const cmpRow = (l,c,p,mx) => `<div class="stat-row"><div class="stat-row-head"><b>${l}</b><strong>${fmt(c,2)} м³</strong></div><div class="stat-row-meta"><span class="mut">${p==null ? 'Нет данных за прошлый период' : 'Было '+fmt(p,2)+' м³'}</span>${p==null ? '' : p>0 ? dchip(c,p) : '<span class="dc">'+(c>0?'Новый объём':'0%')+'</span>'}</div><div class="bar"><i style="--w:${c/mx*100}%"></i></div></div>`;
+let statsRequest = 0;
+async function firewoodPeriod(path,a,b,dateKey) {
+  const result=[];
+  for(let offset=0;;offset+=1000){
+    const rows=await api(path+'?limit=1000&offset='+offset) || [];
+    result.push(...rows.filter(x=>{const d=dayKey(x[dateKey]);return d>=a&&d<=b;}));
+    if(rows.length<1000)return result;
+  }
+}
 async function loadStats() {
-  const box = $('#sr'); if (!box) return;
+  const box=$('#sr'); if(!box)return;
+  const request=++statsRequest, a=$('#d1').value, b=$('#d2').value;
+  if(!a||!b||a>b){box.innerHTML=none('Проверьте даты','Начало периода должно быть не позже окончания.');return;}
+  box.innerHTML=sk(3);
+  const pr=prevRange(a,b);
+  const fwPromise=Promise.all([firewoodPeriod('/firewood/arrivals',a,b,'arrival_date'),firewoodPeriod('/firewood/processing',a,b,'date'),api('/firewood/stock')]).catch(()=>null);
   try {
-    const a = $('#d1').value, b = $('#d2').value, pr = prevRange(a, b);
-    const [d, pd] = await Promise.all([api(sQ(a, b)), pr ? api(sQ(...pr)).catch(() => null) : null]);
-    if (S.cur !== 'stats') return;
-    const g = (o, k) => o ? +o[k] || 0 : null;
-    const R = g(d, 'total_sales_amount'), A = g(d, 'total_logs_arrived_volume'), W = g(d, 'total_logs_sawed_volume'), V = g(d, 'total_sales_volume');
-    const PR = g(pd, 'total_sales_amount'), PA = g(pd, 'total_logs_arrived_volume'), PW = g(pd, 'total_logs_sawed_volume'), PV = g(pd, 'total_sales_volume');
-    const mx = Math.max(A, W, V, PA || 0, PW || 0, PV || 0, 0.0001);
-    box.innerHTML = `<section class="rev"><p class="lbl">Выручка</p><div class="big"><span data-n="${R}" data-u=" ₽">0</span></div>
-        ${pd ? `<p class="rv-d">${dchip(R, PR)}<span class="mut">к предыдущему периоду · было ${fmt(PR, 0)} ₽</span></p>` : ''}</section>
-      <div class="stats-comparison"><div class="sh"><h2>Движение объёмов</h2></div>
-      ${pd ? '<p class="mut sm" style="margin-bottom:8px">Светлая полоса — выбранный период, серая — предыдущий такой же длины.</p>' : ''}
-      ${cmpRow('Пришло сырья', A, PA, mx)}${cmpRow('Распилено', W, PW, mx)}${cmpRow('Продано', V, PV, mx)}
-      </div><div class="workspace-card" style="margin-top:16px"><h3 class="section-label">Соотношение операций</h3><div class="ld"><span>Распилено от прихода</span><b>${A ? fmt(W / A * 100, 0) : 0}%</b></div><div class="ld"><span>Продано от распила</span><b>${W ? fmt(V / W * 100, 0) : 0}%</b></div></div>`;
-    countUp(box);
-  } catch (e) { box.innerHTML = none('Не удалось загрузить отчёт', esc(e.message)); }
+    const [d,pd]=await Promise.all([api(sQ(a,b)),pr?api(sQ(...pr)).catch(()=>null):null]);
+    if(request!==statsRequest||!box.isConnected)return;
+    const g=(o,k)=>o?+o[k]||0:null;
+    const R=g(d,'total_sales_amount'),A=g(d,'total_logs_arrived_volume'),W=g(d,'total_logs_sawed_volume'),V=g(d,'total_sales_volume');
+    const PR=g(pd,'total_sales_amount'),PA=g(pd,'total_logs_arrived_volume'),PW=g(pd,'total_logs_sawed_volume'),PV=g(pd,'total_sales_volume');
+    const mx=Math.max(A,W,V,.0001);
+    box.innerHTML=`<section class="rev"><p class="lbl">Выручка за период</p><div class="big">${fmt(R,0)} ₽</div><div class="rv-d">${pd ? dchip(R,PR)+'<span class="mut">Было '+fmt(PR,0)+' ₽</span>' : '<span class="mut">Прошлый период недоступен</span>'}</div></section>
+    ${tots([['Продано, м³',fmt(V,2)],['Пришло сырья, м³',fmt(A,2)],['Распилено, м³',fmt(W,2)]])}
+    <section class="workspace-card stats-production"><h2>Динамика и КПД производства</h2>
+    ${cmpRow('Пришло сырья',A,PA,mx)}${cmpRow('Распилено',W,PW,mx)}${cmpRow('Продано',V,PV,mx)}
+    <div class="efficiency"><div><span>Распилено от прихода</span><b>${A?fmt(W/A*100,0)+'%':'—'}</b></div><div><span>Продано от распила</span><b>${W?fmt(V/W*100,0)+'%':'—'}</b></div></div></section>
+    <section class="workspace-card stats-firewood"><h2>Сводка по дровам за период</h2><div id="fw-report">${sk(2)}</div></section>`;
+    const fw=await fwPromise;
+    if(request!==statsRequest||!box.isConnected)return;
+    const out=$('#fw-report',box);
+    if(!fw){out.innerHTML='<p class="mut">Не удалось загрузить данные по дровам.</p>';return;}
+    const [arr,proc,stock]=fw;
+    const row=(l,v)=>`<div class="dl"><span>${l}</span><b>${fmt(v,2)} м³</b></div>`;
+    out.innerHTML=row('Пришло берёзы',sum(arr,'volume_m3'))+row('Получено колотых',sum(proc.filter(x=>x.kind==='split'),'volume_m3'))+row('Получено чурбаков',sum(proc.filter(x=>x.kind==='round'),'volume_m3'))+row('Списано сырья в переработку',sum(proc,'raw_m3'))+
+      '<h3 class="section-label">Остатки сейчас</h3>'+row('Сырьё',stock.raw_m3)+row('Колотые',stock.split_m3)+row('Чурбаки',stock.round_m3);
+  } catch(e) { if(request===statsRequest&&box.isConnected)box.innerHTML=none('Не удалось загрузить отчёт',esc(e.message)); }
 }
 
 /* ---------- профиль и вход ---------- */
