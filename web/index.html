@@ -24,7 +24,7 @@
 --bot:max(var(--tg-safe-area-inset-bottom,0px),env(safe-area-inset-bottom,0px))}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0}
-body{background:var(--bg);color:var(--t1);font:16px/1.5 var(--font);font-variant-numeric:tabular-nums;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;color-scheme:dark}
+body{background:var(--bg);color:var(--t1);font:16px/1.5 var(--font);font-variant-numeric:normal;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;color-scheme:dark}
 /* фон: размытый туман без внешних картинок */
 body::before,body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none}
 body::before{background:
@@ -463,7 +463,7 @@ body.noauth #sheet{display:none}
 .filterbar .chips{flex:1 1 100%;width:100%;max-width:none;min-width:0;border:0;background:none;border-radius:0;gap:8px;overflow-x:auto;padding:2px 20px 6px 0;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 16px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 16px),transparent)}
 .filterbar .chips .chip{flex:none;border:1px solid var(--line);background:var(--s2);border-radius:999px}
 .filterbar .chips .chip.on{background:var(--active);color:var(--active-ink)}
-.utab,.utab .tab-count{letter-spacing:normal;word-spacing:normal;font-variant-numeric:tabular-nums;font-kerning:none}
+.utab,.utab .tab-count{letter-spacing:normal;word-spacing:normal;font-variant-numeric:normal;font-kerning:none}
 .utab .tab-count{display:inline-block;white-space:nowrap;margin-left:3px;color:var(--t2)}
 .utab.on .tab-count{color:inherit}
 .order-content:empty{display:none}
@@ -477,7 +477,7 @@ html[data-t="light"] #hact .hbtn{background:#111315;color:#fff;border:1px solid 
 html[data-t="light"] .srch,html[data-t="light"] .li,html[data-t="light"] .tt,html[data-t="light"] .tile{background:#fff;border:1px solid #e2e6ee;box-shadow:0 2px 8px rgba(20,25,35,.04)}
 html[data-t="light"] .seg,html[data-t="light"] .utabs{background:#e4e7ee;border:1px solid #cfd5df}
 html[data-t="light"] .seg button.on,html[data-t="light"] .utab.on{background:#fff;color:#111315;box-shadow:0 2px 6px rgba(0,0,0,.08)}
-.utab .tab-count{letter-spacing:0!important;font-feature-settings:"tnum" 1}
+.utab .tab-count{letter-spacing:0!important;font-feature-settings:normal}
 @media(max-width:767px){.tabs{bottom:0;left:0;right:0;border-radius:0;border:0;border-top:1px solid var(--line);padding:6px 8px calc(env(safe-area-inset-bottom,0px)*.55 + 4px)}}
 #sr{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
 #sr>.tots{grid-column:1/-1;margin:0}
@@ -522,7 +522,7 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
 .home-order{display:flex;align-items:center;gap:8px;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;font-size:12px}
 .home-order:last-child{border-bottom:0}.home-order>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .home-order b{white-space:nowrap}.home-order .st{font-size:10px;gap:4px;white-space:nowrap}
-.grp b{letter-spacing:0;word-spacing:normal;font-variant-numeric:tabular-nums}
+.grp b{letter-spacing:0;word-spacing:normal;font-variant-numeric:normal}
 .staff-card{display:flex;align-items:center;gap:12px;width:100%;margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--s1);text-align:left}
 .staff-avatar{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:50%;background:var(--s2);font-weight:600}
 .staff-main{flex:1;min-width:0}.staff-main b{display:block;overflow-wrap:anywhere;font-size:14px;font-weight:500}
@@ -531,7 +531,7 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
 .staff-role{font-size:10px;padding:4px 8px;border-radius:999px;background:var(--s2);color:var(--t2)}
 .staff-role.manager{background:rgba(193,145,40,.16);color:var(--warn)}.staff-role.master{background:rgba(60,150,120,.16);color:var(--ok)}
 
-</style>
+#ol>.card-group,#ol>.grp{grid-column:1/-1}#ol .card-group{margin-top:12px}.order-compact{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;width:100%;text-align:left;color:inherit}.order-compact b{font-size:13px}.order-compact small{display:block;font-size:11px;color:var(--t2)}.compact-total{text-align:right}.compact-total small{color:var(--ok)}.compact-content{grid-column:1/-1;font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style>
 </head>
 <body class="noauth">
 <header class="top">
@@ -820,7 +820,7 @@ const oPaid = o => +o.paid_amount || 0;
 const oDue = o => Math.max(osum(o) - oPaid(o), 0);
 const payTxt = o => { const t = osum(o); if (t <= 0 || o.status === 'canceled') return ''; return oPaid(o) >= t - .005 ? 'оплачен' : oPaid(o) > 0 ? 'долг ' + fmt(oDue(o), 0) + ' ₽' : 'не оплачен'; };
 const orderContents = o => [...(o.items || []).map(p => { const b = p.height_mm ? p : D.boards.find(x=>x.id==p.board_id) || p; return `${b.height_mm ? boardTitle(b) + ' · ' + lenM(b.length_mm) : 'Доски · позиция №' + p.board_id} — ${fmt(p.count,0)} шт${p.volume_m3 != null ? ' · '+fmt(p.volume_m3,3)+' м³' : ''}`; }), ...(o.firewood_items || []).map(p=>`${FW_NAMES[p.kind] || 'Дрова'} — ${fmt(p.volume_m3,3)} м³`)];
-const oRow = o => { const t = osum(o), paid=oPaid(o), contents=orderContents(o); return `<article class="order-card">
+const oRow = o => { const t = osum(o), paid=oPaid(o), contents=orderContents(o); if(o.status==='completed' && oDue(o)<=.005) return `<button class="order-card order-compact" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(o.id)} · ${esc(sdate(o.created_at))}</b><small>${esc(D.con[o.contractor_id]||'Клиент №'+o.contractor_id)}</small></span><span class="compact-total"><b>${fmt(t,0)} ₽</b><small>✓ Оплачен</small></span><span class="compact-content">${esc(contents.join('; '))}</span></button>`; return `<article class="order-card">
 <button class="order-head" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(o.id)}</b><small>${esc(D.con[o.contractor_id] || 'Клиент №'+o.contractor_id)}</small></span>${stl(o.status)}</button>
 ${contents.length ? `<div class="order-content">${contents.map(x=>`<span>${esc(x)}</span>`).join('')}</div>` : ''}
 <div class="payment-summary"><span>Оплачено <b>${fmt(paid,0)} ₽</b></span><span>${o.status==='canceled' ? 'Отменён' : 'Долг '+fmt(oDue(o),0)+' ₽'}</span></div>
@@ -1004,7 +1004,7 @@ async function vOrders(fetchNew = true) {
   const c = {all: D.orders.length, open: D.orders.filter(isOpen).length, done: D.orders.filter(o => !isOpen(o)).length, debt: new Set(D.debts.map(d => d.contractor_id)).size};
   v.innerHTML = `<div class="filterbar"><div class="srch">${ic('search')}<input id="oq" placeholder="Поиск по №, клиенту" aria-label="Поиск" value="${esc(S.oq)}"></div>
     <div class="utabs">${[['all', 'Все'], ['open', 'Активные'], ['done', 'Завершённые'], ['debt', 'Долги']].map(([k, l]) => `<button class="utab ${S.of === k ? 'on' : ''}" data-a="of" data-v="${k}">${l} <span class="tab-count">${c[k]}</span></button>`).join('')}</div>
-    </div><div id="osum"></div><div id="ol"></div>`;
+    </div><div id="donefilters"></div><div id="osum"></div><div id="ol"></div>`;
   orderList();
 }
 function debtList() {
@@ -1016,12 +1016,16 @@ function debtList() {
   $('#ol').innerHTML = rows.length ? rows.map(r => li(esc(r.name), `${r.n} ${pl(r.n, ['заказ', 'заказа', 'заказов'])}`, `${fmt(r.due, 0)} ₽`, '', {a: 'debtc', d: r.id})).join('') : none('Долгов нет', 'Все завершённые заказы оплачены');
 }
 function orderList() {
-  if (S.of === 'debt') { debtList(); return; }
-  const q = S.oq.toLowerCase();
-  const l = D.orders.filter(o => (S.of === 'all' || (S.of === 'open') === isOpen(o)) && (!q || `${o.id} ${D.con[o.contractor_id] || ''}`.toLowerCase().includes(q)));
-  const t = tot(l, osum);
-  $('#osum').innerHTML = l.length ? tots([['Заказов', fmt(l.length, 0)], ['Активных', fmt(l.filter(isOpen).length, 0)], ['Сумма, ₽', fmtR(t)]]) : '';
-  $('#ol').innerHTML = l.length ? l.map(oRow).join('') : none('Заказов нет');
+  if(S.of==='debt'){ $('#donefilters').innerHTML='';debtList();return; }
+  $('#donefilters').innerHTML=S.of==='done'?`<div class="chips">${[['all','Все завершённые'],['due','С долгом'],['paid','Оплаченные']].map(([k,l])=>`<button class="chip ${(S.donefilter||'all')===k?'on':''}" data-a="donefilter" data-v="${k}">${l}</button>`).join('')}</div>`:'';
+  const q=S.oq.toLowerCase();
+  const l=D.orders.filter(o=>(S.of==='all'||(S.of==='open')===isOpen(o))&&(!q||`${o.id} ${D.con[o.contractor_id]||''}`.toLowerCase().includes(q))&&(S.of!=='done'||!S.donefilter||S.donefilter==='all'||(S.donefilter==='due'?o.status==='completed'&&oDue(o)>.005:o.status==='completed'&&oDue(o)<=.005))).sort((a,b)=>(new Date(b.created_at)-new Date(a.created_at))||b.id-a.id);
+  $('#osum').innerHTML=tots([['Заказов',l.length],['Активных',l.filter(isOpen).length],['Сумма, ₽',fmtR(tot(l,osum))]]);
+  const section=(title,rows)=>rows.length?grp(title,fmtR(tot(rows,osum))+' ₽',rows.map(oRow).join('')):'';
+  const months=rows=>{const g=new Map();rows.forEach(o=>{const key=dayKey(o.created_at).slice(0,7);if(!g.has(key))g.set(key,[]);g.get(key).push(o);});return [...g].map(([k,a])=>section(k?new Date(k+'-01T00:00:00').toLocaleDateString('ru-RU',{month:'long',year:'numeric'}):'Без даты',a)).join('');};
+  $('#ol').innerHTML=!l.length?none('Заказов нет'):S.of==='all'?
+    section('В работе / Активные',l.filter(isOpen))+section('Неоплаченные (с долгом)',l.filter(o=>o.status==='completed'&&oDue(o)>.005))+ (l.some(o=>o.status==='completed'&&oDue(o)<=.005)?'<h2 class="grp">Архив (завершённые и оплаченные)</h2>'+months(l.filter(o=>o.status==='completed'&&oDue(o)<=.005)):'')+section('Отменённые',l.filter(o=>o.status==='canceled')):
+    S.of==='done'?months(l):l.map(oRow).join('');
 }
 async function doComplete(id, btn) {
   btn.disabled = true; btn.classList.add('busy');
@@ -1504,6 +1508,7 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
   jt: v => { S.jt = v; vJournal(); },
   wt: v => { S.wt = v; S.wsp = ''; vStock(false); },
   sp: v => { S.wsp = v; vStock(false); },
+  donefilter: v => {S.donefilter=v;orderList();},
   of: v => { S.of = v; vOrders(false); },
   range: v => { S.range = v; vStats(); },
   boardgroup: key => {
