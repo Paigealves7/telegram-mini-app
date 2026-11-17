@@ -531,7 +531,44 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
 .staff-role{font-size:10px;padding:4px 8px;border-radius:999px;background:var(--s2);color:var(--t2)}
 .staff-role.manager{background:rgba(193,145,40,.16);color:var(--warn)}.staff-role.master{background:rgba(60,150,120,.16);color:var(--ok)}
 
-#ol>.card-group,#ol>.grp{grid-column:1/-1}#ol .card-group{margin-top:12px}.order-compact{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;width:100%;text-align:left;color:inherit}.order-compact b{font-size:13px}.order-compact small{display:block;font-size:11px;color:var(--t2)}.compact-total{text-align:right}.compact-total small{color:var(--ok)}.compact-content{grid-column:1/-1;font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style>
+#ol>.card-group,#ol>.grp{grid-column:1/-1}#ol .card-group{margin-top:12px}.order-compact{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;width:100%;text-align:left;color:inherit}.order-compact b{font-size:13px}.order-compact small{display:block;font-size:11px;color:var(--t2)}.compact-total{text-align:right}.compact-total small{color:var(--ok)}.compact-content{grid-column:1/-1;font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Desktop: рабочая сетка и инспектор только при открытом содержимом. */
+@media(min-width:1024px){
+ :root{--inspector:400px;--scroll-thumb:rgba(255,255,255,.14)}
+ html[data-t="light"]{--scroll-thumb:rgba(30,40,55,.25)}
+ body:not(.noauth){grid-template-columns:240px minmax(0,1fr) 0px;transition:grid-template-columns .22s var(--ease)}
+ body:not(.noauth):has(#sheet.on){grid-template-columns:240px minmax(0,1fr) var(--inspector)}
+ #sheet{overflow:hidden;border-left:0;visibility:hidden;pointer-events:none;transition:visibility .22s}
+ #sheet.on{visibility:visible;pointer-events:auto;border-left:1px solid var(--line)}
+ #sheet:not(.on) .panel{visibility:hidden}
+ #sheet .inspector-empty{display:none!important}
+ body[data-view="home"] .quickbar,body[data-view="home"] .qa{display:none}
+ body[data-view="home"] .home-grid{display:block}
+ body[data-view="home"] .home-feed{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+ #tdy .tiles{grid-template-columns:repeat(3,minmax(0,200px));justify-content:start}
+ #tdy .tile{min-height:76px}#tdy{padding:14px}
+ #sl{display:block}
+ #sl>.card-group{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px}
+ #sl .card-group>.grp{grid-column:1/-1}
+ #sl .card-group>.li{margin:0}
+ #ol{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:14px}
+ #ol>.card-group,#jl>.card-group{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:14px}
+ #ol>.card-group>.grp,#jl>.card-group>.grp{grid-column:1/-1}
+ #jl .card-group>.li{margin:0}
+ .order-actions{justify-content:flex-end}
+ .order-actions button{flex:0 0 auto;width:auto;min-height:36px;height:36px;padding:0 16px;font-size:13px}
+ body[data-view="profile"] #view{width:100%;max-width:640px;justify-self:center}
+ .profile-logout{width:auto;min-width:180px}
+ .side-profile.on{background:var(--s3);border-radius:12px;box-shadow:0 0 0 6px var(--s3)}
+ body[data-view="stats"] #view{width:100%;max-width:1320px;justify-self:center}
+ .sel select{padding-right:40px!important;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+ body,#view,.panel{scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) transparent}
+ body::-webkit-scrollbar,#view::-webkit-scrollbar,.panel::-webkit-scrollbar{width:6px;height:6px}
+ body::-webkit-scrollbar-track,#view::-webkit-scrollbar-track,.panel::-webkit-scrollbar-track{background:transparent}
+ body::-webkit-scrollbar-thumb,#view::-webkit-scrollbar-thumb,.panel::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:999px}
+}
+
+</style>
 </head>
 <body class="noauth">
 <header class="top">
@@ -783,6 +820,7 @@ function show(v, p) {
   document.body.classList.toggle('sub', sub);
   $('#title').textContent = f ? f.t : v === 'home' ? 'Лесопилка' : TT[v] || 'Лесопилка';
   setAct(v);
+  const profileButton=$('.side-profile'); if(profileButton){profileButton.classList.toggle('on',v==='profile');v==='profile'?profileButton.setAttribute('aria-current','page'):profileButton.removeAttribute('aria-current');}
   $$('.tab').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
   try { sub ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {}
   scrollTo(0, 0); $('#view').scrollTop=0;
