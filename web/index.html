@@ -398,7 +398,8 @@ body[data-view="home"] #view{display:block}
 .resource-grid{display:grid;gap:10px}.resource-grid .srow{margin:0;border-radius:14px}.resource-grid small{font-size:12px}
 .who{display:grid;grid-template-columns:56px 1fr;gap:2px 14px;text-align:left;align-items:center;padding:8px 0 20px}
 .who .avatar{grid-row:span 2;width:56px;height:56px;font-size:24px;margin:0}.who h2{font-size:20px}
-.inspector-heading{display:flex;align-items:center;justify-content:space-between;color:var(--t2);font-size:12px;margin-bottom:18px}
+.inspector-heading{display:none;align-items:center;justify-content:space-between;color:var(--t2);font-size:12px;margin-bottom:18px}
+@media(min-width:768px){#sheet .inspector-heading{display:flex}#sheet .grab{display:none}}
 .inspector-heading button{display:grid;place-items:center;width:36px;height:36px;font-size:24px;border:1px solid var(--line);border-radius:10px;background:var(--s2)}
 .inspector-empty{display:none}.sheet:not(.on) #sb{display:none}
 .stats-filter .dates{margin:0;gap:8px;flex:1 1 260px}.stats-filter .dates input{height:40px;padding:0 10px;font-size:12px;border-radius:10px}.stats-filter .dates label{font-size:10px;margin:0}
@@ -1774,16 +1775,18 @@ const ACT = {
     if (!canSuper()) return;
     sheet(`<h3>Очистить тестовые данные</h3>
       <p class="mut">Все заказы, оплаты, продажи, приходы, распилы и корректировки будут удалены. Остатки обнулятся, нумерация заказов начнётся с №1.</p>
-      <div class="fld"><label for="reset-word">Для подтверждения введите СБРОС</label><input id="reset-word" autocomplete="off"></div>
+      <div class="fld"><label for="reset-word">Для подтверждения введите СБРОС</label><input id="reset-word" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false"></div>
       <button class="btn ghost admin-delete" data-a="resetdataok">Очистить данные</button>`);
   },
   resetdataok: async (_, button) => {
     if (!canSuper()) return;
-    const input = $('#reset-word');
-    if (input.value !== 'СБРОС') { input.focus(); toast('Для подтверждения введите СБРОС', 'err'); return; }
+    const input = $('#sheet.on #sb input#reset-word');
+    if (!input) return;
+    const confirm = input.value.trim().toUpperCase().replace(/C/g,'С').replace(/B/g,'Б').replace(/P/g,'Р').replace(/O/g,'О');
+    if (confirm !== 'СБРОС') { input.focus(); toast('Для подтверждения введите СБРОС', 'err'); return; }
     button.disabled = true;
     try {
-      await api('/admin/reset-test-data', {method:'POST', body:JSON.stringify({confirm:input.value})});
+      await api('/admin/reset-test-data', {method:'POST', body:JSON.stringify({confirm})});
       if (button.isConnected) go('home');
       notify('success'); toast('Тестовые данные очищены');
     } catch (e) { notify('error'); toast(e.message, 'err'); }

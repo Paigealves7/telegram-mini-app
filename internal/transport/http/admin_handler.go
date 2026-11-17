@@ -20,11 +20,14 @@ type AdminHandler struct {
 	repo *repository.Repository
 }
 
+var resetConfirmationLetters = strings.NewReplacer("C", "С", "B", "Б", "P", "Р", "O", "О")
+
 func (h AdminHandler) ResetTestData(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Confirm string `json:"confirm"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Confirm != "СБРОС" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
+		resetConfirmationLetters.Replace(strings.ToUpper(strings.TrimSpace(req.Confirm))) != "СБРОС" {
 		http.Error(w, "для подтверждения введите СБРОС", http.StatusBadRequest)
 		return
 	}
