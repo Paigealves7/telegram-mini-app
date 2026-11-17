@@ -20,6 +20,17 @@ type AdminHandler struct {
 	repo *repository.Repository
 }
 
+func (h AdminHandler) ResetTestData(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Confirm string `json:"confirm"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Confirm != "СБРОС" {
+		http.Error(w, "для подтверждения введите СБРОС", http.StatusBadRequest)
+		return
+	}
+	adminResult(w, r, "не удалось очистить тестовые данные", h.repo.ResetTestData(r.Context()))
+}
+
 func adminID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {

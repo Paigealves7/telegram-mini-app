@@ -22,6 +22,7 @@ const (
 	RoleManager Role = "manager"
 	RoleMaster  Role = "master"
 	RoleWorker  Role = "worker"
+	RolePending Role = "pending"
 )
 
 type User struct {

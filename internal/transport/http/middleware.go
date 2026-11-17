@@ -95,6 +95,10 @@ func RequireRoles(allowedRoles ...domain.Role) func(http.Handler) http.Handler {
 			}
 
 			userRole := domain.Role(claims.Role)
+			if userRole == domain.RolePending {
+				http.Error(w, "доступ ожидает подтверждения руководителем", http.StatusForbidden)
+				return
+			}
 			isAllowed := claims.IsSuperAdmin
 
 			for _, role := range allowedRoles {

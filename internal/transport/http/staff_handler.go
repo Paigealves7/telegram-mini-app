@@ -77,7 +77,7 @@ func (h *StaffHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
 		return
 	}
-	if req.Role != domain.RoleManager && req.Role != domain.RoleMaster && req.Role != domain.RoleWorker {
+	if req.Role != domain.RoleManager && req.Role != domain.RoleMaster && req.Role != domain.RoleWorker && req.Role != domain.RolePending {
 		http.Error(w, "неизвестная роль", http.StatusBadRequest)
 		return
 	}

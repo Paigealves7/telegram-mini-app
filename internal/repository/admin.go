@@ -15,6 +15,15 @@ var (
 	ErrOrderSaleLink  = errors.New("для завершённого заказа не удалось однозначно определить связанную продажу")
 )
 
+func (r *Repository) ResetTestData(ctx context.Context) error {
+	// Один TRUNCATE атомарно очищает операции и сбрасывает их последовательности.
+	_, err := r.db.Exec(ctx, `TRUNCATE TABLE order_payments, order_boards, order_firewood, orders,
+		sale_boards, sales, sawed_logs, boards, sawing_operations, log_items, log_arrivals,
+		firewood_processing, firewood_arrivals, stock_adjustments, firewood_stock_adjustments
+		RESTART IDENTITY CASCADE`)
+	return err
+}
+
 func (r *Repository) DeleteOrder(ctx context.Context, id int64) error {
 	return pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
 		var status domain.OrderStatus

@@ -69,7 +69,11 @@ func (h *TelegramAuthHandler) LoginViaTelegram(w http.ResponseWriter, r *http.Re
 
 	user, err := h.repo.GetUserByUsername(r.Context(), username)
 	if err != nil {
-		created, createErr := h.repo.CreateUser(r.Context(), username, tgPasswordMarker, domain.RoleWorker)
+		role := domain.RolePending
+		if (domain.User{Username: username}).IsSuperAdmin() {
+			role = domain.RoleManager
+		}
+		created, createErr := h.repo.CreateUser(r.Context(), username, tgPasswordMarker, role)
 		if errors.Is(createErr, repository.ErrDeletedUser) {
 			http.Error(w, createErr.Error(), http.StatusForbidden)
 			return

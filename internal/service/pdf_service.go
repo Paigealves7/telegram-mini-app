@@ -24,8 +24,9 @@ var ErrPDFFonts = errors.New("шрифты для PDF не найдены на �
 
 // OrderPDF — готовый документ.
 type OrderPDF struct {
-	Data     []byte
-	Filename string
+	Data           []byte
+	Filename       string
+	OrderCreatedAt time.Time
 }
 
 func PDFFileName(orderID int64) string      { return fmt.Sprintf("Накладная_%d.pdf", orderID) }
@@ -183,7 +184,7 @@ func (s *PDFService) BuildOrderPDF(ctx context.Context, orderID int64) (*OrderPD
 	if err != nil {
 		return nil, &PDFError{Stage: "вёрстка", Err: err}
 	}
-	return &OrderPDF{Data: data, Filename: PDFFileName(orderID)}, nil
+	return &OrderPDF{Data: data, Filename: PDFFileName(orderID), OrderCreatedAt: order.CreatedAt}, nil
 }
 
 const (

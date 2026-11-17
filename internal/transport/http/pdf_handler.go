@@ -117,12 +117,13 @@ func (h *OrderHandler) PDFLink(w http.ResponseWriter, r *http.Request) {
 	}
 	// Сначала реально собираем накладную: если не получилось, ссылку не выдаём.
 	// Иначе Telegram «скачает» текст ошибки под видом файла .pdf, который потом не открыть.
-	if _, err := h.pdfService.BuildOrderPDF(r.Context(), id); err != nil {
+	doc, err := h.pdfService.BuildOrderPDF(r.Context(), id)
+	if err != nil {
 		writePDFError(w, err)
 		return
 	}
 
-	token := h.pdfService.SignLink(id, pdfLinkTTL)
+	token := h.pdfService.SignLink(id, doc.OrderCreatedAt, pdfLinkTTL)
 	link := fmt.Sprintf("%s/files/pdf/%s/%s", publicBaseURL(r), token, service.PDFFileNameASCII(id))
 	pdfWriteJSON(w, http.StatusOK, pdfLinkResponse{
 		DownloadURL: link,
@@ -134,7 +135,7 @@ func (h *OrderHandler) PDFLink(w http.ResponseWriter, r *http.Request) {
 
 // GET|HEAD /files/pdf/{token}/{name} — публичная ссылка; доступ даёт только действующая подпись.
 func (h *OrderHandler) ServePDF(w http.ResponseWriter, r *http.Request) {
-	id, err := h.pdfService.VerifyLink(chi.URLParam(r, "token"))
+	id, createdAt, err := h.pdfService.VerifyLink(chi.URLParam(r, "token"))
 	if err != nil {
 		http.Error(w, "ссылка недействительна или устарела, запросите новую в приложении", http.StatusGone)
 		return
@@ -142,6 +143,13 @@ func (h *OrderHandler) ServePDF(w http.ResponseWriter, r *http.Request) {
 	doc, err := h.pdfService.BuildOrderPDF(r.Context(), id)
 	if err != nil {
 		writePDFError(w, err)
+		return
+	}
+	// После сброса номер может принадлежать другому заказу. Проверяем запись
+	// повторно, чтобы сброс между запросами сборки PDF тоже не раскрыл данные.
+	order, err := h.repo.GetOrderByID(r.Context(), id)
+	if err != nil || doc.OrderCreatedAt.UnixMicro() != createdAt || order.CreatedAt.UnixMicro() != createdAt {
+		http.Error(w, "ссылка недействительна или устарела, запросите новую в приложении", http.StatusGone)
 		return
 	}
 	disposition := "attachment"

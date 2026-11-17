@@ -542,6 +542,7 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
 .staff-end{display:grid;justify-items:end;gap:4px;flex:none}
 .staff-role{font-size:10px;padding:4px 8px;border-radius:999px;background:var(--s2);color:var(--t2)}
 .staff-role.manager{background:rgba(193,145,40,.16);color:var(--warn)}.staff-role.master{background:rgba(60,150,120,.16);color:var(--ok)}
+.staff-role.pending{background:rgba(193,145,40,.24);color:var(--warn);font-weight:700}
 
 #ol>.card-group,#ol>.grp{grid-column:1/-1}#ol .card-group{margin-top:12px}.order-compact{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;width:100%;text-align:left;color:inherit}.order-compact b{font-size:13px}.order-compact small{display:block;font-size:11px;color:var(--t2)}.compact-total{text-align:right}.compact-total small{color:var(--ok)}.compact-content{grid-column:1/-1;font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Desktop: рабочая сетка и инспектор только при открытом содержимом. */
@@ -677,7 +678,8 @@ const sum = (a, k) => a.reduce((s, x) => s + (+x[k] || 0), 0);
 const pad = n => String(n).padStart(2, '0'), ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? 0 : n; };
 const ST = {new: 'Новый', in_progress: 'В работе', completed: 'Завершён', canceled: 'Отменён'};
-const ROLE = {manager: 'Руководитель', master: 'Мастер', worker: 'Сотрудник'};
+const ROLE = {manager: 'Руководитель', master: 'Мастер', worker: 'Сотрудник', pending: 'Ожидает подтверждения'};
+const STAFF_ROLES = ['manager', 'master', 'worker'];
 /* палитра графиков — внутри дизайн-системы: blueprint blue, violet, ice, teal, signal, ember */
 const PAL = ['#b6d9fc', '#8a63f5', '#98c0ef', '#269684', '#027dea', '#e46d4c'];
 const ICP = {
@@ -762,7 +764,7 @@ function perfProbe() {
 
 /* ---------- состояние и утилиты ---------- */
 const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month', cq: ''};
-const canSuper = () => S.isSuperAdmin && !S.previewRole;
+const canSuper = () => S.isSuperAdmin && S.accountRole !== 'pending' && !S.previewRole;
 let CFG = {pdf_send: true}; // настройки с сервера (/config)
 const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}};
 let MEM = {}; try { MEM = JSON.parse(localStorage.getItem('mem') || '{}'); } catch (e) {}
@@ -779,7 +781,8 @@ function toast(m, k = 'ok') { const t = $('#toast'); t.className = k + ' on'; t.
 
 async function api(path, opts = {}) {
   const headers = {'Content-Type': 'application/json', ...(opts.headers || {})};
-  if (token()) headers.Authorization = 'Bearer ' + token();
+  const session = token();
+  if (session) headers.Authorization = 'Bearer ' + session;
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
   let r, text;
   try {
@@ -794,6 +797,11 @@ async function api(path, opts = {}) {
   if (!r.ok) {
     const supplied = data && (data.message || data.error || data.detail);
     const plainMessage = !data && text.trim() ? text.trim() : null;
+    if (r.status === 403 && plainMessage === 'доступ ожидает подтверждения руководителем' &&
+        session && session === token() && S.cur !== 'pending') {
+      S.accountRole = 'pending';
+      vPending();
+    }
     if (r.status === 401 || r.status === 403) throw new Error(supplied || plainMessage || 'Нет доступа. Возможно, нужно войти снова.');
     if (r.status >= 500) throw new Error(supplied || plainMessage || 'На сервере произошла ошибка. Попробуйте позже.');
     throw new Error(supplied || plainMessage || (r.status === 400 ? 'Проверьте введённые данные.' : `Не удалось выполнить запрос (${r.status}).`));
@@ -806,15 +814,18 @@ async function loadConfig() {
   const session = token();
   try {
     const c = await api('/config');
-    if (!c || token() !== session) return;
+    if (!c || token() !== session) return false;
     CFG = {...CFG, ...c};
     if (!Object.hasOwn(ROLE, c.role) || typeof c.is_super_admin !== 'boolean' ||
-        (S.accountRole === c.role && S.isSuperAdmin === c.is_super_admin)) return;
+        (S.accountRole === c.role && S.isSuperAdmin === c.is_super_admin)) return true;
     S.accountRole = c.role; S.isSuperAdmin = c.is_super_admin;
     if (!S.isSuperAdmin) S.previewRole = '';
+    if (c.role === 'pending') { vPending(); return true; }
     S.role = S.previewRole || (S.isSuperAdmin ? 'manager' : S.accountRole);
+    document.body.classList.remove('noauth');
     buildTabs(); go(S.cur === 'profile' ? 'profile' : 'home');
-  } catch (e) { /* необязательная конфигурация: используются значения сессии */ }
+    return true;
+  } catch (e) { return false; }
 }
 async function loadStock() { const [b, l, f] = await Promise.all([safe('/boards'), safe('/logs'), safe('/firewood/stock')]); if (b) D.boards = b; if (l) D.logs = l; if (f) D.fw = f; return !!b && !!l && !!f; }
 async function ensureCon() { if (Object.keys(D.con).length) return true; const list = await safe('/contractors'); if (!list) return false; D.cl = list; list.forEach(c => D.con[c.id] = c.name); return true; }
@@ -1282,10 +1293,11 @@ function vProfile() {
       <div class="profile-setting"><div><b>Экономный режим</b><p class="mut sm">Меньше анимаций</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
     </div>
     ${S.isSuperAdmin ? `<div class="profile-group role-preview"><b>Смотреть интерфейс как</b>
-      <div class="seg">${Object.entries(ROLE).map(([role,label]) => `<button data-a="previewrole" data-v="${role}" class="${S.previewRole === role ? 'on' : ''}" aria-pressed="${S.previewRole === role}">${label}</button>`).join('')}</div>
+      <div class="seg">${STAFF_ROLES.map(role => `<button data-a="previewrole" data-v="${role}" class="${S.previewRole === role ? 'on' : ''}" aria-pressed="${S.previewRole === role}">${ROLE[role]}</button>`).join('')}</div>
       ${S.previewRole ? '<button class="lnk" data-a="previewrole" data-v="">Вернуться в режим супер-админа</button>' : ''}
     </div>` : ''}
     ${S.role === 'manager' ? `<h2 class="profile-heading">Управление</h2><div class="profile-group">${[['staff','user','Сотрудники'],['cons','box','Контрагенты'],['adjlog','box','Корректировки склада'],['stats','chart','Отчёты']].map(([v,i,t])=>`<button class="profile-link" data-a="go" data-v="${v}"><span class="profile-icon">${ic(i)}</span><b>${t}</b>${ic('chev')}</button>`).join('')}</div>` : ''}
+    ${canSuper() ? '<button class="btn ghost admin-delete profile-logout" data-a="resetdata">Очистить тестовые данные (Сброс склада и заказов)</button>' : ''}
     ${inTg ? '' : '<button class="btn ghost profile-logout" data-a="logout">Выйти</button>'}`;
 }
 /* ---------- корректировки склада (только руководитель) ---------- */
@@ -1334,8 +1346,20 @@ async function vStaff() {
 }
 function staffList(){
   const q=(S.staffq||'').trim().toLowerCase();
-  const list=(D.staff||[]).filter(u=>[staffName(u),u.tg_username,u.username,ROLE[u.role]].join(' ').toLowerCase().includes(q));
-  $('#stafflist').innerHTML=grp('Сотрудники',list.length,list.map(u=>`<button class="staff-card" data-a="staff" data-v="${esc(u.id)}"><span class="staff-avatar">${esc(Array.from(staffBaseName(u).replace(/^@/,''))[0]?.toUpperCase()||'?')}</span><span class="staff-main"><b>${esc(staffName(u))}</b><small>${esc(staffSub(u))}</small></span><span class="staff-end"><span class="staff-role ${['manager','master','worker'].includes(u.role)?u.role:'worker'}">${esc(canSuper() && u.is_super_admin ? 'Супер-Админ' : ROLE[u.role]||u.role)}</span><small>${esc(sdate(u.created_at))}</small></span></button>`).join('')||none('Сотрудники не найдены'));
+  const list=(D.staff||[]).filter(u=>[staffName(u),u.tg_username,u.username,ROLE[u.role]].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>Number(b.role==='pending')-Number(a.role==='pending'));
+  $('#stafflist').innerHTML=grp('Сотрудники',list.length,list.map(u=>`<button class="staff-card" data-a="staff" data-v="${esc(u.id)}"><span class="staff-avatar">${esc(Array.from(staffBaseName(u).replace(/^@/,''))[0]?.toUpperCase()||'?')}</span><span class="staff-main"><b>${esc(staffName(u))}</b><small>${esc(staffSub(u))}</small></span><span class="staff-end"><span class="staff-role ${Object.hasOwn(ROLE,u.role)?u.role:'worker'}">${esc(u.role === 'pending' ? 'Ожидает доступа' : canSuper() && u.is_super_admin ? 'Супер-Админ' : ROLE[u.role]||u.role)}</span><small>${esc(sdate(u.created_at))}</small></span></button>`).join('')||none('Сотрудники не найдены'));
+}
+function vPending() {
+  closeSheet();
+  S.cur = 'pending'; S.role = 'pending'; S.previewRole = '';
+  document.body.classList.add('noauth');
+  $('#tabs').replaceChildren();
+  try { tg.BackButton.hide(); } catch (e) {}
+  $('#view').innerHTML = `<section class="login"><div class="logo">${ic('lock')}</div>
+    <h1>Доступ ожидает подтверждения</h1>
+    <p class="sub">Ваша учётная запись зарегистрирована (ID: ${esc(jwt()?.user_id || '—')}). Попросите руководителя подтвердить ваш доступ в разделе «Сотрудники».</p>
+    <button class="btn" data-a="checkaccess">Проверить доступ</button></section>`;
 }
 function vLogin(msg) {
   document.body.classList.add('noauth'); S.cur = 'login';
@@ -1363,6 +1387,7 @@ function finish(tkn, name) {
   const account = jwt() || {};
   S.accountRole = account.role || 'worker'; S.isSuperAdmin = account.is_super_admin === true; S.previewRole = '';
   S.role = S.isSuperAdmin ? 'manager' : S.accountRole; S.name = name || localStorage.getItem('uname') || 'Сотрудник';
+  if (S.accountRole === 'pending') { vPending(); loadConfig(); return; }
   document.body.classList.remove('noauth'); buildTabs(); loadConfig(); go('home'); perfProbe();
 }
 async function tgAuth() {
@@ -1732,9 +1757,37 @@ const ACT = {
  fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){toast(e.message,'err')}},
   theme: toggleTheme,
   previewrole: role => {
-    if (!S.isSuperAdmin || (role && !Object.hasOwn(ROLE, role))) return;
+    if (!S.isSuperAdmin || (role && !STAFF_ROLES.includes(role))) return;
     S.previewRole = role; S.role = role || 'manager'; S.tab = 'home'; S.stack = [];
     buildTabs(); show('profile');
+  },
+  checkaccess: async (_, button) => {
+    button.disabled = true;
+    if (inTg) await tgAuth();
+    else if (!await loadConfig()) {
+      if ((jwt()?.exp || 0) * 1000 <= Date.now()) vLogin();
+      else toast('Не удалось проверить доступ. Повторите попытку.', 'err');
+    } else if (S.cur === 'pending') toast('Доступ ещё ожидает подтверждения');
+    button.disabled = false;
+  },
+  resetdata: () => {
+    if (!canSuper()) return;
+    sheet(`<h3>Очистить тестовые данные</h3>
+      <p class="mut">Все заказы, оплаты, продажи, приходы, распилы и корректировки будут удалены. Остатки обнулятся, нумерация заказов начнётся с №1.</p>
+      <div class="fld"><label for="reset-word">Для подтверждения введите СБРОС</label><input id="reset-word" autocomplete="off"></div>
+      <button class="btn ghost admin-delete" data-a="resetdataok">Очистить данные</button>`);
+  },
+  resetdataok: async (_, button) => {
+    if (!canSuper()) return;
+    const input = $('#reset-word');
+    if (input.value !== 'СБРОС') { input.focus(); toast('Для подтверждения введите СБРОС', 'err'); return; }
+    button.disabled = true;
+    try {
+      await api('/admin/reset-test-data', {method:'POST', body:JSON.stringify({confirm:input.value})});
+      if (button.isConnected) go('home');
+      notify('success'); toast('Тестовые данные очищены');
+    } catch (e) { notify('error'); toast(e.message, 'err'); }
+    finally { button.disabled = false; }
   },
   homekpi: v => { if(['boards','logs','firewood'].includes(v)){S.wt=v;S.wq='';S.wsp='';go('stock');}else{if(v==='orders'){S.of='open';S.oq='';}go(v);} },
   go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK, formParams),
@@ -1869,8 +1922,8 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
   staff: v => {
     const u = (D.staff || []).find(x => x.id == v); if (!u) return;
     const self = u.id == uid(), protectedAccount = u.is_super_admin && !canSuper();
-    const roles = self || protectedAccount ? [] : canSuper() ? Object.keys(ROLE) : u.role === 'manager' ? [] : ['master','worker'];
-    const btns = roles.filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">Назначить: ${esc(ROLE[r])}</button>`).join('') +
+    const roles = self || protectedAccount ? [] : canSuper() ? Object.keys(ROLE) : u.role === 'manager' ? [] : ['master','worker','pending'];
+    const btns = roles.filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">${r === 'pending' ? 'Заблокировать доступ' : 'Назначить: ' + esc(ROLE[r])}</button>`).join('') +
       (u.kind === 'password' && !protectedAccount ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '') +
       (self ? '' : deleteButton('staff', u.id, 'Удалить сотрудника'));
     sheet(`<h3>${esc(staffName(u))}</h3>
@@ -1879,13 +1932,16 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
       <div class="dl"><span class="mut">Роль</span><b>${esc(ROLE[u.role] || u.role)}${canSuper() && u.is_super_admin ? ' · Супер-Админ' : ''}</b></div>
       ${btns ? `<div class="stackb">${btns}</div>` : ''}`);
   },
-  srole: v => {
+  srole: async (v, button) => {
     const [id, role] = v.split(':'), u = D.staff.find(x => x.id == id); if (!u) return;
-    ask('user', 'Изменить роль', `${staffName(u)}: ${ROLE[role]}`, 'Изменить').then(async ok => {
-      if (!ok) return;
-      try { await api(`/users/${id}/role`, {method: 'PUT', body: JSON.stringify({role})}); notify('success'); toast('Роль изменена'); vStaff(); }
-      catch (e) { notify('error'); toast(e.message, 'err'); }
-    });
+    if (u.role !== 'pending' && !await ask('user', 'Изменить роль', `${staffName(u)}: ${ROLE[role]}`, 'Изменить')) return;
+    button.disabled = true;
+    try {
+      await api(`/users/${id}/role`, {method: 'PUT', body: JSON.stringify({role})});
+      if (S.cur === 'staff') { closeSheet(); vStaff(); }
+      notify('success'); toast('Роль изменена');
+    } catch (e) { notify('error'); toast(e.message, 'err'); }
+    finally { button.disabled = false; }
   },
   spw: v => {
     const u = D.staff.find(x => x.id == v); if (!u) return;
