@@ -450,6 +450,26 @@ body.noauth #sheet{display:none}
 @media(min-width:1440px){#sr{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}#sr>.rev{grid-column:1/-1}#sr>.workspace-card{margin-top:0!important}:root{--inspector:380px}.resource-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#ol{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @keyframes inspector-in{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
 
+
+/* Уточнения мобильного UX после проверки в Telegram на iPhone. */
+#hact .hbtn{width:auto;min-width:0;height:40px;padding:0 12px;border-radius:999px;gap:5px}
+#hact .hbtn span{display:inline;font-size:12px;white-space:nowrap}
+#hact:empty{display:none}
+.metric{min-height:82px;padding:10px;gap:3px}
+.metric small{margin-top:0}
+.metrics{gap:8px;margin-bottom:14px}
+.quick-btn{background:var(--s2)}
+.quick-btn svg{color:var(--t2)}
+.filterbar .chips{flex:1 1 100%;width:100%;max-width:none;min-width:0;border:0;background:none;border-radius:0;gap:8px;overflow-x:auto;padding:2px 20px 6px 0;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 16px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 16px),transparent)}
+.filterbar .chips .chip{flex:none;border:1px solid var(--line);background:var(--s2);border-radius:999px}
+.filterbar .chips .chip.on{background:var(--active);color:var(--active-ink)}
+.utab,.utab .tab-count{letter-spacing:normal;word-spacing:normal;font-variant-numeric:tabular-nums;font-kerning:none}
+.utab .tab-count{display:inline-block;white-space:nowrap;margin-left:3px;color:var(--t2)}
+.utab.on .tab-count{color:inherit}
+.order-content:empty{display:none}
+@media(min-width:1024px){.metric{min-height:76px;padding:9px 10px}}
+@media(max-width:359px){.top:has(#hact .hbtn){gap:4px}#hact .hbtn{padding:0 9px}#hact .hbtn span{font-size:11px}}
+
 </style>
 </head>
 <body class="noauth">
@@ -671,9 +691,9 @@ const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-lab
 function setAct(v) {
   const actions = v === 'orders' ? hbtn('order', 'Доски') + hbtn('fworder', 'Дрова')
     : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
-  $('#hact').innerHTML = '<button class="rbtn" data-a="theme" aria-label="Сменить тему"></button>' +
+  $('#hact').innerHTML = (v === 'home' ? '<button class="rbtn" data-a="theme" aria-label="Сменить тему"></button>' +
     (S.role === 'manager' ? '<button class="rbtn" data-a="go" data-v="stats" aria-label="Отчёты" title="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
-    '<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль" title="Профиль">' + esc((S.name || '?')[0].toUpperCase()) + '</button>' + actions;
+    '<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль" title="Профиль">' + esc((S.name || '?')[0].toUpperCase()) + '</button>' : '') + actions;
   theme();
 }
 function go(v, p) {
@@ -739,7 +759,7 @@ const payTxt = o => { const t = osum(o); if (t <= 0 || o.status === 'canceled') 
 const orderContents = o => [...(o.items || []).map(p => { const b = D.boards.find(x=>x.id==p.board_id) || p; return `${b.height_mm ? boardTitle(b) + ' · ' + lenM(b.length_mm) : 'Доски · позиция №' + p.board_id} — ${fmt(p.count,0)} шт`; }), ...(o.firewood_items || []).map(p=>`${FW_NAMES[p.kind] || 'Дрова'} — ${fmt(p.volume_m3,3)} м³`)];
 const oRow = o => { const t = osum(o), paid=oPaid(o), contents=orderContents(o); return `<article class="order-card">
 <button class="order-head" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(o.id)}</b><small>${esc(D.con[o.contractor_id] || 'Клиент №'+o.contractor_id)}</small></span>${stl(o.status)}</button>
-<div class="order-content">${contents.length ? contents.map(x=>`<span>${esc(x)}</span>`).join('') : '<span class="mut">Состав не указан</span>'}</div>
+${contents.length ? `<div class="order-content">${contents.map(x=>`<span>${esc(x)}</span>`).join('')}</div>` : ''}
 <div class="payment-summary"><span>Оплачено <b>${fmt(paid,0)} ₽</b></span><span>${o.status==='canceled' ? 'Отменён' : 'Долг '+fmt(oDue(o),0)+' ₽'}</span></div>
 <div class="bar"><i style="--w:${t>0 ? Math.min(100,paid/t*100) : 0}%"></i></div>
 <div class="order-meta"><span>${esc(odate(o,{day:'numeric',month:'short'}))}</span><b>${fmt(t,0)} ₽</b></div>
@@ -768,7 +788,7 @@ const sQ = (a, b) => `/statistics?start_date=${encodeURIComponent(a)}&end_date=$
 /* Шкала индикатора: сколько м³ соответствует 100% дуги. null = подбирается автоматически. */
 
 const quickActions = () => [canOrd() && ['arrival','Приход леса','arrival'], canOrd() && ['fwarr','Дрова','box'], S.role !== 'master' && ['sawing','Распил','sawing'], canOrd() && ['order','Заказ','order'], !canOrd() && ['fwproc','Переработка дров','box']].filter(Boolean);
-const quickBar = () => quickActions().map(([k,l,i]) => `<button class="quick-btn" data-a="new" data-v="${k}">${ic('plus')}<span>${l}</span></button>`).join('');
+const quickBar = () => quickActions().map(([k,l,i]) => `<button class="quick-btn" data-a="new" data-v="${k}">${ic(i)}<span>${l}</span></button>`).join('');
 async function vHome() {
   const v = $('#view');
   v.innerHTML = `<div class="quickbar">${quickBar()}</div><div id="hd">${sk(4)}</div>`;
@@ -910,7 +930,7 @@ function stockList() {
   const row = x => {
     const low = t === 'boards' && (+x.count || 0) <= LOW_STOCK_PCS, d = sdate(x.created_at || x.updated_at);
     return li((t === 'boards' ? esc(boardTitle(x)) : `Бревно Ø${esc(x.diameter_mm)}`),
-      esc([lenM(x.length_mm), t === 'boards' ? (x.grade ? 'сорт ' + x.grade : '') : 'партия №' + x.arrival_id, d].filter(Boolean).join(' · ')),
+      esc([lenM(x.length_mm), t === 'boards' ? [x.grade ? 'сорт ' + x.grade : '', 'Позиция №' + x.id].filter(Boolean).join(' · ') : 'партия №' + x.arrival_id, d].filter(Boolean).join(' · ')),
       `${fmt(x.volume_m3, 3)} м³`, `${fmt(x.count, 0)} шт`, {a: 'item', d: `${t}:${x.id}`, lines: low ? lowTag('Мало на складе') : ''});
   };
   $('#sl').innerHTML = list.length ? Object.entries(g).sort((a, b) => sum(b[1], 'volume_m3') - sum(a[1], 'volume_m3')).map(([n, a]) =>
@@ -924,7 +944,7 @@ async function vOrders(fetchNew = true) {
   if (fetchNew) { v.innerHTML = sk(4); const [o, , dbt] = await Promise.all([safe('/orders'), ensureCon(), canOrd() ? safe('/debts') : null, loadStock()]); if (S.cur !== 'orders') return; if (!o) { v.innerHTML = fail('Не удалось загрузить заказы', 'orders'); return; } D.orders = o; D.debts = dbt || []; }
   const c = {all: D.orders.length, open: D.orders.filter(isOpen).length, done: D.orders.filter(o => !isOpen(o)).length, debt: new Set(D.debts.map(d => d.contractor_id)).size};
   v.innerHTML = `<div class="filterbar"><div class="srch">${ic('search')}<input id="oq" placeholder="Поиск по №, клиенту" aria-label="Поиск" value="${esc(S.oq)}"></div>
-    <div class="utabs">${[['all', 'Все'], ['open', 'Активные'], ['done', 'Завершённые'], ['debt', 'Долги']].map(([k, l]) => `<button class="utab ${S.of === k ? 'on' : ''}" data-a="of" data-v="${k}">${l} <span class="mut">${c[k]}</span></button>`).join('')}</div>
+    <div class="utabs">${[['all', 'Все'], ['open', 'Активные'], ['done', 'Завершённые'], ['debt', 'Долги']].map(([k, l]) => `<button class="utab ${S.of === k ? 'on' : ''}" data-a="of" data-v="${k}">${l} <span class="tab-count">${c[k]}</span></button>`).join('')}</div>
     </div><div id="osum"></div><div id="ol"></div>`;
   orderList();
 }
@@ -1403,7 +1423,7 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
   item: v => {
     const [t, id] = v.split(':'), x = find(t, id); if (!x) return;
     sheet(`<h3>${t === 'boards' ? esc(boardTitle(x)) : `Бревно Ø${esc(x.diameter_mm)}`}</h3>
-      <div class="dl"><span class="hint">Порода</span><b>${esc(x.species || 'не указана')}</b></div>
+      <div class="dl"><span class="hint">Позиция склада</span><b>№${esc(x.id)}</b></div><div class="dl"><span class="hint">Порода</span><b>${esc(x.species || 'не указана')}</b></div>
       <div class="dl"><span class="hint">Длина</span><b>${lenM(x.length_mm)}</b></div>
       ${t === 'boards' ? `<div class="dl"><span class="hint">Сорт</span><b>${esc(x.grade || '1')}</b></div>` : `<div class="dl"><span class="hint">Партия прихода</span><b>№${esc(x.arrival_id)}</b></div>`}
       <div class="dl"><span class="hint">Остаток</span><b>${esc(x.count)} шт${t === 'boards' && (+x.count || 0) <= LOW_STOCK_PCS ? ' · мало на складе' : ''}</b></div>
