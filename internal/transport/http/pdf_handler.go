@@ -172,7 +172,7 @@ func (h *OrderHandler) PDFSend(w http.ResponseWriter, r *http.Request) {
 		writePDFError(w, err)
 		return
 	}
-	caption := fmt.Sprintf("📄 Накладная к заказу №%d", id)
+	caption := fmt.Sprintf("Товарная накладная №%d", id)
 	if err := h.botService.SendDocument(r.Context(), user.UserID, doc.Filename, doc.Data, caption); err != nil {
 		if errors.Is(err, service.ErrBotCannotWrite) || errors.Is(err, service.ErrNoTelegramAccount) {
 			http.Error(w, err.Error(), http.StatusConflict)
