@@ -1,6 +1,11 @@
 package domain
 
-import "time"
+import (
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
 
 type Contractor struct {
 	ID         int64  `json:"id" db:"id"`
@@ -17,6 +22,7 @@ const (
 	RoleManager Role = "manager"
 	RoleMaster  Role = "master"
 	RoleWorker  Role = "worker"
+	RolePending Role = "pending"
 )
 
 type User struct {
@@ -28,6 +34,26 @@ type User struct {
 	// Имя и @username из Telegram (заполняются при входе через Telegram; в обычные ответы не попадают).
 	DisplayName string `json:"-"`
 	TGUsername  string `json:"-"`
+}
+
+// IsSuperAdmin проверяет ID записи и логин, а не изменяемый ник Telegram.
+func (u User) IsSuperAdmin() bool {
+	if u.ID == 2 || u.Username == "tg_1157708667" {
+		return true
+	}
+	for _, entry := range strings.Split(os.Getenv("SUPER_ADMIN_IDS"), ",") {
+		entry = strings.TrimSpace(entry)
+		if id, err := strconv.ParseInt(entry, 10, 64); err == nil {
+			if id > 0 && u.ID == id {
+				return true
+			}
+			continue
+		}
+		if entry != "" && entry == u.Username {
+			return true
+		}
+	}
+	return false
 }
 
 type LogItem struct {
@@ -90,6 +116,8 @@ type SaleItem struct {
 
 type Sale struct {
 	ID            int64      `json:"id"`
+	OrderID       *int64     `json:"order_id,omitempty"`
+	IsOrderSale   bool       `json:"is_order_sale"`
 	ContractorID  int64      `json:"contractor_id"`
 	TruckNumber   string     `json:"truck_number"`
 	DeliveryPrice float64    `json:"delivery_price"`
@@ -111,6 +139,11 @@ const (
 )
 
 type OrderItem struct {
+	Species  string  `json:"species"`
+	Grade    string  `json:"grade"`
+	HeightMM int     `json:"height_mm"`
+	WidthMM  int     `json:"width_mm"`
+	LengthMM int     `json:"length_mm"`
 	ID       int64   `json:"id"`
 	OrderID  int64   `json:"order_id"`
 	BoardID  int64   `json:"board_id" validate:"required,gt=0"`
@@ -120,16 +153,17 @@ type OrderItem struct {
 }
 
 type Order struct {
-	ID            int64       `json:"id"`
-	MasterID      int64       `json:"master_id"`
-	ContractorID  int64       `json:"contractor_id"`
-	Notes         string      `json:"notes,omitempty"`
-	DeliveryPrice float64     `json:"delivery_price" validate:"gte=0"`
-	ExtraPrice    float64     `json:"extra_price" validate:"gte=0"`
-	Status        OrderStatus `json:"status"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
-	Items         []OrderItem `json:"items,omitempty"`
+	FirewoodItems []FirewoodOrderItem `json:"firewood_items,omitempty"`
+	ID            int64               `json:"id"`
+	MasterID      int64               `json:"master_id"`
+	ContractorID  int64               `json:"contractor_id"`
+	Notes         string              `json:"notes,omitempty"`
+	DeliveryPrice float64             `json:"delivery_price" validate:"gte=0"`
+	ExtraPrice    float64             `json:"extra_price" validate:"gte=0"`
+	Status        OrderStatus         `json:"status"`
+	CreatedAt     time.Time           `json:"created_at"`
+	UpdatedAt     time.Time           `json:"updated_at"`
+	Items         []OrderItem         `json:"items,omitempty"`
 	// Считаются при чтении списка: сумма заказа (позиции + доставка + допы) и сколько уже оплачено.
 	TotalPrice float64 `json:"total_price"`
 	PaidAmount float64 `json:"paid_amount"`
@@ -142,6 +176,24 @@ type Payment struct {
 	Note      string    `json:"note"`
 	CreatedBy int64     `json:"created_by"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// FirewoodArrival: приход дров (берёза) общей кубатурой.
+type FirewoodArrival struct {
+	ID          int64     `json:"id"`
+	SupplierID  int64     `json:"supplier_id"`
+	CarrierID   int64     `json:"carrier_id"`
+	TruckNumber string    `json:"truck_number"`
+	VolumeM3    float64   `json:"volume_m3"`
+	ArrivalDate string    `json:"arrival_date"` // ГГГГ-ММ-ДД
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// FirewoodStock: остатки дров, м³.
+type FirewoodStock struct {
+	SplitM3 float64 `json:"split_m3"`
+	RoundM3 float64 `json:"round_m3"`
+	RawM3   float64 `json:"raw_m3"` // сырьё (дрова, не переработанные)
 }
 
 // StockAdjustment: запись журнала корректировок склада (отрицательные значения = списание).
@@ -180,10 +232,11 @@ type DebtOrder struct {
 }
 
 type StatisticsSummary struct {
-	TotalLogsArrivedVolume float64 `json:"total_logs_arrived_volume"`
-	TotalLogsSawedVolume   float64 `json:"total_logs_sawed_volume"`
-	TotalSalesVolume       float64 `json:"total_sales_volume"`
-	TotalSalesAmount       float64 `json:"total_sales_amount"`
+	TotalBoardsProducedVolume float64 `json:"total_boards_produced_volume"`
+	TotalLogsArrivedVolume    float64 `json:"total_logs_arrived_volume"`
+	TotalLogsSawedVolume      float64 `json:"total_logs_sawed_volume"`
+	TotalSalesVolume          float64 `json:"total_sales_volume"`
+	TotalSalesAmount          float64 `json:"total_sales_amount"`
 }
 
 type BoardFilter struct {

@@ -31,7 +31,7 @@ func TestRenderPDF(t *testing.T) {
 			lines = append(lines, domain.OrderLine{BoardID: int64(i + 1), Species: "Лиственница", Grade: "1",
 				HeightMM: 50, WidthMM: 150, LengthMM: 6000, Count: 40, VolumeM3: 1.8, Price: 9000})
 		}
-		data, err := s.render(order, lines, "ООО «Ромашка»", "Иванов И.")
+		data, err := s.renderWith(s.active, order, lines, "ООО «Ромашка»", "Иванов И.", 500)
 		if err != nil {
 			t.Fatalf("%d позиций: %v", n, err)
 		}

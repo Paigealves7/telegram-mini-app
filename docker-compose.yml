@@ -20,6 +20,10 @@ services:
       - ./migrations/000005_contractor_types.up.sql:/docker-entrypoint-initdb.d/05_contractor_types.sql
       - ./migrations/000006_order_payments.up.sql:/docker-entrypoint-initdb.d/06_order_payments.sql
       - ./migrations/000007_stock_adjustments.up.sql:/docker-entrypoint-initdb.d/07_stock_adjustments.sql
+      - ./migrations/000008_firewood_arrivals.up.sql:/docker-entrypoint-initdb.d/08_firewood_arrivals.sql
+      - ./migrations/000009_firewood_processing.up.sql:/docker-entrypoint-initdb.d/09_firewood_processing.sql
+      - ./migrations/000010_super_admin_stock.up.sql:/docker-entrypoint-initdb.d/10_super_admin_stock.sql
+      - ./migrations/000011_pending_role.up.sql:/docker-entrypoint-initdb.d/11_pending_role.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d telegram-mini-app_db"]
       interval: 5s
@@ -44,7 +48,10 @@ services:
       PORT: 8080
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан в .env}@postgres:5432/telegram-mini-app_db?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET не задан в .env}
+      SUPER_ADMIN_IDS: ${SUPER_ADMIN_IDS:-2,tg_1157708667}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN не задан в .env}
+      TELEGRAM_PROXY: ${TELEGRAM_PROXY:-}
+      TELEGRAM_API_BASE: ${TELEGRAM_API_BASE:-https://api.telegram.org}
       # Адрес сайта для ссылок на PDF, например https://sawmill.example.com (без слэша в конце)
       PUBLIC_URL: ${PUBLIC_URL:-}
       # Часовой пояс для дат в накладных, например Europe/Moscow или Europe/Tallinn

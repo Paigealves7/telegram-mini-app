@@ -16,3 +16,6 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 *.test
+
+backup_*.sql
+*.dump

@@ -65,7 +65,7 @@ func TestFormatVolumeAndInt(t *testing.T) {
 
 func TestItemTitle(t *testing.T) {
 	l := domain.OrderLine{BoardID: 7, Species: "Сосна", Grade: "1", HeightMM: 50, WidthMM: 150, LengthMM: 6000}
-	if got := itemTitle(l); got != "Сосна 50×150×6000 мм, сорт 1" {
+	if got := itemTitle(l); got != "Доска обрезная Сосна 50×150×6000 мм, сорт 1" {
 		t.Errorf("itemTitle = %q", got)
 	}
 	if got := itemTitle(domain.OrderLine{BoardID: 7}); got != "Позиция склада №7" {

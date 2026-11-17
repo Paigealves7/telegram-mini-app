@@ -87,6 +87,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	staffHandler := NewStaffHandler(repo)
 	paymentHandler := NewPaymentHandler(repo)
 	stockHandler := NewStockHandler(repo)
+	firewoodHandler := NewFirewoodHandler(repo)
 
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(r.Context()); err != nil {
@@ -146,21 +147,43 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		r.Group(func(r chi.Router) {
 			// 3. Прокидываем секрет в Middleware
 			r.Use(AuthMiddleware(jwtSecret))
+			r.Use(RefreshUser(repo))
+			r.Get("/config", ConfigHandler)
+			r = r.With(RequireRoles(domain.RoleManager, domain.RoleMaster, domain.RoleWorker))
 
 			r.Get("/boards", boardHandler.GetList)
 			r.Get("/logs", logHandler.GetList)
+			r.Get("/firewood/stock", firewoodHandler.GetStock)
+			r.Get("/firewood/settings", firewoodHandler.GetSettings)
+			r.Get("/firewood/processing", firewoodHandler.GetProcessing)
 			r.Get("/contractors", dictHandler.GetContractors)
-			r.Get("/config", ConfigHandler)
+
+			r.Group(func(r chi.Router) {
+				r.Use(RequireSuperAdmin)
+				admin := AdminHandler{repo: repo}
+				r.Post("/admin/reset-test-data", admin.ResetTestData)
+				r.Delete("/users/{id}", staffHandler.Delete)
+				r.Delete("/orders/{id}", deleteOperation(repo.DeleteOrder))
+				r.Delete("/arrivals/{id}", deleteOperation(repo.DeleteLogArrival))
+				r.Delete("/firewood/arrivals/{id}", deleteOperation(repo.DeleteFirewoodArrival))
+				r.Delete("/sawing/{id}", deleteOperation(repo.DeleteSawing))
+				r.Delete("/sales/{id}", deleteOperation(repo.DeleteSale))
+				r.Put("/boards/{id}", admin.UpdateBoard)
+				r.Put("/firewood/stock", admin.SetFirewoodStock)
+			})
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleMaster))
 				r.Get("/arrivals", arrivalHandler.GetList)
 				r.Post("/arrivals", arrivalHandler.CreateArrival)
+				r.Get("/firewood/arrivals", firewoodHandler.GetArrivals)
+				r.Post("/firewood/arrivals", firewoodHandler.CreateArrival)
 				r.Get("/sales", salesHandler.GetList)
 				r.Post("/sales", salesHandler.CreateSale)
 				r.Get("/orders", orderHandler.GetOrders)
 				r.Post("/orders", orderHandler.CreateOrder)
 				r.Put("/orders/{id}/complete", orderHandler.CompleteOrder)
+				r.Put("/orders/{id}/status", orderHandler.UpdateStatus)
 				r.Get("/orders/{id}/payments", paymentHandler.List)
 				r.Post("/orders/{id}/payments", paymentHandler.Add)
 				r.Get("/debts", paymentHandler.Debts)
@@ -173,10 +196,13 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleWorker))
 				r.Get("/sawing", sawingHandler.GetList)
 				r.Post("/sawing", sawingHandler.CreateSawing)
+				r.Post("/firewood/processing", firewoodHandler.CreateProcessing)
 			})
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager))
+				r.Post("/firewood/settings", firewoodHandler.SetSettings)
+				r.Delete("/firewood/processing/{id}", firewoodHandler.DeleteProcessing)
 				r.Get("/statistics", statsHandler.GetSummary)
 				r.Post("/users", authHandler.Register) // создание сотрудников: только менеджер
 				r.Post("/contractors", dictHandler.CreateContractor)

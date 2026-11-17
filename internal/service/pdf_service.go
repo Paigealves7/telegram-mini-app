@@ -24,8 +24,9 @@ var ErrPDFFonts = errors.New("шрифты для PDF не найдены на �
 
 // OrderPDF — готовый документ.
 type OrderPDF struct {
-	Data     []byte
-	Filename string
+	Data           []byte
+	Filename       string
+	OrderCreatedAt time.Time
 }
 
 func PDFFileName(orderID int64) string      { return fmt.Sprintf("Накладная_%d.pdf", orderID) }
@@ -96,7 +97,7 @@ func (s *PDFService) initFonts(dir string) {
 			continue
 		}
 		fp := &fontPair{name: base, regular: reg, bold: bold}
-		if _, err := s.renderWith(fp, sampleOrder(), sampleLines(), "Проверка", "Проверка"); err != nil {
+		if _, err := s.renderWith(fp, sampleOrder(), sampleLines(), "Проверка", "Проверка", 0); err != nil {
 			lastErr = fmt.Errorf("шрифт %s: %w", base, err)
 			log.Printf("PDF: шрифт %s не подошёл: %v", base, err)
 			continue
@@ -163,20 +164,27 @@ func (s *PDFService) BuildOrderPDF(ctx context.Context, orderID int64) (*OrderPD
 	if err != nil || strings.TrimSpace(client) == "" {
 		client = fmt.Sprintf("Клиент №%d", order.ContractorID)
 	}
-	author := ""
+	author := "Не указан"
+	if order.MasterID > 0 {
+		author = fmt.Sprintf("Сотрудник №%d", order.MasterID)
+	}
 	if u, err := s.repo.GetUserByID(ctx, order.MasterID); err == nil {
-		if strings.HasPrefix(u.Username, "tg_") {
-			author = fmt.Sprintf("Сотрудник №%d", u.ID)
-		} else {
-			author = u.Username
+		if name := strings.TrimSpace(u.DisplayName); name != "" && name != "." {
+			author = name
+		} else if username := strings.TrimLeft(strings.TrimSpace(u.TGUsername), "@"); username != "" {
+			author = "@" + username
 		}
 	}
 
-	data, err := s.render(order, lines, client, author)
+	payments, err := s.repo.GetOrderPayments(ctx, orderID)
+	if err != nil {
+		return nil, &PDFError{Stage: "оплаты заказа", Err: err}
+	}
+	data, err := s.renderWith(s.active, order, lines, client, author, payments.PaidAmount)
 	if err != nil {
 		return nil, &PDFError{Stage: "вёрстка", Err: err}
 	}
-	return &OrderPDF{Data: data, Filename: PDFFileName(orderID)}, nil
+	return &OrderPDF{Data: data, Filename: PDFFileName(orderID), OrderCreatedAt: order.CreatedAt}, nil
 }
 
 const (
@@ -195,11 +203,12 @@ type tableCol struct {
 }
 
 var tableCols = []tableCol{
-	{9, "№", "C"},
-	{66, "Наименование", "L"},
-	{20, "Кол-во, шт", "R"},
-	{25, "Объём, м³", "R"},
-	{30, "Цена за м³, руб.", "R"},
+	{8, "№", "C"},
+	{62, "Наименование, размер, сорт", "L"},
+	{12, "Ед.", "C"},
+	{18, "Кол-во, шт", "R"},
+	{22, "Объём, м³", "R"},
+	{28, "Цена за м³, руб.", "R"},
 	{30, "Сумма, руб.", "R"},
 }
 
@@ -220,11 +229,7 @@ func fitText(pdf *fpdf.Fpdf, style, text string, maxW, size float64) string {
 	return string(r) + "…"
 }
 
-func (s *PDFService) render(order *domain.Order, lines []domain.OrderLine, client, author string) ([]byte, error) {
-	return s.renderWith(s.active, order, lines, client, author)
-}
-
-func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domain.OrderLine, client, author string) (data []byte, err error) {
+func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domain.OrderLine, client, author string, paid float64) (data []byte, err error) {
 	// Библиотека может паниковать на «неудобных» шрифтах: превращаем панику в обычную ошибку.
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -251,9 +256,10 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 		pdf.SetDrawColor(205, 205, 205)
 		pdf.SetLineWidth(0.2)
 		pdf.Line(marginX, pdf.GetY(), pageW-marginX, pdf.GetY())
-		pdf.SetFont(fontName, "", 8)
 		pdf.SetTextColor(130, 130, 130)
-		pdf.CellFormat(120, 8, footerLeft, "", 0, "L", false, 0, "")
+		txt := fitText(pdf, "", footerLeft, 118, 8)
+		pdf.CellFormat(120, 8, txt, "", 0, "L", false, 0, "")
+		pdf.SetFont(fontName, "", 8)
 		pdf.CellFormat(60, 8, fmt.Sprintf("Стр. %d из {nb}", pdf.PageNo()), "", 0, "R", false, 0, "")
 	})
 
@@ -261,29 +267,12 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 
 	// ----- шапка -----
 	pdf.SetTextColor(30, 30, 30)
-	name := fitText(pdf, "B", s.company, 98, 16)
-	pdf.CellFormat(100, 8, name, "", 0, "L", false, 0, "")
-	pdf.SetTextColor(30, 30, 30)
 	pdf.SetFont(fontName, "B", 16)
-	pdf.CellFormat(80, 8, fmt.Sprintf("НАКЛАДНАЯ № %d", order.ID), "", 1, "R", false, 0, "")
-
-	y := pdf.GetY()
-	pdf.SetFont(fontName, "", 8)
-	pdf.SetTextColor(120, 120, 120)
-	if s.info != "" {
-		pdf.MultiCell(100, 4, s.info, "", "L", false)
-	}
-	infoEnd := pdf.GetY()
-	if !order.CreatedAt.IsZero() {
-		pdf.SetXY(marginX+100, y)
-		pdf.SetFont(fontName, "", 10)
-		pdf.SetTextColor(30, 30, 30)
-		pdf.CellFormat(80, 5, "от "+order.CreatedAt.In(time.Local).Format("02.01.2006"), "", 0, "R", false, 0, "")
-	}
-	if infoEnd < y+5 {
-		infoEnd = y + 5
-	}
-	y = infoEnd + 3
+	pdf.CellFormat(contentW, 8, fmt.Sprintf("ТОВАРНАЯ НАКЛАДНАЯ № %d", order.ID), "", 1, "C", false, 0, "")
+	date := order.CreatedAt.In(time.Local).Format("02.01.2006")
+	pdf.SetFont(fontName, "", 10)
+	pdf.CellFormat(contentW, 6, "от "+date, "", 1, "C", false, 0, "")
+	y := pdf.GetY() + 3
 	pdf.SetDrawColor(60, 60, 60)
 	pdf.SetLineWidth(0.4)
 	pdf.Line(marginX, y, pageW-marginX, y)
@@ -294,17 +283,31 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 		if strings.TrimSpace(value) == "" {
 			return
 		}
+		if pdf.GetY()+5.5 > bottomY {
+			pdf.AddPage()
+		}
 		pdf.SetX(marginX)
 		pdf.SetFont(fontName, "", 9)
 		pdf.SetTextColor(120, 120, 120)
 		pdf.CellFormat(32, 5.5, label, "", 0, "L", false, 0, "")
 		pdf.SetFont(fontName, "B", 10)
 		pdf.SetTextColor(30, 30, 30)
-		pdf.MultiCell(contentW-32, 5.5, value, "", "L", false)
+		for _, line := range pdf.SplitText(strings.ReplaceAll(value, "\r", ""), contentW-32) {
+			if pdf.GetY()+5.5 > bottomY {
+				pdf.AddPage()
+			}
+			pdf.SetX(marginX + 32)
+			pdf.CellFormat(contentW-32, 5.5, line, "", 1, "L", false, 0, "")
+		}
 	}
-	kv("Клиент:", client)
-	kv("Оформил:", author)
-	kv("Статус:", statusLabel(order.Status))
+	supplier := s.company
+	if s.info != "" {
+		supplier += "\n" + s.info
+	}
+	kv("Поставщик:", supplier)
+	kv("Покупатель:", client)
+	kv("Основание:", fmt.Sprintf("Заказ (заявка) № %d от %s", order.ID, date))
+	kv("Ответственный:", author)
 	kv("Примечание:", order.Notes)
 	pdf.Ln(4)
 
@@ -320,8 +323,11 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 			if i == len(tableCols)-1 {
 				ln = 1
 			}
-			pdf.CellFormat(c.w, 9, txt, "TB", ln, "C", false, 0, "")
+			pdf.CellFormat(c.w, 9, txt, "1", ln, c.align, false, 0, "")
 		}
+	}
+	if pdf.GetY()+19 > bottomY {
+		pdf.AddPage()
 	}
 	drawHeader()
 
@@ -333,6 +339,9 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 		pdf.CellFormat(contentW, 10, "Позиции отсутствуют", "B", 1, "C", false, 0, "")
 	}
 	for i, l := range lines {
+		pdf.SetFont(fontName, "", 9)
+		titleLines := pdf.SplitText(itemTitle(l), tableCols[1].w)
+		rowH := max(rowH, 2+4*float64(len(titleLines)))
 		if pdf.GetY()+rowH > bottomY {
 			pdf.AddPage()
 			drawHeader()
@@ -341,50 +350,68 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 		totalVol += l.VolumeM3
 		totalSum += sum
 
-		fill := false
 		pdf.SetDrawColor(215, 215, 215)
 		pdf.SetLineWidth(0.2)
 		pdf.SetTextColor(30, 30, 30)
+		unit := "шт / м³"
+		if l.FirewoodKind != "" {
+			unit = "м³"
+		}
 		cells := []string{
-			strconv.Itoa(i + 1), itemTitle(l), formatInt(l.Count),
+			strconv.Itoa(i + 1), "", unit, itemCount(l),
 			formatVolume(l.VolumeM3), formatMoney(l.Price), formatMoney(sum),
 		}
 		for j, c := range tableCols {
+			if j == 1 {
+				x, y := pdf.GetXY()
+				pdf.SetFont(fontName, "", 9)
+				pdf.CellFormat(c.w, rowH, "", "1", 0, "L", false, 0, "")
+				pdf.SetY(y + (rowH-4*float64(len(titleLines)))/2)
+				for _, line := range titleLines {
+					pdf.SetX(x)
+					pdf.CellFormat(c.w, 4, line, "", 1, "L", false, 0, "")
+				}
+				pdf.SetXY(x+c.w, y)
+				continue
+			}
 			txt := fitText(pdf, "", cells[j], c.w-2, 9)
 			ln := 0
 			if j == len(tableCols)-1 {
 				ln = 1
 			}
-			align := c.align
-			if j == 0 {
-				align = "C"
-			}
-			pdf.CellFormat(c.w, rowH, txt, "B", ln, align, fill, 0, "")
+			pdf.CellFormat(c.w, rowH, txt, "1", ln, c.align, false, 0, "")
 		}
 	}
 
 	// ----- итоги -----
 	grand := domain.Round2(totalSum + order.DeliveryPrice + order.ExtraPrice)
-	if pdf.GetY()+95 > bottomY {
+	if pdf.GetY()+110 > bottomY {
 		pdf.AddPage()
 	}
 	pdf.Ln(4)
+	totalsY := pdf.GetY()
+	pdf.SetFont(fontName, "", 9)
+	pdf.MultiCell(76, 5, fmt.Sprintf("Всего отпущено наименований: %d, общим объёмом %s м³ на сумму %s руб.",
+		len(lines), formatVolume(totalVol), formatMoney(grand)), "", "L", false)
+	summaryEnd := pdf.GetY()
+	pdf.SetY(totalsY)
 
 	const labelW, valW = 60.0, 40.0
 	totalRow := func(label, value string, accent bool) {
 		pdf.SetX(pageW - marginX - labelW - valW)
 		border := ""
+		style, size := "", 10.0
 		pdf.SetTextColor(30, 30, 30)
 		if accent {
 			pdf.SetDrawColor(60, 60, 60)
 			pdf.SetLineWidth(0.3)
-			pdf.SetFont(fontName, "B", 12)
+			style, size = "B", 12
 			border = "T" // итог выделен жирным шрифтом и линией сверху, без заливки
-		} else {
-			pdf.SetFont(fontName, "", 10)
 		}
+		pdf.SetFont(fontName, style, size)
 		pdf.CellFormat(labelW, 8, label, border, 0, "R", false, 0, "")
-		pdf.CellFormat(valW, 8, value, border, 1, "R", false, 0, "")
+		txt := fitText(pdf, style, value, valW-2, size)
+		pdf.CellFormat(valW, 8, txt, border, 1, "R", false, 0, "")
 	}
 	totalRow("Итого объём:", formatVolume(totalVol)+" м³", false)
 	totalRow("Сумма по позициям:", formatMoney(totalSum)+" руб.", false)
@@ -395,7 +422,12 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 		totalRow("Дополнительно:", formatMoney(order.ExtraPrice)+" руб.", false)
 	}
 	pdf.Ln(1)
-	totalRow("К ОПЛАТЕ:", formatMoney(grand)+" руб.", true)
+	totalRow("ИТОГО К ОПЛАТЕ:", formatMoney(grand)+" руб.", true)
+	if paid > 0 {
+		totalRow("Оплачено:", formatMoney(paid)+" руб.", false)
+		totalRow("Остаток долга:", formatMoney(max(0, domain.Round2(grand-paid)))+" руб.", false)
+	}
+	pdf.SetY(max(pdf.GetY(), summaryEnd))
 
 	pdf.Ln(4)
 	pdf.SetX(marginX)
@@ -407,20 +439,21 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 	pdf.MultiCell(contentW-32, 5, amountInWords(grand)+".", "", "L", false)
 
 	// ----- подписи -----
-	if pdf.GetY()+30 > bottomY {
+	pdf.SetFont(fontName, "", 9)
+	sender := "Отпустил (Сдал): _______________ / " + strings.Join(strings.Fields(author), " ") + " /"
+	signatureHeight := 10 + 5*float64(max(3, len(pdf.SplitText(sender, 87))))
+	if pdf.GetY()+signatureHeight > bottomY {
 		pdf.AddPage()
 	}
-	ys := pdf.GetY() + 18
-	pdf.SetDrawColor(120, 120, 120)
-	pdf.SetLineWidth(0.3)
-	pdf.Line(marginX, ys, marginX+75, ys)
-	pdf.Line(pageW-marginX-75, ys, pageW-marginX, ys)
-	pdf.SetFont(fontName, "", 8)
-	pdf.SetTextColor(120, 120, 120)
-	pdf.SetXY(marginX, ys+1)
-	pdf.CellFormat(75, 4, "Отпустил: подпись / расшифровка", "", 0, "L", false, 0, "")
-	pdf.SetXY(pageW-marginX-75, ys+1)
-	pdf.CellFormat(75, 4, "Получил: подпись / расшифровка", "", 0, "L", false, 0, "")
+	ys := pdf.GetY() + 5
+	pdf.SetFont(fontName, "", 9)
+	pdf.SetXY(marginX, ys)
+	pdf.MultiCell(87, 5, sender, "", "L", false)
+	pdf.SetX(marginX)
+	pdf.CellFormat(87, 5, "Должность: ____________________", "", 1, "L", false, 0, "")
+	pdf.CellFormat(87, 5, "М.П.", "", 1, "L", false, 0, "")
+	pdf.SetXY(marginX+93, ys)
+	pdf.MultiCell(87, 5, "Получил (Принял): _______________ / _______________ /\nДолжность: ____________________", "", "L", false)
 
 	if e := pdf.Error(); e != nil {
 		return nil, fmt.Errorf("построение страницы: %w", e)

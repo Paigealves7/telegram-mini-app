@@ -69,7 +69,15 @@ func (h *TelegramAuthHandler) LoginViaTelegram(w http.ResponseWriter, r *http.Re
 
 	user, err := h.repo.GetUserByUsername(r.Context(), username)
 	if err != nil {
-		created, createErr := h.repo.CreateUser(r.Context(), username, tgPasswordMarker, domain.RoleWorker)
+		role := domain.RolePending
+		if (domain.User{Username: username}).IsSuperAdmin() {
+			role = domain.RoleManager
+		}
+		created, createErr := h.repo.CreateUser(r.Context(), username, tgPasswordMarker, role)
+		if errors.Is(createErr, repository.ErrDeletedUser) {
+			http.Error(w, createErr.Error(), http.StatusForbidden)
+			return
+		}
 		if createErr == nil {
 			user = created // свежий Telegram-аккаунт; PasswordHash в ответе CreateUser пустой
 		} else {
@@ -97,10 +105,8 @@ func (h *TelegramAuthHandler) LoginViaTelegram(w http.ResponseWriter, r *http.Re
 		log.Printf("TG AUTH: не удалось сохранить имя пользователя %s: %v", username, err)
 	}
 
-	claims := &Claims{
-		UserID: user.ID,
-		Role:   string(user.Role),
-	}
+	claims := &Claims{}
+	claims.setUser(user)
 
 	tokenString, err := generateToken(claims, h.jwtSecret, telegramSessionTTL)
 	if err != nil {

@@ -3,28 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#121412">
+<meta name="theme-color" content="#0b0c0e">
 <meta name="color-scheme" content="dark">
 <title>Лесопилка</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* Лесопилка: тёмный «стеклянный» интерфейс. Фон: туман в оливково-серых тонах. Акцент: кремовый. */
 :root{--bg:#121412;--ink:#1a1c1a;--s1:rgba(255,255,255,.06);--s2:rgba(255,255,255,.08);--s3:rgba(255,255,255,.14);
 --line:rgba(255,255,255,.12);--line2:rgba(255,255,255,.22);
 --t1:#f5efe6;--t2:rgba(245,239,230,.6);--t3:rgba(245,239,230,.5);--wood:#f3e6d3;--err:#f0a99f;--ease:cubic-bezier(.2,.8,.2,1);
---font:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
---serif:'Cormorant Garamond','Playfair Display',Georgia,'Times New Roman',serif;
+--font:'Onest',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+--serif:var(--font);
 --blur:blur(22px) saturate(1.3);
 --fx:inset 0 1px 0 rgba(255,255,255,.1),0 12px 40px rgba(0,0,0,.28);
 --top:calc(var(--tg-content-safe-area-inset-top,0px) + var(--tg-safe-area-inset-top,0px) + env(safe-area-inset-top,0px));
---bot:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px))}
+--bot:max(var(--tg-safe-area-inset-bottom,0px),env(safe-area-inset-bottom,0px))}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0}
-body{background:var(--bg);color:var(--t1);font:16px/1.5 var(--font);font-variant-numeric:tabular-nums;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;color-scheme:dark}
+body{background:var(--bg);color:var(--t1);font:16px/1.5 var(--font);font-variant-numeric:normal;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;color-scheme:dark}
 /* фон: размытый туман без внешних картинок */
 body::before,body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none}
 body::before{background:
@@ -263,6 +263,392 @@ button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:380px){.tv{font-size:24px}.lg{font-size:16px}}
 html.lite .sk{animation:none}
 html.lite .tile,html.lite .tt{-webkit-backdrop-filter:none;backdrop-filter:none}
+
+/* Flowstate / Lumber: единые темы и адаптивная компоновка. */
+:root,html[data-t="dark"]{--bg:#0b0c0e;--ink:#0b0c0e;--s1:#16181a;--s2:rgba(255,255,255,.06);--s3:rgba(255,255,255,.11);--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.2);--hair:var(--line);--t1:#fff;--t2:#a3a7af;--t3:#858a93;--wood:#fff;--ok:#86d4ae;--warn:#e8c27a;--bad:#e8a29a;--err:#e8a29a;--r-card:20px;--r-btn:999px;--r-fld:16px;--sp:16px;--gap:24px;--blur:blur(20px);--glass:rgba(22,24,26,.9);--fx:0 8px 28px rgba(0,0,0,.12);--active:#fff;--active-ink:#0b0c0e;color-scheme:dark}
+html[data-t="light"]{--bg:#f3f4f6;--s1:#fff;--s2:#eceef1;--s3:#e0e3e8;--line:rgba(20,25,35,.1);--line2:rgba(20,25,35,.22);--t1:#15181e;--t2:#565d69;--t3:#67707e;--wood:#15181e;--ink:#fff;--glass:rgba(255,255,255,.92);--ok:#167346;--warn:#866012;--bad:#ad3434;--err:#ad3434;--fx:0 8px 28px rgba(20,25,35,.04);color-scheme:light}
+body{color-scheme:inherit;background:var(--bg);font-size:15px}
+body::before{background:var(--bg)}body::after{display:none}
+.top{gap:8px;background:var(--glass);backdrop-filter:var(--blur);border-bottom:1px solid var(--line);padding:calc(var(--top) + 12px) var(--sp) 12px;flex-wrap:wrap}
+#title,body.sub #title{font-family:var(--font);font-size:28px;line-height:40px;font-weight:600;letter-spacing:-.04em}
+#hact{flex:none;max-width:100%;display:flex;flex-wrap:wrap;gap:6px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--s1)}
+#hact:empty{display:none}
+#hact .rbtn,#hact .avatar,#hact .hbtn{width:44px;height:44px;min-width:44px;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;backdrop-filter:none;color:var(--t2);font-size:16px}
+#hact svg{width:19px;height:19px}
+#hact .hbtn,#hact [aria-current="page"]{background:var(--active);color:var(--active-ink)}
+#hact .hbtn span{display:none}
+#hb{margin-left:-6px;border:0;background:transparent;box-shadow:none;width:36px;min-width:36px;height:44px}
+#view{padding-top:20px}
+.stock,.login,.tile,.tt,.li,.srow{border:1px solid var(--line);background:var(--s1);box-shadow:none;border-radius:var(--r-card)}
+.stock{padding:20px}.g-t,.bar,.pb{background:var(--s2);stroke:var(--line2)}
+.big,.tv,.tt-v,.pvr b{font-family:var(--font);letter-spacing:-.04em;font-weight:600}
+.gv .big{font-size:64px}.big{font-size:48px}.rev .big{font-size:48px}
+.qa-b{background:var(--s2);border:1px solid var(--line);border-radius:16px;padding:20px 6px 12px;min-height:96px;font-size:12px}
+.qa-b .dot{width:5px;height:5px;top:10px;margin-left:-2px}
+.tiles,.tots{gap:10px;grid-template-columns:repeat(var(--n),minmax(0,1fr))}
+.tile,.tt{min-height:116px;padding:16px;gap:5px}
+.tl,.tt-l{color:var(--t1);font-weight:500}.ts{order:1}.tv{order:2;margin-top:auto;font-size:28px}.tt-v{margin-top:auto;white-space:normal;overflow-wrap:anywhere;font-size:24px}
+.li{width:100%;margin:10px 0 0;padding:16px;gap:6px 12px;background-image:none;align-items:start}
+.li-t{font-weight:600}.li-v{font-size:20px;font-weight:600;letter-spacing:-.025em}.li-s{font-size:12px;line-height:1.6}
+.li-e{max-width:100%;white-space:normal}.li-v{white-space:normal;overflow-wrap:anywhere}
+.li-l{gap:0;margin-top:8px;padding-left:7px;font-size:13px}
+.li-l>span:not(.tag){position:relative;display:block;border-left:1px solid var(--line2);padding:2px 0 14px 16px}
+.li-l>span:not(.tag):last-child{padding-bottom:2px;border-color:transparent}
+.li-l>span:not(.tag)::before{content:"";position:absolute;left:-3px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--t2)}
+#rcn{margin-top:24px;border:1px solid var(--line);border-radius:20px;padding:16px;background:var(--s1)}
+#rcn:empty{display:none}#rcn>.sh{margin-top:0}
+.ra{position:relative;grid-template-columns:minmax(0,1fr) auto;margin-left:6px;padding:10px 0 18px 18px;gap:10px;border-left:1px solid var(--line2);box-shadow:none}
+.ra::before{content:"";position:absolute;left:-3px;top:18px;width:5px;height:5px;border-radius:50%;background:var(--t1)}
+.ra:last-child{border-color:transparent;padding-bottom:0}.ra-i{display:none}.ra-e b{font-size:14px}.ra-e{white-space:normal}
+.seg,.utabs,.chips{gap:4px;border:1px solid var(--line);border-radius:999px;background:var(--s1);padding:4px;margin:0 0 16px;box-shadow:none;overflow-x:auto;scrollbar-width:none}
+.seg button,.utab,.chip{border:0;border-radius:999px;min-height:44px;padding:0 16px;background:transparent;color:var(--t2);font-size:13px;white-space:nowrap}
+.seg button.on,.utab.on,.chip.on{background:var(--active);color:var(--active-ink);font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.utab.on::after{display:none}.utab.on .mut{color:inherit}.chips{width:fit-content;max-width:100%}.fld .chips{border:0;background:none}
+.tabs{left:0;right:0;bottom:0;height:calc(76px + var(--bot));padding:6px 12px calc(6px + var(--bot));gap:4px;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--glass);box-shadow:none;backdrop-filter:var(--blur)}
+.tab{display:flex;flex-direction:column;justify-content:center;gap:5px;height:60px;min-height:44px;padding:6px;border-radius:14px;color:var(--t3)}
+.tab span{font-size:10px;line-height:14px;font-weight:500}.tab svg{width:23px;height:23px}
+.tab.on{color:var(--t1);background:transparent;box-shadow:none}
+.act{background:linear-gradient(transparent,var(--bg) 35%);padding-top:24px}
+.btn{font-weight:600;box-shadow:none}.btn:active{background:var(--wood)}.btn.ghost:active{background:var(--s3)}
+.stackb{gap:12px;margin-top:20px}.stackb .btn{min-height:52px}
+.panel{background:var(--glass);border-radius:24px 24px 0 0;border-color:var(--line);box-shadow:var(--fx);max-height:88dvh;overscroll-behavior:contain}
+#toast{background:var(--glass);border-color:var(--line);box-shadow:var(--fx)}
+.fld select option{background:var(--s1);color:var(--t1)}
+.fld input:focus,.fld select:focus,.num:focus-within{border-color:var(--line2);box-shadow:0 0 0 3px var(--s2)}
+html.lite .stock,html.lite .tabs,html.lite .login,html.lite .hbtn,html.lite .avatar,html.lite .rbtn,html.lite .panel,html.lite #toast{background:var(--s1);backdrop-filter:none}
+@supports not (backdrop-filter:blur(1px)){.top,.tabs,.panel,#toast{background:var(--s1)}}
+@media(hover:hover){.btn:hover{background:var(--wood);filter:brightness(.9)}.btn.ghost:hover{background:var(--s3);filter:none}button.li:hover{background:var(--s2)}#hact .hbtn:hover{background:var(--active);color:var(--active-ink)}}
+@media(max-width:399px){#title,body.sub #title{font-size:24px}#hact{gap:2px}#hact .rbtn,#hact .avatar,#hact .hbtn{width:44px;min-width:44px}.top:has(#hact .hbtn) #hact{margin-left:auto}.tiles,.tots{grid-template-columns:repeat(2,minmax(0,1fr))}.tile:last-child:nth-child(odd),.tt:last-child:nth-child(odd){grid-column:1/-1}}
+@media(min-width:768px){
+ :root{--sp:28px;--sidebar:204px}
+ .tabs{top:0;bottom:0;left:0;right:auto;width:var(--sidebar);height:100dvh;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:108px 14px 24px;border:0;border-right:1px solid var(--line);border-radius:0;background:var(--s1)}
+ .tabs::before{content:'ЛЕСОПИЛКА';position:absolute;top:36px;left:24px;font-size:13px;font-weight:700;letter-spacing:.12em;color:var(--t1)}
+ .tab{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 16px;height:50px;border-radius:12px}.tab span{font-size:14px}.tab svg{width:20px;height:20px}.tab.on{background:var(--s3)}
+ .top{margin-left:var(--sidebar);padding:24px 32px;flex-wrap:nowrap}#title,body.sub #title{font-size:30px}
+ #view{margin-left:var(--sidebar);padding:28px 32px 64px;max-width:1440px}
+ body.form .tabs{display:flex}body.noauth .tabs{display:none}body.noauth #view{margin:0;max-width:none}
+ .act{left:var(--sidebar);padding:20px 32px;background:var(--glass);border-top:1px solid var(--line)}.act .btn{max-width:420px;margin-left:auto}
+ body.form #view{max-width:1064px;padding-bottom:120px}
+ .fgrid{column-gap:24px}
+ .sheet{display:grid;place-items:center;padding:32px}.panel{position:relative;left:auto;right:auto;bottom:auto;width:min(100%,600px);max-height:85dvh;padding:28px;border:1px solid var(--line);border-radius:24px;transform:translateY(16px) scale(.98);opacity:0;transition:transform .25s var(--ease),opacity .25s}.sheet.on .panel{transform:none;opacity:1}.grab{display:none}
+ .card-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:24px}.card-group>.grp{grid-column:1/-1;margin:0 0 2px}.card-group>.li{margin:0}
+ #sl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#sl>.li{margin:0}#sl>.card-group,#sl>.stackb,#sl>.empty{grid-column:1/-1}#sl>.stackb{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+ body[data-view="home"] #view{display:grid;grid-template-columns:minmax(240px,.85fr) minmax(0,1.4fr);gap:24px;align-items:start}#hd{margin:0;min-width:0}
+ .tiles,.tots{gap:12px}.tile,.tt{min-height:128px}.who{padding-top:24px}
+}
+@media(min-width:1280px){:root{--sidebar:232px}.card-group{grid-template-columns:repeat(3,minmax(0,1fr))}#sl{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+
+/* Рабочее пространство: компактный обзор, списки и независимый инспектор. */
+[hidden]{display:none!important}
+.side-brand,.side-create,.side-footer{display:none}
+body[data-view="home"] #view{display:block}
+.quickbar{display:flex;gap:8px;position:sticky;top:0;z-index:12;background:var(--bg);padding:0 0 12px;overflow-x:auto;scrollbar-width:none}
+.quick-btn{display:flex;align-items:center;justify-content:center;gap:5px;flex:1;white-space:nowrap;padding:9px 10px;min-height:42px;border:1px solid var(--line2);border-radius:12px;background:var(--s1);font-size:12px}
+.quick-btn svg{width:16px;height:16px}
+.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.metric{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0;min-height:116px;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--s1);text-align:left}
+.metric>span,.metric small{font-size:11px;color:var(--t2)}
+.metric strong{font-size:clamp(18px,2vw,28px);font-weight:600;letter-spacing:-.04em;white-space:nowrap}
+.metric small{margin-top:auto}
+.home-grid,.home-feed{display:grid;gap:16px;min-width:0;align-items:start}
+.workspace-card{min-width:0;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--s1)}
+.workspace-card .sh{margin:0 0 12px;gap:8px;align-items:center}
+.sh h2{font-size:16px;line-height:1.4}.lnk{font-size:12px;white-space:nowrap;padding:8px 0}
+.balance-row{padding:14px 0;border-bottom:1px solid var(--line)}
+.balance-row>div:first-child{display:flex;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:13px}
+.balance-row strong{white-space:nowrap}.balance-row small{display:block;margin-top:7px;font-size:11px}
+.section-label{display:block;font-size:12px;color:var(--t2);font-weight:500;margin:20px 0 12px}
+#rcn{margin:0;padding:16px;border-radius:16px}#tdy .sh{margin-top:20px}
+#tdy .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}#tdy .tile{min-height:90px;padding:10px}
+#tdy .tile:last-child{grid-column:auto}#tdy .tv{font-size:20px}#tdy .tl,#tdy .ts{font-size:10px}
+.filterbar{position:sticky;top:0;z-index:15;display:flex;flex-wrap:wrap;gap:8px;padding:10px 0;background:var(--bg);border-bottom:1px solid var(--line);margin-bottom:12px}
+.filterbar .srch{flex:1 1 200px;margin:0;height:44px;border-radius:12px;padding:0 12px;font-size:13px}
+.filterbar .seg,.filterbar .utabs{flex:1 1 auto;min-width:0;max-width:100%;margin:0;border-radius:12px}
+.filterbar .seg button,.filterbar .utab{min-height:36px;padding:0 10px;font-size:12px;border-radius:9px}
+.filterbar .chips{flex-basis:100%;margin:0;border:0;background:none;padding:0;border-radius:0}
+.filterbar .chip{min-height:32px;font-size:11px;padding:0 12px}
+.tots,#ssum .tots,#osum .tots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0 16px}
+.tots .tt{grid-column:auto!important;min-height:72px;padding:10px 12px;border-radius:12px}
+.tt-l{font-size:11px;color:var(--t2)}.tt-v{font-size:21px;line-height:1.2}
+.order-card{padding:14px;margin:10px 0;border:1px solid var(--line);border-radius:14px;background:var(--s1);min-width:0}
+.order-head{display:flex;align-items:start;justify-content:space-between;gap:8px;border:0;padding:0 0 10px;background:none;text-align:left;width:100%}
+.order-head>span:first-child{min-width:0}.order-head b{font-size:14px}.order-head small{display:block;font-size:12px;color:var(--t2);margin-top:3px;overflow-wrap:anywhere}
+.order-head .st{font-size:10px;white-space:nowrap;gap:4px}.order-head .st i{width:5px;height:5px}
+.order-content{display:grid;gap:4px;font-size:12px;padding:10px 0;color:var(--t2);border-top:1px solid var(--line);overflow-wrap:anywhere}
+.payment-summary,.order-meta{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--t2);margin:9px 0}
+.payment-summary b,.order-meta b{color:var(--t1);font-weight:500}
+.order-card .bar{height:4px}.order-card .bar i{background:var(--ok)}
+.order-actions{display:flex;gap:6px;flex-wrap:wrap}
+.order-actions button{flex:1;min-height:36px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--s2);font-size:11px;white-space:nowrap}
+.order-actions .primary{background:var(--wood);color:var(--ink)}
+.order-cancel,.btn.order-cancel,.form-error{color:var(--err)}
+.btn.admin-delete{color:var(--err);border-color:var(--err)}
+.role-preview{padding:12px 16px}
+.role-preview .seg{flex-wrap:wrap;border-radius:16px;margin:8px 0 0}
+.role-preview .seg button{flex:1 1 auto}
+.form-rows{display:grid;gap:12px;margin-bottom:12px}
+.form-row{border:1px solid var(--line);border-radius:var(--r-fld);padding:12px;min-width:0}
+.form-row-head,.form-row-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.form-row-head{justify-content:space-between;margin-bottom:8px}
+.form-row-head .lnk,.form-row .lnk{padding:8px 0}
+.form-row-tools{margin-bottom:16px}
+.form-row-tools .btn{flex:1 1 auto;width:auto;min-height:42px;padding:0 12px;font-size:14px}
+.home-feed .order-card{background:var(--bg)}
+.resource-grid{display:grid;gap:10px}.resource-grid .srow{margin:0;border-radius:14px}.resource-grid small{font-size:12px}
+.who{display:grid;grid-template-columns:56px 1fr;gap:2px 14px;text-align:left;align-items:center;padding:8px 0 20px}
+.who .avatar{grid-row:span 2;width:56px;height:56px;font-size:24px;margin:0}.who h2{font-size:20px}
+.inspector-heading{display:none;align-items:center;justify-content:space-between;color:var(--t2);font-size:12px;margin-bottom:18px}
+@media(min-width:768px){#sheet .inspector-heading{display:flex}#sheet .grab{display:none}}
+.inspector-heading button{display:grid;place-items:center;width:36px;height:36px;font-size:24px;border:1px solid var(--line);border-radius:10px;background:var(--s2)}
+.inspector-empty{display:none}.sheet:not(.on) #sb{display:none}
+.stats-filter .dates{margin:0;gap:8px;flex:1 1 260px}.stats-filter .dates input{height:40px;padding:0 10px;font-size:12px;border-radius:10px}.stats-filter .dates label{font-size:10px;margin:0}
+#sr .rev{margin:0;padding:20px;background:var(--s1);border:1px solid var(--line);border-radius:16px}
+#sr .stats-comparison{min-width:0}#sr .vb{padding:16px;background:var(--s1);border:1px solid var(--line);border-radius:14px;margin-top:12px}
+body.dock-form .act{display:block;position:sticky;inset:auto;bottom:-20px;padding:16px 0;background:var(--s1);border-top:1px solid var(--line);z-index:2}
+body.dock-form .act .btn{max-width:none}
+body.noauth #sheet{display:none}
+@media(max-width:767px){
+ .quickbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.quick-btn{min-height:38px}
+ .top{position:relative}.quickbar{top:0}.filterbar{top:0}
+ #view{padding:12px 16px calc(var(--bot) + 100px)}
+ #hact{border:0;padding:0;background:none;gap:2px}
+ #title,body.sub #title{font-size:23px}
+ .tabs .tab[data-v="stats"]{display:none}
+ .sheet .panel{padding:10px 18px calc(var(--bot) + 24px)}
+ .inspector-heading{margin:0 0 12px}.grab{margin-bottom:8px}
+}
+@media(min-width:768px){
+ :root{--sidebar:240px;--inspector:360px}
+ body:not(.noauth){display:grid;grid-template-columns:240px minmax(0,1fr) var(--inspector);grid-template-rows:76px minmax(0,1fr);height:100vh;height:100dvh;overflow:hidden}
+ .tabs{position:relative;grid-column:1;grid-row:1/3;inset:auto;width:auto;height:100%;padding:24px 16px;gap:6px;overflow-y:auto}
+ .tabs::before{display:none}
+ .side-brand{display:flex;gap:12px;align-items:center;margin:0 4px 26px;font-size:18px;font-weight:600}
+ .side-brand small{display:block;font-size:10px;color:var(--t2);font-weight:400;margin-top:4px}.side-brand svg{width:28px;height:28px}
+ .tab{height:44px;padding:0 12px}.tab span{font-size:13px}
+ .side-create{display:grid;gap:8px;margin-top:16px}.side-create .section-label{margin:0 0 4px 12px}
+ .side-create .quick-btn{justify-content:flex-start;background:transparent;border-color:transparent;padding-left:12px}
+ .side-footer{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:24px}
+ .side-profile{display:flex;align-items:center;gap:8px;flex:1;min-width:0;text-align:left;border:0;background:none;padding:8px 0;font-size:12px}
+ .side-profile span{min-width:0}.side-profile b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}.side-profile small{display:block;color:var(--t2);font-size:10px}
+ .theme-button{width:36px;height:36px;flex:none;border:1px solid var(--line);border-radius:10px;background:var(--s2)}.theme-button svg{width:18px;height:18px}
+ .top{grid-column:2;grid-row:1;position:relative;margin:0;padding:16px 20px;min-width:0;gap:6px}
+ #title,body.sub #title{font-size:24px;line-height:36px}
+ #hact{border:0;padding:0;background:none;gap:6px}
+ #hact>.rbtn,#hact>.avatar{display:none}
+ #hact .hbtn{width:auto;padding:0 10px;height:36px;border-radius:10px;gap:4px}#hact .hbtn span{display:inline;font-size:11px}
+ #view,body.form #view{grid-column:2;grid-row:2;margin:0;min-width:0;max-width:none;overflow:auto;padding:16px 20px 32px;scrollbar-gutter:stable;overscroll-behavior:contain}
+ .metrics{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+ .metric{padding:12px 10px;min-height:106px}.metric strong{font-size:clamp(15px,1.5vw,25px)}
+ .home-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+ .workspace-card{padding:12px}.sh h2{font-size:14px}.home-grid .sh{flex-wrap:wrap}
+ #sl,.card-group{display:block}#sl>.card-group{margin-top:16px}.card-group>.li{margin-top:6px}
+ .li{padding:12px;border-radius:10px;margin-top:6px}.li-v{font-size:17px}.li-t{font-size:13px}
+ #ol{display:grid;grid-template-columns:1fr;gap:10px}#ol .order-card{margin:0}
+ .filterbar{margin-top:-16px;padding-top:16px}
+ .sheet{position:relative;grid-column:3;grid-row:1/3;inset:auto;display:block;visibility:visible;padding:0;z-index:25;border-left:1px solid var(--line);min-width:0;min-height:0;background:var(--s1)}
+ .sheet .scrim{display:none}
+ .sheet .panel,.sheet.on .panel{position:absolute;inset:0;width:100%;height:100%;max-height:none;padding:20px;border:0;border-radius:0;transform:none;opacity:1;background:var(--s1);box-shadow:none;backdrop-filter:none;overflow:auto}
+ .sheet:not(.on) .inspector-empty{display:block;margin-top:30vh;text-align:center}.inspector-empty>span{font-size:18px;font-weight:500;color:var(--t1)}.inspector-empty p{font-size:13px;margin-top:10px;color:var(--t2)}
+ .sheet:not(.on) .inspector-heading button{visibility:hidden}
+ .sheet.on #sb{animation:inspector-in .18s ease-out}
+ .panel h3{font-size:19px}.panel .fld{margin-bottom:14px}.panel .fld>label{font-size:12px}.panel .fgrid{column-gap:12px}
+ .panel .fld input,.panel .fld select{height:44px;padding:0 12px;border-radius:10px;font-size:13px}
+ .panel .num{border-radius:10px}.panel .num input{height:42px}.panel .num button{width:36px}.panel .btn{min-height:44px;border-radius:12px;font-size:13px;padding:8px 12px}
+ .panel .dl{padding:12px 0;font-size:13px}.panel .pv{margin-top:16px;padding-top:16px}.panel .pvr b{font-size:22px}
+ .panel .fs{font-size:16px;margin-top:20px}.panel .two{gap:8px}
+ body.form:not(.dock-form) .act{left:240px;right:var(--inspector)}
+ body.noauth{display:block;height:auto}body.noauth #view{margin:0;padding:20px;overflow:auto}
+}
+@media(min-width:1440px){#sr{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}#sr>.rev{grid-column:1/-1}#sr>.workspace-card{margin-top:0!important}:root{--inspector:380px}.resource-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#ol{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@keyframes inspector-in{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
+
+
+/* Уточнения мобильного UX после проверки в Telegram на iPhone. */
+#hact .hbtn{width:auto;min-width:0;height:40px;padding:0 12px;border-radius:999px;gap:5px}
+#hact .hbtn span{display:inline;font-size:12px;white-space:nowrap}
+#hact:empty{display:none}
+.metric{min-height:82px;padding:10px;gap:3px}
+.metric small{margin-top:0}
+.metrics{gap:8px;margin-bottom:14px}
+.quick-btn{background:var(--s2)}
+.quick-btn svg{color:var(--t2)}
+.filterbar .chips{flex:1 1 100%;width:100%;max-width:none;min-width:0;border:0;background:none;border-radius:0;gap:8px;overflow-x:auto;padding:2px 20px 6px 0;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 16px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 16px),transparent)}
+.filterbar .chips .chip{flex:none;border:1px solid var(--line);background:var(--s2);border-radius:999px}
+.filterbar .chips .chip.on{background:var(--active);color:var(--active-ink)}
+.utab,.utab .tab-count{letter-spacing:normal;word-spacing:normal;font-variant-numeric:normal;font-kerning:none}
+.utab .tab-count{display:inline-block;white-space:nowrap;margin-left:3px;color:var(--t2)}
+.utab.on .tab-count{color:inherit}
+.order-content:empty{display:none}
+@media(min-width:768px){.metric{min-height:76px;padding:9px 10px}}
+@media(max-width:359px){.top:has(#hact .hbtn){gap:4px}#hact .hbtn{padding:0 9px}#hact .hbtn span{font-size:11px}}
+
+@media(max-width:767px){.tabs{left:0;right:0;bottom:0;border:0;border-top:1px solid var(--line);border-radius:0;height:auto;padding:8px 8px calc(var(--bot) + 6px)}}
+
+html[data-t="light"]{--bg:#f2f4f7;--line:#e2e6ee}
+html[data-t="light"] #hact .hbtn{background:#111315;color:#fff;border:1px solid #111315}
+html[data-t="light"] .srch,html[data-t="light"] .li,html[data-t="light"] .tt,html[data-t="light"] .tile{background:#fff;border:1px solid #e2e6ee;box-shadow:0 2px 8px rgba(20,25,35,.04)}
+html[data-t="light"] .seg,html[data-t="light"] .utabs{background:#e4e7ee;border:1px solid #cfd5df}
+html[data-t="light"] .seg button.on,html[data-t="light"] .utab.on{background:#fff;color:#111315;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.utab .tab-count{letter-spacing:0!important;font-feature-settings:normal}
+@media(max-width:767px){.tabs{bottom:0;left:0;right:0;border-radius:0;border:0;border-top:1px solid var(--line);padding:6px 8px calc(env(safe-area-inset-bottom,0px)*.55 + 4px)}}
+#sr{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+#sr>.tots{grid-column:1/-1;margin:0}
+#sr .rev{padding:16px}#sr .rev .big{font-size:32px;margin:6px 0}
+#sr .rv-d{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+.stats-filter .utabs{flex-basis:100%}.stats-filter .dates{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stats-production h2,.stats-firewood h2{font-size:16px}
+.stat-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:14px 0;border-bottom:1px solid var(--line)}
+.stat-row-head{display:flex;justify-content:space-between;gap:8px;grid-column:1/-1;font-size:13px}
+.stat-row-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;grid-column:1/-1}
+.stat-row .bar{grid-column:1/-1;height:5px}
+.efficiency{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}
+.efficiency>div{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:10px;background:var(--s2);font-size:11px}
+.efficiency b{font-size:20px}.stats-firewood .dl{font-size:13px;padding:10px 0}
+@media(min-width:1440px){#sr{grid-template-columns:repeat(2,minmax(0,1fr))}#sr>.rev{grid-column:1/-1}}
+
+
+html.in-telegram body.sub #hb{display:none}
+body[data-view="home"] #hact{gap:8px}
+body[data-view="home"] #hact .home-reports{display:flex;width:auto;min-width:0;height:38px;padding:0 12px;gap:6px;border:1px solid var(--line);border-radius:999px;background:var(--s2);color:var(--t1)}
+body[data-view="home"] #hact .home-reports span{display:inline;font-size:13px}
+body[data-view="home"] #hact .avatar{display:flex;width:38px;min-width:38px;height:38px;border:1px solid var(--line2);border-radius:50%;background:var(--s2);color:var(--t1)}
+.who{display:flex;align-items:center;gap:14px;text-align:left;padding:16px;background:var(--s1);border:1px solid var(--line);border-radius:var(--r-card);margin-bottom:16px}
+.who .avatar{width:52px;height:52px;margin:0;flex:none;font-size:22px}
+.who h2{font-size:18px;line-height:24px}.profile-meta{font-size:12px;color:var(--t2);margin-top:4px}
+.role-badge{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--s2);color:var(--t1)}
+.profile-heading{font-size:13px;line-height:20px;color:var(--t2);font-weight:600;margin:0 0 8px}
+.profile-group{background:var(--s1);border:1px solid var(--line);border-radius:var(--r-card);padding:0 16px;margin-bottom:16px}
+.profile-setting{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;padding:8px 0}
+.profile-setting+ .profile-setting,.profile-link+ .profile-link{border-top:1px solid var(--line)}
+.profile-setting b,.profile-link b{font-size:14px;font-weight:500}.profile-setting p{font-size:11px}
+.profile-link{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:0;border:0;background:transparent;text-align:left}
+.profile-link b{flex:1}.profile-link>svg{width:18px;height:18px;color:var(--t3)}
+.profile-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--s2)}
+.profile-icon svg{width:18px;height:18px}
+.profile-logout{min-height:44px;margin-top:0}
+
+
+body[data-view="home"] .quickbar,body[data-view="home"] .qa{position:static}
+body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+#tdy{margin-bottom:12px}#tdy .sh{margin-top:0}
+.home-order{display:flex;align-items:center;gap:8px;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;font-size:12px}
+.home-order:last-child{border-bottom:0}.home-order>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-order b{white-space:nowrap}.home-order .st{font-size:10px;gap:4px;white-space:nowrap}
+.grp b{letter-spacing:0;word-spacing:normal;font-variant-numeric:normal}
+.staff-card{display:flex;align-items:center;gap:12px;width:100%;margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--s1);text-align:left}
+.staff-avatar{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:50%;background:var(--s2);font-weight:600}
+.staff-main{flex:1;min-width:0}.staff-main b{display:block;overflow-wrap:anywhere;font-size:14px;font-weight:500}
+.staff-main small,.staff-end small{display:block;font-size:11px;color:var(--t2)}
+.staff-end{display:grid;justify-items:end;gap:4px;flex:none}
+.staff-role{font-size:10px;padding:4px 8px;border-radius:999px;background:var(--s2);color:var(--t2)}
+.staff-role.manager{background:rgba(193,145,40,.16);color:var(--warn)}.staff-role.master{background:rgba(60,150,120,.16);color:var(--ok)}
+.staff-role.pending{background:rgba(193,145,40,.24);color:var(--warn);font-weight:700}
+
+#ol>.card-group,#ol>.grp{grid-column:1/-1}#ol .card-group{margin-top:12px}.order-compact{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;width:100%;text-align:left;color:inherit}.order-compact b{font-size:13px}.order-compact small{display:block;font-size:11px;color:var(--t2)}.compact-total{text-align:right}.compact-total small{color:var(--ok)}.compact-content{grid-column:1/-1;font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Desktop: рабочая сетка и инспектор только при открытом содержимом. */
+@media(min-width:768px){
+ :root{--inspector:400px;--scroll-thumb:rgba(255,255,255,.14)}
+ html[data-t="light"]{--scroll-thumb:rgba(30,40,55,.25)}
+ body:not(.noauth){grid-template-columns:240px minmax(0,1fr) 0px;transition:grid-template-columns .22s var(--ease)}
+ body:not(.noauth):has(#sheet.on){grid-template-columns:240px minmax(0,1fr) var(--inspector)}
+ #sheet{overflow:hidden;border-left:0;visibility:hidden;pointer-events:none;transition:visibility .22s}
+ #sheet.on{visibility:visible;pointer-events:auto;border-left:1px solid var(--line)}
+ #sheet:not(.on) .panel{visibility:hidden}
+ #sheet .inspector-empty{display:none!important}
+ body[data-view="home"] .quickbar,body[data-view="home"] .qa{display:none}
+ body[data-view="home"] .home-grid{display:block}
+ body[data-view="home"] .home-feed{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+ #tdy .tiles{grid-template-columns:repeat(3,minmax(0,200px));justify-content:start}
+ #tdy .tile{min-height:76px}#tdy{padding:14px}
+ #sl{display:block}
+ #sl>.card-group{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px}
+ #sl .card-group>.grp{grid-column:1/-1}
+ #sl .card-group>.li{margin:0}
+ #ol{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:14px}
+ #ol>.card-group,#jl>.card-group{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:14px}
+ #ol>.card-group>.grp,#jl>.card-group>.grp{grid-column:1/-1}
+ #jl .card-group>.li{margin:0}
+ .order-actions{justify-content:flex-end}
+ .order-actions button{flex:0 0 auto;width:auto;min-height:36px;height:36px;padding:0 16px;font-size:13px}
+ body[data-view="profile"] #view{width:100%;max-width:640px;justify-self:center}
+ .profile-logout{width:auto;min-width:180px}
+ .side-profile.on{background:var(--s3);border-radius:12px;box-shadow:0 0 0 6px var(--s3)}
+ body[data-view="stats"] #view{width:100%;max-width:1320px;justify-self:center}
+ .sel select{padding-right:40px!important;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+ body,#view,.panel{scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) transparent}
+ body::-webkit-scrollbar,#view::-webkit-scrollbar,.panel::-webkit-scrollbar{width:6px;height:6px}
+ body::-webkit-scrollbar-track,#view::-webkit-scrollbar-track,.panel::-webkit-scrollbar-track{background:transparent}
+ body::-webkit-scrollbar-thumb,#view::-webkit-scrollbar-thumb,.panel::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:999px}
+}
+
+
+/* Собранная рабочая область и центральные стеклянные окна. */
+@media(min-width:768px){
+ body:not(.noauth),body:not(.noauth):has(#sheet.on){grid-template-columns:240px minmax(0,1fr);transition:none}
+ :root{--sidebar:240px}
+ .top,#view,body.form #view{width:100%;max-width:1160px;margin-left:auto;margin-right:auto;justify-self:center}
+ .top{padding:16px 24px}
+ #view,body.form #view{padding:20px 24px 40px}
+ body[data-view="stats"] #view{max-width:1160px}
+ body[data-view="profile"] #view{max-width:640px}
+ body::before{background:radial-gradient(ellipse 70% 45% at 58% 0%,rgba(120,137,160,.09),transparent 75%),var(--bg)}
+ html[data-t="light"] body::before{background:radial-gradient(ellipse 70% 45% at 58% 0%,rgba(130,155,190,.12),transparent 75%),var(--bg)}
+ .workspace-card,.metric,.li,.order-card,.tt,.tile,.staff-card,.profile-group,.who{box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+ body[data-view="home"] .home-feed{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:20px}
+ body[data-view="home"] .home-feed>.workspace-card{height:100%}
+ #tdy{background:var(--s1);padding:12px 16px;margin-bottom:16px}
+ #tdy .sh{margin:0 0 8px}
+ #tdy .tiles{display:flex;gap:24px;flex-wrap:wrap}
+ #tdy .tile{display:flex;flex-direction:row;align-items:baseline;gap:8px;border:0;border-radius:0;box-shadow:none;background:none;min-height:0;padding:0}
+ #tdy .tv{margin:0;font-size:20px;order:0}#tdy .ts{font-size:11px}
+ #sl>.card-group{padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--s1);grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+ #sl .card-group>.grp{margin:0;justify-content:flex-start;gap:16px}
+ #sl .card-group>.li{background:var(--s2)}
+ #ol{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
+ #ol>.card-group{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
+ #jl>.card-group{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+ .order-actions{gap:6px}.order-actions button{padding:0 10px;font-size:12px}
+ #sheet,#sheet.on{position:fixed;inset:0;display:block;grid-column:auto;grid-row:auto;width:auto;height:auto;padding:0;border:0;z-index:60;overflow:hidden;background:transparent;transition:visibility 0s .25s}
+ #sheet:not(.on){visibility:hidden;pointer-events:none}
+ #sheet.on{visibility:visible;pointer-events:auto;transition-delay:0s}
+ #sheet .scrim{display:block;position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+ #sheet .panel,#sheet:not(.on) .panel{visibility:inherit;position:fixed;inset:auto;top:50%;left:50%;width:calc(100% - 48px);max-width:520px;height:auto;max-height:86vh;overflow-y:auto;padding:28px;border-radius:24px;background:rgba(22,25,30,.78);backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 28px 80px rgba(0,0,0,.65);transform:translate(-50%,-48%) scale(.96);opacity:0;transition:transform .25s var(--ease),opacity .25s}
+ #sheet.on .panel{transform:translate(-50%,-50%) scale(1);opacity:1}
+ html[data-t="light"] #sheet .panel{background:rgba(255,255,255,.85);border-color:rgba(255,255,255,.8);box-shadow:inset 0 1px 0 #fff,0 24px 64px rgba(30,40,55,.22)}
+ #sheet .grab,#sheet .inspector-empty{display:none!important}
+ #sheet .inspector-heading button{visibility:visible;border-radius:50%;width:32px;height:32px;font-size:22px}
+ body.dock-form .act{bottom:-28px;background:var(--glass);backdrop-filter:blur(16px)}
+ .sel select{padding-right:40px!important}
+ body:has(#sheet.on) #view{overflow:hidden}
+}
+
+
+@media(min-width:768px){
+ #workspace{grid-column:2;grid-row:2;min-width:0;min-height:0;width:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) transparent}
+ #workspace::-webkit-scrollbar{width:6px}#workspace::-webkit-scrollbar-track{background:transparent}#workspace::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:999px}
+ #view,body.form #view,body[data-view="stats"] #view{width:100%;max-width:1120px;overflow:visible;min-height:100%;margin:0 auto;padding:20px 24px 40px}
+ body[data-view="profile"] #view{max-width:640px}
+ body:has(#sheet.on) #workspace{overflow:hidden}
+ body.noauth #workspace{width:100%;overflow:visible}
+ .filterbar{position:static;top:auto;margin:0 0 16px;padding:0 0 4px;border:0;background:transparent;box-shadow:none}
+ .side-create .quick-btn{position:relative;justify-content:flex-start;min-height:42px;padding:10px 30px 10px 12px;border-radius:12px;background:var(--s2);border:1px solid var(--line);cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease,transform .15s ease}
+ .side-create .quick-btn::after{content:'+';position:absolute;right:12px;opacity:0;color:var(--t1);transition:opacity .15s}
+ .side-create .quick-btn:hover,.side-create .quick-btn:focus-visible{background:var(--s3);border-color:var(--line2);color:var(--t1)}
+ .side-create .quick-btn:hover svg,.side-create .quick-btn:focus-visible svg{color:var(--t1)}
+ .side-create .quick-btn:hover::after,.side-create .quick-btn:focus-visible::after{opacity:1}
+ .side-create .quick-btn:active{transform:scale(.97)}
+ body[data-active-form="arrival"] .side-create [data-v="arrival"],body[data-active-form="fwarr"] .side-create [data-v="fwarr"],body[data-active-form="sawing"] .side-create [data-v="sawing"],body[data-active-form="order"] .side-create [data-v="order"],body[data-active-form="fwproc"] .side-create [data-v="fwproc"]{background:var(--s3);border-color:var(--line2);color:var(--t1)}
+ .side-footer{padding-top:24px}
+ .side-profile{display:flex;gap:10px;width:100%;min-width:0;padding:10px 12px;background:var(--s1);border:1px solid var(--line);border-radius:14px;transition:background .15s,border-color .15s}
+ .side-profile:hover,.side-profile.on{background:var(--s2);border-color:var(--line2);box-shadow:none}
+ .side-avatar{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:50%;background:var(--s3);font-weight:600}
+ .side-profile>span:nth-child(2){flex:1;min-width:0}
+ .side-profile small{display:inline-block;padding:2px 6px;margin-top:3px;border-radius:999px;background:var(--s2)}
+ .side-profile>svg{width:16px;height:16px;color:var(--t2)}
+ #jl>.card-group>.li:only-of-type{grid-column:1/-1}
+}
+
 </style>
 </head>
 <body class="noauth">
@@ -271,14 +657,15 @@ html.lite .tile,html.lite .tt{-webkit-backdrop-filter:none;backdrop-filter:none}
   <h1 id="title">Лесопилка</h1>
   <div id="hact"></div>
 </header>
-<main id="view"></main>
+<div id="workspace"><main id="view"></main></div>
 <nav class="tabs" id="tabs" aria-label="Разделы"></nav>
 <div class="act"><button class="btn" id="ok" data-a="ok"></button></div>
-<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="scrim" data-a="no"></div><div class="panel"><div class="grab"></div><div id="sb"></div></div></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="scrim" data-a="no"></div><div class="panel"><div class="grab"></div><div class="inspector-heading"><span>Детали и действия</span><button data-a="no" aria-label="Закрыть панель">×</button></div><div class="inspector-empty"><span>Выберите объект</span><p>Откройте заказ или позицию склада, чтобы увидеть детали и доступные действия.</p></div><div id="sb"></div></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const tg = window.Telegram.WebApp, inTg = !!tg.initData;
+document.documentElement.classList.toggle('in-telegram', inTg);
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const NF = {};
@@ -292,7 +679,8 @@ const sum = (a, k) => a.reduce((s, x) => s + (+x[k] || 0), 0);
 const pad = n => String(n).padStart(2, '0'), ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? 0 : n; };
 const ST = {new: 'Новый', in_progress: 'В работе', completed: 'Завершён', canceled: 'Отменён'};
-const ROLE = {manager: 'Руководитель', master: 'Мастер', worker: 'Сотрудник'};
+const ROLE = {manager: 'Руководитель', master: 'Мастер', worker: 'Сотрудник', pending: 'Ожидает подтверждения'};
+const STAFF_ROLES = ['manager', 'master', 'worker'];
 /* палитра графиков — внутри дизайн-системы: blueprint blue, violet, ice, teal, signal, ember */
 const PAL = ['#b6d9fc', '#8a63f5', '#98c0ef', '#269684', '#027dea', '#e46d4c'];
 const ICP = {
@@ -319,15 +707,36 @@ const ICP = {
   trend: '<path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>', trendDown: '<path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/>',
   sNew: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>', sProg: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   sDone: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>', sCanc: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
+  moon: '<path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/>',
   mark: '<path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17z"/><path d="M12 22v-3"/>',
 };
 const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICP[n] || ''}</svg>`;
 
 tg.ready(); tg.expand();
-/* тема: всегда midnight — кастомная палитра является основной темой приложения */
+/* Тема пользователя имеет приоритет над оформлением Telegram. */
+let chosenTheme = null;
+try { chosenTheme = localStorage.getItem('theme'); } catch (e) {}
+if (!['light', 'dark'].includes(chosenTheme)) chosenTheme = null;
 function theme() {
-  document.documentElement.dataset.t = 'dark';
-  try { tg.setHeaderColor('#121412'); tg.setBackgroundColor('#121412'); } catch (e) {}
+  const mode = chosenTheme || (inTg ? tg.colorScheme : 'dark') || 'dark';
+  document.documentElement.dataset.t = mode;
+  document.querySelector('meta[name="color-scheme"]').content = mode;
+  const bg = mode === 'light' ? '#f2f4f7' : '#0b0c0e';
+  document.querySelector('meta[name="theme-color"]').content = bg;
+  try { tg.setHeaderColor(bg); } catch (e) {}
+  try { tg.setBackgroundColor(bg); } catch (e) {}
+  $$('[data-a="theme"]').forEach(b => {
+    const dark = mode === 'dark';
+    if (b.getAttribute('role') === 'switch') b.setAttribute('aria-checked', String(dark));
+    else { b.innerHTML = ic(dark ? 'sun' : 'moon'); b.setAttribute('aria-label', dark ? 'Включить светлую тему' : 'Включить тёмную тему'); b.title = b.getAttribute('aria-label'); }
+  });
+}
+function toggleTheme() {
+  chosenTheme = document.documentElement.dataset.t === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem('theme', chosenTheme); } catch (e) {}
+  theme();
+  const label = document.querySelector('.profile-setting .mut'); if(label) label.textContent = document.documentElement.dataset.t === 'dark' ? 'Тёмная тема' : 'Светлая тема';
 }
 theme(); tg.onEvent('themeChanged', theme);
 try { tg.MainButton.hide(); } catch (e) {}
@@ -356,8 +765,9 @@ function perfProbe() {
 
 /* ---------- состояние и утилиты ---------- */
 const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month', cq: ''};
+const canSuper = () => S.isSuperAdmin && S.accountRole !== 'pending' && !S.previewRole;
 let CFG = {pdf_send: true}; // настройки с сервера (/config)
-const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: []};
+const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}};
 let MEM = {}; try { MEM = JSON.parse(localStorage.getItem('mem') || '{}'); } catch (e) {}
 const mem = (k, v) => { MEM[k] = v; try { localStorage.setItem('mem', JSON.stringify(MEM)); } catch (e) {} };
 const hap = t => { try { tg.HapticFeedback.impactOccurred(t || 'light'); } catch (e) {} };
@@ -372,7 +782,8 @@ function toast(m, k = 'ok') { const t = $('#toast'); t.className = k + ' on'; t.
 
 async function api(path, opts = {}) {
   const headers = {'Content-Type': 'application/json', ...(opts.headers || {})};
-  if (token()) headers.Authorization = 'Bearer ' + token();
+  const session = token();
+  if (session) headers.Authorization = 'Bearer ' + session;
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
   let r, text;
   try {
@@ -387,6 +798,11 @@ async function api(path, opts = {}) {
   if (!r.ok) {
     const supplied = data && (data.message || data.error || data.detail);
     const plainMessage = !data && text.trim() ? text.trim() : null;
+    if (r.status === 403 && plainMessage === 'доступ ожидает подтверждения руководителем' &&
+        session && session === token() && S.cur !== 'pending') {
+      S.accountRole = 'pending';
+      vPending();
+    }
     if (r.status === 401 || r.status === 403) throw new Error(supplied || plainMessage || 'Нет доступа. Возможно, нужно войти снова.');
     if (r.status >= 500) throw new Error(supplied || plainMessage || 'На сервере произошла ошибка. Попробуйте позже.');
     throw new Error(supplied || plainMessage || (r.status === 400 ? 'Проверьте введённые данные.' : `Не удалось выполнить запрос (${r.status}).`));
@@ -395,8 +811,24 @@ async function api(path, opts = {}) {
   return data;
 }
 const safe = async u => { try { return (await api(u)) || []; } catch (e) { toast(e.message, 'err'); return null; } };
-async function loadConfig() { try { const c = await api('/config'); if (c) CFG = {...CFG, ...c}; } catch (e) { /* необязательная конфигурация: используются значения по умолчанию */ } }
-async function loadStock() { const [b, l] = await Promise.all([safe('/boards'), safe('/logs')]); if (b) D.boards = b; if (l) D.logs = l; return !!b && !!l; }
+async function loadConfig() {
+  const session = token();
+  try {
+    const c = await api('/config');
+    if (!c || token() !== session) return false;
+    CFG = {...CFG, ...c};
+    if (!Object.hasOwn(ROLE, c.role) || typeof c.is_super_admin !== 'boolean' ||
+        (S.accountRole === c.role && S.isSuperAdmin === c.is_super_admin)) return true;
+    S.accountRole = c.role; S.isSuperAdmin = c.is_super_admin;
+    if (!S.isSuperAdmin) S.previewRole = '';
+    if (c.role === 'pending') { vPending(); return true; }
+    S.role = S.previewRole || (S.isSuperAdmin ? 'manager' : S.accountRole);
+    document.body.classList.remove('noauth');
+    buildTabs(); go(S.cur === 'profile' ? 'profile' : 'home');
+    return true;
+  } catch (e) { return false; }
+}
+async function loadStock() { const [b, l, f] = await Promise.all([safe('/boards'), safe('/logs'), safe('/firewood/stock')]); if (b) D.boards = b; if (l) D.logs = l; if (f) D.fw = f; return !!b && !!l && !!f; }
 async function ensureCon() { if (Object.keys(D.con).length) return true; const list = await safe('/contractors'); if (!list) return false; D.cl = list; list.forEach(c => D.con[c.id] = c.name); return true; }
 
 function countUp(root = $('#view')) {
@@ -409,18 +841,43 @@ function countUp(root = $('#view')) {
 }
 
 /* ---------- шторка и подтверждение ---------- */
-let ASK = null;
-const sheet = html => { $('#sb').innerHTML = html; $('#sheet').classList.add('on'); };
-const closeSheet = () => $('#sheet').classList.remove('on');
-function ask(e, title, text, ok) {
-  return new Promise(res => {
-    ASK = res;
-    sheet(`<h3>${esc(title)}</h3><p class="mut">${esc(text)}</p>
-      <div class="two"><button class="btn ghost" data-a="no">Отмена</button><button class="btn" data-a="yes">${esc(ok)}</button></div>`);
+let ASK = null, sheetSnapshot = null, dockOrigin = null, sheetFocus = null;
+const desktop = () => matchMedia('(min-width:768px)').matches;
+function sheet(html) {
+  if (!$('#sheet').classList.contains('on')) sheetFocus=document.activeElement;
+  $('#sb').innerHTML=html;
+  $('#sheet').classList.add('on');
+  $('#sheet').setAttribute('aria-modal','true');
+  $('.panel').scrollTop=0;
+  requestAnimationFrame(()=>$('#sb').querySelector('input,select,button')?.focus({preventScroll:true}));
+}
+function closeSheet() {
+  if(dockOrigin !== null) {
+    document.body.append($('.act'));
+    S.cur=dockOrigin; dockOrigin=null; FK=null;
+    document.body.classList.remove('dock-form'); document.body.removeAttribute('data-active-form');
+  }
+  $('#sheet').classList.remove('on');
+  $('#sb').replaceChildren();
+  sheetFocus?.isConnected && sheetFocus.focus({preventScroll:true});
+}
+function ask(e,title,text,ok) {
+  if(ASK) return Promise.resolve(false);
+  return new Promise(res=>{
+    ASK=res;
+    sheetSnapshot=$('#sheet').classList.contains('on') ? document.createDocumentFragment() : null;
+    if(sheetSnapshot) while($('#sb').firstChild) sheetSnapshot.append($('#sb').firstChild);
+    sheet(`<h3>${esc(title)}</h3><p class="mut">${esc(text)}</p><div class="two"><button class="btn ghost" data-a="no">Отмена</button><button class="btn" data-a="yes">${esc(ok)}</button></div>`);
   });
 }
-const settle = v => { closeSheet(); if (ASK) { const r = ASK; ASK = null; r(v); } };
-
+function settle(v) {
+  if(ASK) {
+    const r=ASK; ASK=null;
+    if(sheetSnapshot && (!v || dockOrigin !== null)) { $('#sb').replaceChildren(sheetSnapshot); sheetSnapshot=null; }
+    else { sheetSnapshot=null; closeSheet(); }
+    r(v);
+  } else closeSheet();
+}
 /* ---------- навигация ---------- */
 const TABS = ['home', 'stock', 'orders', 'journal', 'stats'];
 const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники', cons: 'Контрагенты', adjlog: 'Корректировки склада'};
@@ -431,29 +888,47 @@ function buildTabs() {
   const t = [['home', 'home', 'Главная'], ['stock', 'box', 'Склад']];
   if (canOrd()) t.push(['orders', 'order', 'Заказы']);
   t.push(['journal', 'journal', 'Журнал']);
-  $('#tabs').innerHTML = t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}</button>`).join('');
+  if(S.role==='manager') t.push(['stats','chart','Отчёты']);
+  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+'<span>Лесопилка<small>Рабочее пространство</small></span></div>' + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile"><span class="side-avatar">${esc((S.name || '?')[0].toUpperCase())}</span><span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span>${ic('chev')}</button></div>`;
+  theme();
 }
-const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}">${ic('plus')}${l}</button>`;
+const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-label="Создать: ${l}" title="Создать: ${l}">${ic('plus')}<span>${l}</span></button>`;
 function setAct(v) {
-  $('#hact').innerHTML = v === 'home' ? `${S.role === 'manager' ? `<button class="rbtn" data-a="go" data-v="stats" aria-label="Отчёты">${ic('chart')}<span>Отчёты</span></button>` : ''}<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль">${esc((S.name || '?')[0].toUpperCase())}</button>`
-    : v === 'orders' ? hbtn('order', 'Заказ')
-    : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Приход') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
+  const actions = v === 'staff' ? hbtn('user','Сотрудник') : v === 'cons' ? '<button class="hbtn" data-a="cedit" data-v="new">'+ic('plus')+'<span>Контрагент</span></button>' : v === 'orders' ? hbtn('order', 'Новый заказ')
+    : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
+  $('#hact').innerHTML = (v === 'home' ?
+    (S.role === 'manager' ? '<button class="hbtn home-reports" data-a="go" data-v="stats" aria-label="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
+    '<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль" title="Профиль">' + esc((S.name || '?')[0].toUpperCase()) + '</button>' : '') + actions;
+  theme();
 }
 function go(v, p) {
+  if(ASK) settle(false);
+  if(FORMS[v] && desktop()) {
+    closeSheet(); dockOrigin=S.cur;
+    document.body.classList.add('dock-form'); document.body.dataset.activeForm=v;
+    sheet(`<h3>${esc(FORMS[v].t)}</h3><div id="formbody"></div>`);
+    $('#sb').append($('.act'));
+    vForm(v,p); return;
+  }
+  closeSheet();
   if (TABS.includes(v)) { S.tab = v; S.stack = []; } else S.stack.push(S.cur);
   show(v, p);
 }
-function back() { show(S.stack.pop() || S.tab); }
+function back() { if(S.cur==='stats'){go('home');return;} if(dockOrigin!==null){ const origin=dockOrigin; closeSheet(); show(origin); return; } show(S.stack.pop() || S.tab); }
 function show(v, p) {
+  if(ASK) settle(false);
+  closeSheet();
   S.cur = v;
-  const f = FORMS[v], sub = !!f || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog';
+  document.body.dataset.view = v;
+  const f = FORMS[v], sub = !!f || v === 'stats' || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog';
   document.body.classList.toggle('form', !!f);
   document.body.classList.toggle('sub', sub);
   $('#title').textContent = f ? f.t : v === 'home' ? 'Лесопилка' : TT[v] || 'Лесопилка';
   setAct(v);
+  const profileButton=$('.side-profile'); if(profileButton){profileButton.classList.toggle('on',v==='profile');v==='profile'?profileButton.setAttribute('aria-current','page'):profileButton.removeAttribute('aria-current');}
   $$('.tab').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
   try { sub ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {}
-  scrollTo(0, 0);
+  scrollTo(0, 0); $('#workspace').scrollTop=0; $('#view').scrollTop=0;
   if (f) vForm(v, p); else ({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff, cons: vCons, adjlog: vAdjLog}[v] || (() => {}))();
 }
 tg.BackButton.onClick(back);
@@ -463,7 +938,7 @@ $('#hb').innerHTML = ic('back');
 const SPX = ['#d8c7a1', '#9fb3a0', '#c49a76', '#cfd3d8', '#8a7a5e', '#7c8799'], SPN = {'сосна': 0, 'ель': 1, 'лиственница': 2, 'берёза': 3, 'дуб': 4};
 const spc = (n, i) => SPX[SPN[String(n).toLowerCase()] ?? i % SPX.length];
 const li = (t, s, v, s2, o = {}) => { const tag = o.a ? 'button' : 'div'; return `<${tag} class="li"${o.a ? ` data-a="${o.a}" data-v="${esc(o.d)}"` : ''}><span class="li-m"><span class="li-t">${t}</span><span class="li-s">${s}</span></span><span class="li-e"><span class="li-v">${v}</span><span class="li-s">${s2}</span></span>${o.lines ? `<span class="li-l">${o.lines}</span>` : ''}</${tag}>`; };
-const grp = (h, b, rows) => `<section><h2 class="grp"><span>${h}</span>${b ? `<b>${b}</b>` : ''}</h2>${rows}</section>`;
+const grp = (h, b, rows) => `<section class="card-group"><h2 class="grp"><span>${h}</span>${b ? `<b>${b}</b>` : ''}</h2>${rows}</section>`;
 const fail = (m, v) => `<div class="empty"><span class="eic">${ic('warn')}</span><b>${m}</b><button class="btn ghost" data-a="go" data-v="${v}">Повторить</button></div>`;
 const none = (t, s) => `<div class="empty"><span class="eic">${ic('inbox')}</span><b>${t}</b>${s ? `<span>${s}</span>` : ''}</div>`;
 const dayKey = s => { if (!s) return ''; const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T00:00:00') : new Date(s); return isNaN(d) ? '' : ymd(d); };
@@ -476,7 +951,13 @@ const dayLabel = k => {
 };
 const byDay = (list, kf, rf) => { const g = new Map(); list.forEach(x => { const k = dayKey(kf(x)); if (!g.has(k)) g.set(k, []); g.get(k).push(x); }); return [...g].map(([k, a]) => grp(dayLabel(k), '', a.map(rf).join(''))).join(''); };
 const lines = a => a.map(l => `<span>${esc(l)}</span>`).join('');
-const isOpen = o => o.status !== 'completed' && o.status !== 'canceled';
+const isOpen = o => o.status === 'new' || o.status === 'in_progress';
+function orderStatusButtons(o, detail = false) {
+  if (!canOrd() || !isOpen(o)) return '';
+  const cls = detail ? 'btn ghost' : '';
+  return `${o.status === 'new' ? `<button class="${cls}" data-a="ostatus" data-v="${esc(o.id)}:in_progress">Взять в работу</button>` : ''}
+    <button class="${cls} order-cancel" data-a="ostatus" data-v="${esc(o.id)}:canceled">Отменить заказ</button>`;
+}
 const STC = {new: '#d8c7a1', in_progress: '#9db8d8', completed: '#86d4ae', canceled: '#e8a29a'};
 const SI = {new: 'sNew', in_progress: 'sProg', completed: 'sDone', canceled: 'sCanc'};
 const stl = (s, big) => `<span class="st" style="--c:${STC[s] || '#a1a1aa'}">${big && SI[s] ? ic(SI[s]) : '<i></i>'}${esc(ST[s] || s)}</span>`;
@@ -487,7 +968,14 @@ const sdate = s => { const d = s ? new Date(s) : null; return d && !isNaN(d) ? d
 const oPaid = o => +o.paid_amount || 0;
 const oDue = o => Math.max(osum(o) - oPaid(o), 0);
 const payTxt = o => { const t = osum(o); if (t <= 0 || o.status === 'canceled') return ''; return oPaid(o) >= t - .005 ? 'оплачен' : oPaid(o) > 0 ? 'долг ' + fmt(oDue(o), 0) + ' ₽' : 'не оплачен'; };
-const oRow = o => { const t = osum(o); return li(`Заказ №${esc(o.id)}`, esc(D.con[o.contractor_id] || 'Клиент №' + o.contractor_id), stl(o.status), esc([odate(o, {day: 'numeric', month: 'short'}), t > 0 ? fmt(t, 0) + ' ₽' : '', payTxt(o)].filter(Boolean).join(' · ')), {a: 'order', d: o.id}); };
+const orderContents = o => [...(o.items || []).map(p => { const b = p.height_mm ? p : D.boards.find(x=>x.id==p.board_id) || p; return `${b.height_mm ? boardTitle(b) + ' · ' + lenM(b.length_mm) : 'Доски · позиция №' + p.board_id} — ${fmt(p.count,0)} шт${p.volume_m3 != null ? ' · '+fmt(p.volume_m3,3)+' м³' : ''}`; }), ...(o.firewood_items || []).map(p=>`${FW_NAMES[p.kind] || 'Дрова'} — ${fmt(p.volume_m3,3)} м³`)];
+const oRow = o => { const t = osum(o), paid=oPaid(o), contents=orderContents(o); if(o.status==='completed' && oDue(o)<=.005) return `<button class="order-card order-compact" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(o.id)} · ${esc(sdate(o.created_at))}</b><small>${esc(D.con[o.contractor_id]||'Клиент №'+o.contractor_id)}</small></span><span class="compact-total"><b>${fmt(t,0)} ₽</b><small>✓ Оплачен</small></span><span class="compact-content">${esc(contents.join('; '))}</span></button>`; return `<article class="order-card">
+<button class="order-head" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(o.id)}</b><small>${esc(D.con[o.contractor_id] || 'Клиент №'+o.contractor_id)}</small></span>${stl(o.status)}</button>
+${contents.length ? `<div class="order-content">${contents.map(x=>`<span>${esc(x)}</span>`).join('')}</div>` : ''}
+<div class="payment-summary"><span>Оплачено <b>${fmt(paid,0)} ₽</b></span><span>${o.status==='canceled' ? 'Отменён' : 'Долг '+fmt(oDue(o),0)+' ₽'}</span></div>
+<div class="bar"><i style="--w:${t>0 ? Math.min(100,paid/t*100) : 0}%"></i></div>
+<div class="order-meta"><span>${esc(odate(o,{day:'numeric',month:'short'}))}</span><b>${fmt(t,0)} ₽</b></div>
+<div class="order-actions"><button data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button>${canOrd() && o.status!=='canceled' && t>0 ? `<button data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}${canOrd() && isOpen(o) ? `<button class="primary" data-a="done" data-v="${esc(o.id)}">Завершить</button>` : ''}${orderStatusButtons(o)}</div></article>`; };
 const pl = (n, f) => { n = Math.abs(n) % 100; const k = n % 10; return n > 10 && n < 20 ? f[2] : k > 1 && k < 5 ? f[1] : k === 1 ? f[0] : f[2]; };
 const fmtR = n => n >= 1e6 ? fmt(n / 1e6, 1) + ' млн' : fmt(n, 0);
 const tot = (a, f) => a.reduce((x, y) => x + (+f(y) || 0), 0);
@@ -510,48 +998,29 @@ function rng(r) {
 const sQ = (a, b) => `/statistics?start_date=${encodeURIComponent(a)}&end_date=${encodeURIComponent(b)}`;
 
 /* Шкала индикатора: сколько м³ соответствует 100% дуги. null = подбирается автоматически. */
-const GAUGE_MAX = null;
-const gaugeMax = v => { if (GAUGE_MAX) return GAUGE_MAX; if (v <= 0) return 1; const p = 10 ** Math.floor(Math.log10(v)); return [1, 1.5, 2, 3, 5, 7.5, 10].map(k => k * p).find(x => x >= v) || 10 * p; };
-const QA = {arrival: ['tractor', '#f4a261'], sawing: ['sawing', '#7b82f0'], order: ['cart', '#7fd18b']};
 
+const quickActions = () => [canOrd() && ['arrival','Приход леса','arrival'], canOrd() && ['fwarr','Дрова','box'], S.role !== 'master' && ['sawing','Распил','sawing'], canOrd() && ['order','Заказ','order'], !canOrd() && ['fwproc','Переработка дров','box']].filter(Boolean);
+const quickBar = () => quickActions().map(([k,l,i]) => `<button class="quick-btn" data-a="new" data-v="${k}">${ic(i)}<span>${l}</span></button>`).join('');
+const homeOrderRow = o => `<button class="home-order" data-a="order" data-v="${esc(o.id)}"><span>Заказ №${esc(o.id)} · ${esc(D.con[o.contractor_id] || "Клиент №"+o.contractor_id)}</span><b>${fmt(osum(o),0)} ₽</b>${stl(o.status)}</button>`;
 async function vHome() {
-  const v = $('#view'), m = S.role === 'manager';
-  const qa = [['arrival', 'Приход<br>леса'], ['sawing', 'Распиловка'], canOrd() && ['order', 'Новый<br>заказ']].filter(Boolean);
-  v.innerHTML = `<section class="stock"><p class="lbl">Готовая продукция на складе</p>
-      <div class="gauge"><svg viewBox="0 0 300 160" aria-hidden="true"><path class="g-t" d="M20 150A130 130 0 0 1 280 150"/><path class="g-f" id="gf" pathLength="100" d="M20 150A130 130 0 0 1 280 150"/></svg>
-        <div class="gv"><div class="big" id="gbig"><span>0</span></div><div class="gs" id="gs">&nbsp;</div></div></div>
-      <p class="gm" id="gm">&nbsp;</p><div id="hdl"></div>
-      <div class="qa" style="--n:${qa.length}">${qa.map(([k, l]) => `<button class="qa-b" style="--c:${QA[k][1]}" data-a="new" data-v="${k}"><i class="dot"></i>${ic(QA[k][0])}<span>${l}</span></button>`).join('')}</div></section>
-    <div id="hd">${sk(3)}</div>`;
-  const [, orders, st] = await Promise.all([loadStock(), canOrd() ? safe('/orders') : [], m ? api(sQ(...rng('month'))).catch(e => { toast(e.message, 'err'); return null; }) : null, ensureCon()]);
+  const v = $('#view');
+  v.innerHTML = `<div class="quickbar">${quickBar()}</div><div id="hd">${sk(4)}</div>`;
+  const [stockOK, orders] = await Promise.all([loadStock(), canOrd() ? safe('/orders') : [], ensureCon()]);
   if (S.cur !== 'home' || !$('#hd')) return;
+  if (!stockOK) { $('#hd').innerHTML = fail('Не удалось загрузить остатки', 'home'); return; }
   if (orders) D.orders = orders;
-  const bv = sum(D.boards, 'volume_m3'), bc = sum(D.boards, 'count'), lv = sum(D.logs, 'volume_m3');
-  const open = D.orders.filter(isOpen), np = D.boards.length;
-  const by = {}; D.boards.forEach(b => { const k = b.species || '—', e = by[k] || (by[k] = {v: 0, c: 0, low: 0}); e.v += +b.volume_m3 || 0; e.c += +b.count || 0; if ((+b.count || 0) <= LOW_STOCK_PCS) e.low++; });
-  const sp = Object.entries(by).sort((a, b) => b[1].v - a[1].v), top = sp.slice(0, 5);
-  const rest = sp.slice(5).reduce((a, [, e]) => ({v: a.v + e.v, c: a.c + e.c, low: a.low + e.low}), {v: 0, c: 0, low: 0});
-  const leg = [...top, ...(rest.v > 0 ? [['Прочее', rest]] : [])];
-  /* индикатор */
-  const pct = Math.max(0, Math.min(100, bv / gaugeMax(bv) * 100)), gf = $('#gf'), txt = fmt(bv, 2);
-  gf.style.opacity = pct > 0.5 ? 1 : 0; gf.style.strokeDashoffset = 100 - pct;
-  const gb = $('#gbig'); gb.style.fontSize = txt.length <= 5 ? '' : txt.length <= 7 ? '60px' : '46px';
-  gb.innerHTML = `<span data-n="${bv}" data-d="2">0</span>`;
-  $('#gs').textContent = 'м³ на складе';
-  $('#gm').textContent = `${fmt(bc, 0)} шт · ${fmt(np, 0)} ${pl(np, ['позиция', 'позиции', 'позиций'])} · сырьё ${fmt(lv, 1)} м³`;
-  const row = ([n, e], i) => `<div class="lg"><div class="lg-h"><span class="lg-n">${esc(n)}</span><b>${fmt(e.v, 2)} м³</b></div>
-      <span class="pb" style="--w:${Math.max(2, e.v / bv * 100)}%;--c:${spc(n, i)}"><i></i></span>
-      <div class="lg-f"><span>${fmt(e.c, 0)} шт · ${fmt(e.v / bv * 100, 0)}%</span>${e.low ? lowTag(`Мало на складе: ${e.low} ${pl(e.low, ['позиция', 'позиции', 'позиций'])}`) : ''}</div></div>`;
-  $('#hd').innerHTML = `${leg.length && bv > 0 ? `<div class="spl">${leg.map(row).join('')}</div>` : ''}
-    <div id="tdy"><div class="sh"><h2>Сегодня</h2></div><div class="tiles" style="--n:3">${'<div class="sk tile"></div>'.repeat(3)}</div></div>
-    ${m && st ? `<div class="sh"><h2>За месяц</h2></div>
-      <div class="ld"><span>Выручка</span><b data-n="${st.total_sales_amount || 0}" data-u=" ₽">0</b></div>
-      <div class="ld"><span>Продано</span><b data-n="${st.total_sales_volume || 0}" data-d="1" data-u=" м³">0</b></div>
-      <div class="ld"><span>Распилено</span><b data-n="${st.total_logs_sawed_volume || 0}" data-d="1" data-u=" м³">0</b></div>` : ''}
-    ${canOrd() ? `<div class="sh"><h2>Активные заказы${open.length ? ' (' + open.length + ')' : ''}</h2><button class="lnk" data-a="go" data-v="orders">Все заказы</button></div>
-      ${open.length ? open.slice(0, 3).map(oRow).join('') : '<p class="mut">Активных заказов нет</p>'}` : ''}
-    <div id="rcn"><div class="sh"><h2>Последние действия</h2></div>${sk(3)}</div>`;
-  countUp(v);
+  const bv = sum(D.boards,'volume_m3'), bc = sum(D.boards,'count'), lv = sum(D.logs,'volume_m3');
+  const open = D.orders.filter(isOpen), fw = D.fw, ready = (+fw.split_m3 || 0) + (+fw.round_m3 || 0);
+  const metric = (label,value,sub,tab) => `<button class="metric" data-a="homekpi" data-v="${tab}"><span>${label}</span><strong>${value}</strong><small>${sub}</small></button>`;
+  $('#hd').innerHTML = `<div class="metrics">
+    ${metric('Готовая продукция',fmt(bv,2)+' м³',fmt(bc,0)+' шт','boards')}
+    ${metric('Сырьё · брёвна',fmt(lv,2)+' м³',D.logs.length+' '+pl(D.logs.length,['партия','партии','партий']),'logs')}
+    ${metric('Дрова · сырьё',fmt(fw.raw_m3,2)+' м³','Готовые: '+fmt(ready,2)+' м³','firewood')}
+    ${canOrd() ? metric('Активные заказы',orders ? open.length : '—',orders ? 'В работе' : 'Не удалось загрузить','orders') : metric('Производство','Распил','Перейти в журнал','journal')}
+    </div><section id="tdy" class="workspace-card"></section><div class="home-grid"><div class="home-feed">
+    ${canOrd() ? `<section class="workspace-card"><div class="sh"><h2>Заказы в работе <span class="tag">${open.length}</span></h2><button class="lnk" data-a="go" data-v="orders">Все →</button></div>${orders ? (open.length ? open.slice(0,3).map(homeOrderRow).join('') : '<p class="mut">Все заказы выполнены</p>') : '<p class="mut">Заказы временно недоступны</p>'}</section>` : ''}
+    <section id="rcn" class="workspace-card">${sk(3)}</section></div></div>`;
+  v.prepend($('.metrics'));
   homeExtra(open);
 }
 /* «Сегодня», изменение за 7 дней, последние действия: считаем из журналов, которые уже отдаёт API */
@@ -566,13 +1035,6 @@ async function homeExtra(open) {
   if (sal) { const a = sal.filter(x => dayKey(x.created_at) === td), amt = tot(a, x => x.total_price); tl.push(['Продано', fmt(tot(a, x => x.total_volume), 2), 'м³' + (amt > 0 ? ' · ' + fmt(amt, 0) + ' ₽' : '')]); }
   if (canOrd()) tl.push(['Активные', fmt(open.length, 0), pl(open.length, ['заказ', 'заказа', 'заказов'])]);
   $('#tdy').innerHTML = tl.length ? `<div class="sh"><h2>Сегодня</h2></div><div class="tiles" style="--n:${tl.length}">${tl.map(([l, x, t]) => `<div class="tile"><span class="tl">${l}</span><b class="tv">${x}</b><span class="ts">${t}</span></div>`).join('')}</div>` : '';
-  if (saw && sal && $('#hdl')) {
-    const full = (l, f) => l.length < 100 || l.some(x => dayKey(f(x)) < w0);
-    if (full(saw, x => x.date) && full(sal, x => x.created_at)) {
-      const d = tot(saw.filter(x => dayKey(x.date) >= w0), sOut) - tot(sal.filter(x => dayKey(x.created_at) >= w0), x => x.total_volume);
-      if (Math.abs(d) >= 0.05) $('#hdl').innerHTML = `<div class="dlt ${d > 0 ? 'up' : 'dn'}">${ic(d > 0 ? 'trend' : 'trendDown')}${d > 0 ? '+' : '−'}${fmt(Math.abs(d), 1)} м³ за 7 дней</div>`;
-    }
-  }
   const ev = [];
   (arr || []).forEach(x => ev.push({id: x.id, d: x.arrival_date, i: 'arrival', t: 'Приход леса', s: D.con[x.supplier_id] || 'Поставщик №' + x.supplier_id, v: fmt(sum(x.items || [], 'volume_m3'), 2) + ' м³'}));
   (saw || []).forEach(x => ev.push({id: x.id, d: x.date, i: 'sawing', t: 'Распил', s: 'Сырья ' + fmt(sIn(x), 2) + ' м³', v: fmt(sOut(x), 2) + ' м³'}));
@@ -582,14 +1044,24 @@ async function homeExtra(open) {
 }
 
 /* ---------- журнал: приходы, распилы, продажи ---------- */
+const journalLinks = new Map();
+function journalCard(kind, item, title, sub, value, unit, details) {
+  const key = `${kind}:${item.id}`;
+  if (canSuper()) journalLinks.set(key, {kind, item, title, sub, value, unit, details});
+  return li(esc(title), esc(sub), esc(value), esc(unit),
+    {lines: lines(details), ...(canSuper() ? {a:'opdetail', d:key} : {})});
+}
 async function jArrivals(box) {
-  const [a, c] = await Promise.all([safe('/arrivals?limit=100'), ensureCon()]);
+  const [a, fw, c] = await Promise.all([safe('/arrivals?limit=100'), safe('/firewood/arrivals?limit=100'), ensureCon()]);
   if (!box.isConnected) return;
   if (!a || !c) { box.innerHTML = fail('Не удалось загрузить поступления', 'journal'); return; }
-  box.innerHTML = a.length ? tots([['Приходов', a.length], ['Штук', fmt(tot(a.flatMap(x => x.items || []), x => x.count), 0)], ['Объём, м³', fmt(tot(a.flatMap(x => x.items || []), x => x.volume_m3), 2)]]) + cap(a) + byDay(a, x => x.arrival_date, x => {
+  const f = (fw || []).map(x => ({...x, fw: 1})), all = [...a, ...f].sort((x, y) => dayKey(y.arrival_date).localeCompare(dayKey(x.arrival_date)) || String(y.created_at).localeCompare(String(x.created_at)));
+  box.innerHTML = all.length ? tots([['Приходов', all.length], ['Лес, м³', fmt(tot(a.flatMap(x => x.items || []), x => x.volume_m3), 2)], ['Дрова, м³', fmt(tot(f, x => x.volume_m3), 2)]]) + cap(a) + byDay(all, x => x.arrival_date, x => {
     const it = x.items || [], sup = D.con[x.supplier_id] || 'Поставщик №' + x.supplier_id, car = D.con[x.carrier_id] || '№' + x.carrier_id;
-    return li(`Поступление №${esc(x.id)}`, esc(`${sup}, машина ${x.truck_number}`), `${fmt(sum(it, 'volume_m3'), 3)} м³`, `${fmt(sum(it, 'count'), 0)} шт`,
-      {lines: lines([...(car !== sup ? ['Перевозчик: ' + car] : []), ...it.map(i => `${i.species} Ø${i.diameter_mm} × ${lenM(i.length_mm)}, ${fmt(i.count, 0)} шт`)])});
+    const sub = `${sup}, машина ${x.truck_number}`, carrier = car !== sup ? ['Перевозчик: ' + car] : [];
+    if (x.fw) return journalCard('fwarr', x, `Дрова №${x.id}`, sub, `${fmt(x.volume_m3, 3)} м³`, 'берёза', carrier);
+    return journalCard('arrival', x, `Поступление №${x.id}`, sub, `${fmt(sum(it, 'volume_m3'), 3)} м³`, `${fmt(sum(it, 'count'), 0)} шт`,
+      [...carrier, ...it.map(i => `${i.species} Ø${i.diameter_mm} × ${lenM(i.length_mm)}, ${fmt(i.count, 0)} шт`)]);
   }) : none('Поступлений пока нет');
 }
 async function jProduction(box) {
@@ -598,8 +1070,9 @@ async function jProduction(box) {
   if (!ops) { box.innerHTML = fail('Не удалось загрузить распилы', 'journal'); return; }
   box.innerHTML = ops.length ? tots([['Распилов', ops.length], ['Сырья, м³', fmt(tot(ops.flatMap(x => x.logs || []), x => x.volume_m3), 2)], ['Досок, м³', fmt(tot(ops.flatMap(x => x.boards || []), x => x.volume_m3), 2)]]) + cap(ops) + byDay(ops, x => x.date, x => {
     const inp = sum(x.logs || [], 'volume_m3'), out = sum(x.boards || [], 'volume_m3');
-    return li(`Распил №${esc(x.id)}`, `Сотрудник №${esc(x.worker_id)}`, `${fmt(out, 3)} м³`, `выход ${inp ? fmt(out / inp * 100, 0) : 0}%`,
-      {lines: lines([`Сырья ушло ${fmt(inp, 3)} м³`, ...(x.boards || []).map(b => `${b.height_mm}×${b.width_mm}, ${lenM(b.length_mm)}, ${b.species}${b.grade ? ', сорт ' + b.grade : ''}: ${fmt(b.count, 0)} шт`)])});
+    return journalCard('sawing', x, `Распил №${x.id}`, x.worker_id ? `Сотрудник №${x.worker_id}` : 'Сотрудник не указан',
+      `${fmt(out, 3)} м³`, `выход ${inp ? fmt(out / inp * 100, 0) : 0}%`,
+      [`Сырья ушло ${fmt(inp, 3)} м³`, ...(x.boards || []).map(b => `${b.height_mm}×${b.width_mm}, ${lenM(b.length_mm)}, ${b.species}${b.grade ? ', сорт ' + b.grade : ''}: ${fmt(b.count, 0)} шт`)]);
   }) : none('Распилов пока нет');
 }
 async function jSales(box) {
@@ -607,28 +1080,36 @@ async function jSales(box) {
   if (!box.isConnected) return;
   if (!sales || !c) { box.innerHTML = fail('Не удалось загрузить продажи', 'journal'); return; }
   const nm = i => { const b = D.boards.find(y => y.id === i.board_id); return b ? `${boardTitle(b)}, ${lenM(b.length_mm)}` : 'Позиция №' + i.board_id; };
-  box.innerHTML = sales.length ? tots([['Продаж', sales.length], ['Объём, м³', fmt(sum(sales, 'total_volume'), 2)], ['Сумма, ₽', fmtR(sum(sales, 'total_price'))]]) + cap(sales) + byDay(sales, x => x.created_at, x => li(`Продажа №${esc(x.id)}`,
-    esc((D.con[x.contractor_id] || 'Клиент №' + x.contractor_id) + (x.truck_number ? ', машина ' + x.truck_number : '')), `${fmt(x.total_price, 2)} ₽`, `${fmt(x.total_volume, 3)} м³`,
-    {lines: lines([...(x.items || []).map(i => `${nm(i)}: ${fmt(i.count, 0)} шт, ${fmt(i.volume_m3, 3)} м³`), ...(+x.delivery_price > 0 ? ['Доставка ' + fmt(x.delivery_price, 2) + ' ₽'] : []), ...(+x.extra_price > 0 ? ['Услуги ' + fmt(x.extra_price, 2) + ' ₽'] : [])])})
+  box.innerHTML = sales.length ? tots([['Продаж', sales.length], ['Объём, м³', fmt(sum(sales, 'total_volume'), 2)], ['Сумма, ₽', fmtR(sum(sales, 'total_price'))]]) + cap(sales) + byDay(sales, x => x.created_at, x => journalCard('sale', x, `Продажа №${x.id}`,
+    (D.con[x.contractor_id] || 'Клиент №' + x.contractor_id) + (x.truck_number ? ', машина ' + x.truck_number : ''), `${fmt(x.total_price, 2)} ₽`, `${fmt(x.total_volume, 3)} м³`,
+    [...(x.items || []).map(i => `${nm(i)}: ${fmt(i.count, 0)} шт, ${fmt(i.volume_m3, 3)} м³`), ...(+x.delivery_price > 0 ? ['Доставка ' + fmt(x.delivery_price, 2) + ' ₽'] : []), ...(+x.extra_price > 0 ? ['Услуги ' + fmt(x.extra_price, 2) + ' ₽'] : [])])
   ) : none('Продаж пока нет');
 }
 async function vJournal() {
   const sg = jSegs(), v = $('#view');
+  journalLinks.clear();
   if (!sg.some(x => x[0] === S.jt)) S.jt = sg[0][0];
-  v.innerHTML = `${sg.length > 1 ? `<div class="seg">${sg.map(([k, l]) => `<button class="${S.jt === k ? 'on' : ''}" data-a="jt" data-v="${k}">${l}</button>`).join('')}</div>` : ''}<div id="jl">${sk(4)}</div>`;
+  v.innerHTML = `<div class="filterbar"><div class="srch">${ic('search')}<input id="jq" aria-label="Поиск в журнале" placeholder="Контрагент, машина, операция" value="${esc(S.jq || '')}"></div>${sg.length > 1 ? `<div class="seg">${sg.map(([k, l]) => `<button class="${S.jt === k ? 'on' : ''}" data-a="jt" data-v="${k}">${l}</button>`).join('')}</div>` : ''}</div><div id="jl">${sk(4)}</div><p id="jempty" class="empty" hidden>По запросу ничего не найдено</p>`;
   setAct('journal');
   await ({arrivals: jArrivals, production: jProduction, sales: jSales}[S.jt])($('#jl'));
+  filterJournal();
 }
 
+function filterJournal() {
+  const box=$('#jl'); if(!box)return;
+  const q=(S.jq||'').trim().toLowerCase();
+  $$('.card-group',box).forEach(g=>{ const rows=$$('.li',g); rows.forEach(r=>r.hidden=!!q&&!r.textContent.toLowerCase().includes(q)); g.hidden=rows.length>0&&rows.every(r=>r.hidden); });
+  if($('#jempty')) $('#jempty').hidden=!q||$$('.li',box).some(r=>!r.hidden);
+}
 /* ---------- склад ---------- */
 async function vStock(fetchNew = true) {
   const v = $('#view');
   if (fetchNew) { v.innerHTML = sk(5); const ok = await loadStock(); if (S.cur !== 'stock') return; if (!ok) { v.innerHTML = fail('Не удалось загрузить склад', 'stock'); return; } }
-  const list = S.wt === 'boards' ? D.boards : D.logs, sps = [...new Set(list.map(x => x.species || '—'))];
-  v.innerHTML = `<div class="srch">${ic('search')}<input id="q" placeholder="Поиск: порода, размер, №" aria-label="Поиск" value="${esc(S.wq)}"></div>
-    <div class="seg">${[['boards', 'Пиломатериалы'], ['logs', 'Сырьё']].map(([k, l]) => `<button class="${S.wt === k ? 'on' : ''}" data-a="wt" data-v="${k}">${l}</button>`).join('')}</div>
+  const fwOn = S.wt === 'firewood', list = S.wt === 'boards' ? D.boards : D.logs, sps = fwOn ? [] : [...new Set(list.map(x => x.species || '—'))];
+  v.innerHTML = `<div class="filterbar">${fwOn ? '' : `<div class="srch">${ic('search')}<input id="q" placeholder="Поиск: порода, размер, №" aria-label="Поиск" value="${esc(S.wq)}"></div>`}
+    <div class="seg">${[['boards', 'Пиломатериалы'], ['logs', 'Сырьё'], ['firewood', 'Дрова']].map(([k, l]) => `<button class="${S.wt === k ? 'on' : ''}" data-a="wt" data-v="${k}">${l}</button>`).join('')}</div>
     ${sps.length > 1 ? `<div class="chips"><button class="chip ${S.wsp ? '' : 'on'}" data-a="sp" data-v="">Все</button>${sps.map(x => `<button class="chip ${S.wsp === x ? 'on' : ''}" data-a="sp" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : ''}
-    <div id="ssum"></div><div id="sl"></div>`;
+    </div><div id="ssum"></div><div id="sl"></div>`;
   stockList();
 }
 const KEYS = new WeakMap();
@@ -643,16 +1124,32 @@ const skey = x => {
   return k;
 };
 let DEB;
+const boardGroupKey = x => JSON.stringify([x.species,x.height_mm,x.width_mm,x.length_mm,x.grade]);
 function stockList() {
+  if (S.wt === 'firewood') {
+    const f = D.fw || {raw_m3: 0};
+    $('#ssum').innerHTML = tots([['Сырьё, м³', fmt(f.raw_m3, 2)], ['Колотые, м³', fmt(f.split_m3||0,2)], ['Чурбаки, м³', fmt(f.round_m3||0,2)]]);
+    $('#sl').innerHTML = li('Дрова, берёза (сырьё)', 'Приходы дров общим объёмом', `${fmt(f.raw_m3, 3)} м³`, '', {});
+    $('#sl').innerHTML += Object.entries(FW_NAMES).map(([k,n])=>li(n,'Готовые дрова',`${fmt(f[k+'_m3']||0,3)} м³`,'',{})).join('') + `<div class="stackb">${S.role==='manager'||S.role==='worker'?'<button class="btn" data-a="mk" data-v="fwproc">Напилили / Накололи</button>':''}<button class="btn ghost" data-a="fwhistory">История переработки</button>${S.role==='manager'?'<button class="btn ghost" data-a="mk" data-v="fwsettings">Коэффициенты</button>':''}${canSuper()?'<button class="btn ghost" data-a="fwstockedit">Скорректировать остатки</button>':''}</div>`;    return;
+  }
   const t = S.wt, q = S.wq.toLowerCase().replace(/(\d)\s*[*xх]\s*(\d)/g, '$1×$2');
-  const list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
+  let list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
+  if(t === 'boards') {
+    const groups = new Map();
+    list.forEach(x=>{
+      const key=boardGroupKey(x);
+      if(!groups.has(key)) groups.set(key,{...x,count:0,volume_m3:0,batches:[]});
+      const g=groups.get(key);g.count+=+x.count||0;g.volume_m3+=+x.volume_m3||0;g.batches.push(x);
+    });
+    list=[...groups.values()].sort((a,b)=>b.volume_m3-a.volume_m3);
+  }
   $('#ssum').innerHTML = tots([['Позиций', fmt(list.length, 0)], ['Штук', fmt(sum(list, 'count'), 0)], ['Объём, м³', fmt(sum(list, 'volume_m3'), 2)]]);
   const g = {}; list.forEach(x => (g[x.species || '—'] = g[x.species || '—'] || []).push(x));
   const row = x => {
     const low = t === 'boards' && (+x.count || 0) <= LOW_STOCK_PCS, d = sdate(x.created_at || x.updated_at);
     return li((t === 'boards' ? esc(boardTitle(x)) : `Бревно Ø${esc(x.diameter_mm)}`),
-      esc([lenM(x.length_mm), t === 'boards' ? (x.grade ? 'сорт ' + x.grade : '') : 'партия №' + x.arrival_id, d].filter(Boolean).join(' · ')),
-      `${fmt(x.volume_m3, 3)} м³`, `${fmt(x.count, 0)} шт`, {a: 'item', d: `${t}:${x.id}`, lines: low ? lowTag('Мало на складе') : ''});
+      esc([lenM(x.length_mm), t === 'boards' ? [x.grade ? 'сорт ' + x.grade : '', x.batches?.length > 1 ? x.batches.length + ' ' + pl(x.batches.length,['партия','партии','партий']) : 'Позиция №' + x.id].filter(Boolean).join(' · ') : 'партия №' + x.arrival_id, d].filter(Boolean).join(' · ')),
+      `${fmt(x.volume_m3, 3)} м³`, `${fmt(x.count, 0)} шт`, {a: t === 'boards' && x.batches.length > 1 ? 'boardgroup' : 'item', d: t === 'boards' && x.batches.length > 1 ? boardGroupKey(x) : `${t}:${x.id}`, lines: low ? lowTag('Мало на складе') : ''});
   };
   $('#sl').innerHTML = list.length ? Object.entries(g).sort((a, b) => sum(b[1], 'volume_m3') - sum(a[1], 'volume_m3')).map(([n, a]) =>
     grp(esc(n), fmt(sum(a, 'volume_m3'), 2) + ' м³', a.map(row).join(''))).join('')
@@ -662,11 +1159,11 @@ function stockList() {
 /* ---------- заказы ---------- */
 async function vOrders(fetchNew = true) {
   const v = $('#view');
-  if (fetchNew) { v.innerHTML = sk(4); const [o, , dbt] = await Promise.all([safe('/orders'), ensureCon(), canOrd() ? safe('/debts') : null]); if (S.cur !== 'orders') return; if (!o) { v.innerHTML = fail('Не удалось загрузить заказы', 'orders'); return; } D.orders = o; D.debts = dbt || []; }
+  if (fetchNew) { v.innerHTML = sk(4); const [o, , dbt] = await Promise.all([safe('/orders'), ensureCon(), canOrd() ? safe('/debts') : null, loadStock()]); if (S.cur !== 'orders') return; if (!o) { v.innerHTML = fail('Не удалось загрузить заказы', 'orders'); return; } D.orders = o; D.debts = dbt || []; }
   const c = {all: D.orders.length, open: D.orders.filter(isOpen).length, done: D.orders.filter(o => !isOpen(o)).length, debt: new Set(D.debts.map(d => d.contractor_id)).size};
-  v.innerHTML = `<div class="srch">${ic('search')}<input id="oq" placeholder="Поиск по №, клиенту" aria-label="Поиск" value="${esc(S.oq)}"></div>
-    <div class="utabs">${[['all', 'Все'], ['open', 'Активные'], ['done', 'Завершённые'], ['debt', 'Долги']].map(([k, l]) => `<button class="utab ${S.of === k ? 'on' : ''}" data-a="of" data-v="${k}">${l} <span class="mut">${c[k]}</span></button>`).join('')}</div>
-    <div id="osum"></div><div id="ol"></div>`;
+  v.innerHTML = `<div class="filterbar"><div class="srch">${ic('search')}<input id="oq" placeholder="Поиск по №, клиенту" aria-label="Поиск" value="${esc(S.oq)}"></div>
+    <div class="utabs">${[['all', 'Все'], ['open', 'Активные'], ['done', 'Завершённые'], ['debt', 'Долги']].map(([k, l]) => `<button class="utab ${S.of === k ? 'on' : ''}" data-a="of" data-v="${k}">${l} <span class="tab-count">${c[k]}</span></button>`).join('')}</div>
+    </div><div id="donefilters"></div><div id="osum"></div><div id="ol"></div>`;
   orderList();
 }
 function debtList() {
@@ -674,16 +1171,20 @@ function debtList() {
   D.debts.forEach(d => { (by[d.contractor_id] = by[d.contractor_id] || []).push(d); });
   const rows = Object.entries(by).map(([id, a]) => ({id, name: D.con[id] || 'Клиент №' + id, n: a.length, due: tot(a, x => x.due)}))
     .filter(r => !q || r.name.toLowerCase().includes(q)).sort((a, b) => b.due - a.due);
-  $('#osum').innerHTML = rows.length ? tots([['Должников', fmt(rows.length, 0)], ['Долг, ₽', fmtR(tot(rows, r => r.due))]]) : '';
+  $('#osum').innerHTML = rows.length ? tots([['Должников', fmt(rows.length, 0)], ['Заказов', fmt(tot(rows,r=>r.n),0)], ['Долг, ₽', fmtR(tot(rows, r => r.due))]]) : '';
   $('#ol').innerHTML = rows.length ? rows.map(r => li(esc(r.name), `${r.n} ${pl(r.n, ['заказ', 'заказа', 'заказов'])}`, `${fmt(r.due, 0)} ₽`, '', {a: 'debtc', d: r.id})).join('') : none('Долгов нет', 'Все завершённые заказы оплачены');
 }
 function orderList() {
-  if (S.of === 'debt') { debtList(); return; }
-  const q = S.oq.toLowerCase();
-  const l = D.orders.filter(o => (S.of === 'all' || (S.of === 'open') === isOpen(o)) && (!q || `${o.id} ${D.con[o.contractor_id] || ''}`.toLowerCase().includes(q)));
-  const t = tot(l, osum);
-  $('#osum').innerHTML = l.length ? tots([['Заказов', fmt(l.length, 0)], ['Активных', fmt(l.filter(isOpen).length, 0)], ...(t > 0 ? [['Сумма, ₽', fmtR(t)]] : [])]) : '';
-  $('#ol').innerHTML = l.length ? l.map(oRow).join('') : none('Заказов нет');
+  if(S.of==='debt'){ $('#donefilters').innerHTML='';debtList();return; }
+  $('#donefilters').innerHTML=S.of==='done'?`<div class="chips">${[['all','Все завершённые'],['due','С долгом'],['paid','Оплаченные']].map(([k,l])=>`<button class="chip ${(S.donefilter||'all')===k?'on':''}" data-a="donefilter" data-v="${k}">${l}</button>`).join('')}</div>`:'';
+  const q=S.oq.toLowerCase();
+  const l=D.orders.filter(o=>(S.of==='all'||(S.of==='open')===isOpen(o))&&(!q||`${o.id} ${D.con[o.contractor_id]||''}`.toLowerCase().includes(q))&&(S.of!=='done'||!S.donefilter||S.donefilter==='all'||(S.donefilter==='due'?o.status==='completed'&&oDue(o)>.005:o.status==='completed'&&oDue(o)<=.005))).sort((a,b)=>(new Date(b.created_at)-new Date(a.created_at))||b.id-a.id);
+  $('#osum').innerHTML=tots([['Заказов',l.length],['Активных',l.filter(isOpen).length],['Сумма, ₽',fmtR(tot(l,osum))]]);
+  const section=(title,rows)=>rows.length?grp(title,fmtR(tot(rows,osum))+' ₽',rows.map(oRow).join('')):'';
+  const months=rows=>{const g=new Map();rows.forEach(o=>{const key=dayKey(o.created_at).slice(0,7);if(!g.has(key))g.set(key,[]);g.get(key).push(o);});return [...g].map(([k,a])=>section(k?new Date(k+'-01T00:00:00').toLocaleDateString('ru-RU',{month:'long',year:'numeric'}):'Без даты',a)).join('');};
+  $('#ol').innerHTML=!l.length?none('Заказов нет'):S.of==='all'?
+    section('В работе / Активные',l.filter(isOpen))+section('Неоплаченные (с долгом)',l.filter(o=>o.status==='completed'&&oDue(o)>.005))+ (l.some(o=>o.status==='completed'&&oDue(o)<=.005)?'<h2 class="grp">Архив (завершённые и оплаченные)</h2>'+months(l.filter(o=>o.status==='completed'&&oDue(o)<=.005)):'')+section('Отменённые',l.filter(o=>o.status==='canceled')):
+    S.of==='done'?months(l):l.map(oRow).join('');
 }
 async function doComplete(id, btn) {
   btn.disabled = true; btn.classList.add('busy');
@@ -725,45 +1226,81 @@ async function pdfDo(kind, id, btn) {
 /* ---------- отчёты ---------- */
 async function vStats() {
   const [a, b] = rng(S.range === 'custom' ? 'month' : S.range);
-  $('#view').innerHTML = `<div class="utabs">${[['today', 'Сегодня'], ['week', '7 дней'], ['month', 'Месяц'], ['year', 'Год']].map(([k, l]) => `<button class="utab ${S.range === k ? 'on' : ''}" data-a="range" data-v="${k}">${l}</button>`).join('')}</div>
+  $('#view').innerHTML = `<div class="filterbar stats-filter"><div class="utabs">${[['today', 'Сегодня'], ['week', '7 дней'], ['month', 'Месяц'], ['year', 'Год']].map(([k, l]) => `<button class="utab ${S.range === k ? 'on' : ''}" data-a="range" data-v="${k}">${l}</button>`).join('')}</div>
     <div class="dates"><div class="fld"><label for="d1">С даты</label><input id="d1" type="date" value="${a}"></div><div class="fld"><label for="d2">По дату</label><input id="d2" type="date" value="${b}"></div></div>
-    <div id="sr" style="margin-top:8px">${sk(3)}</div>`;
+    </div><div id="sr" style="margin-top:8px">${sk(3)}</div>`;
   loadStats();
 }
 const addD = (k, n) => { const d = new Date(k + 'T00:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
 const prevRange = (a, b) => { const x = new Date(a + 'T00:00:00'), y = new Date(b + 'T00:00:00'); if (isNaN(x) || isNaN(y) || y < x) return null; const n = Math.round((y - x) / 864e5) + 1; return [addD(a, -n), addD(a, -1)]; };
 const dchip = (c, p) => { if (!(p > 0)) return ''; const x = (c - p) / p * 100, z = Math.abs(x) < 0.5; return `<span class="dc ${z ? '' : x > 0 ? 'up' : 'dn'}">${x >= 0 ? '+' : '−'}${fmt(Math.abs(x), 0)}%</span>`; };
-const cmpRow = (l, c, p, mx) => `<div class="vb"><div class="vb-h"><span>${l}</span><b>${fmt(c, 2)} м³</b></div><div class="bar"><i style="--w:${c / mx * 100}%"></i></div>${p != null ? `<div class="bar prev"><i style="--w:${p / mx * 100}%"></i></div><div class="vb-f"><span>Было ${fmt(p, 2)} м³</span>${dchip(c, p)}</div>` : ''}</div>`;
+const cmpRow = (l,c,p,mx) => `<div class="stat-row"><div class="stat-row-head"><b>${l}</b><strong>${fmt(c,2)} м³</strong></div><div class="stat-row-meta"><span class="mut">${p==null ? 'Нет данных за прошлый период' : 'Было '+fmt(p,2)+' м³'}</span>${p==null ? '' : p>0 ? dchip(c,p) : '<span class="dc">'+(c>0?'Новый объём':'0%')+'</span>'}</div><div class="bar"><i style="--w:${c/mx*100}%"></i></div></div>`;
+let statsRequest = 0;
+async function firewoodPeriod(path,a,b,dateKey) {
+  const result=[];
+  for(let offset=0;;offset+=1000){
+    const rows=await api(path+'?limit=1000&offset='+offset) || [];
+    result.push(...rows.filter(x=>{const d=dayKey(x[dateKey]);return d>=a&&d<=b;}));
+    if(rows.length<1000)return result;
+  }
+}
 async function loadStats() {
-  const box = $('#sr'); if (!box) return;
+  const box=$('#sr'); if(!box)return;
+  const request=++statsRequest, a=$('#d1').value, b=$('#d2').value;
+  if(!a||!b||a>b){box.innerHTML=none('Проверьте даты','Начало периода должно быть не позже окончания.');return;}
+  box.innerHTML=sk(3);
+  const pr=prevRange(a,b);
+  const fwPromise=Promise.all([firewoodPeriod('/firewood/arrivals',a,b,'arrival_date'),firewoodPeriod('/firewood/processing',a,b,'date'),api('/firewood/stock')]).catch(()=>null);
   try {
-    const a = $('#d1').value, b = $('#d2').value, pr = prevRange(a, b);
-    const [d, pd] = await Promise.all([api(sQ(a, b)), pr ? api(sQ(...pr)).catch(() => null) : null]);
-    if (S.cur !== 'stats') return;
-    const g = (o, k) => o ? +o[k] || 0 : null;
-    const R = g(d, 'total_sales_amount'), A = g(d, 'total_logs_arrived_volume'), W = g(d, 'total_logs_sawed_volume'), V = g(d, 'total_sales_volume');
-    const PR = g(pd, 'total_sales_amount'), PA = g(pd, 'total_logs_arrived_volume'), PW = g(pd, 'total_logs_sawed_volume'), PV = g(pd, 'total_sales_volume');
-    const mx = Math.max(A, W, V, PA || 0, PW || 0, PV || 0, 0.0001);
-    box.innerHTML = `<section class="rev"><p class="lbl">Выручка</p><div class="big"><span data-n="${R}" data-u=" ₽">0</span></div>
-        ${pd ? `<p class="rv-d">${dchip(R, PR)}<span class="mut">к предыдущему периоду · было ${fmt(PR, 0)} ₽</span></p>` : ''}</section>
-      <div class="sh"><h2>Объёмы</h2></div>
-      ${pd ? '<p class="mut sm" style="margin-bottom:8px">Светлая полоса — выбранный период, серая — предыдущий такой же длины.</p>' : ''}
-      ${cmpRow('Пришло сырья', A, PA, mx)}${cmpRow('Распилено', W, PW, mx)}${cmpRow('Продано', V, PV, mx)}
-      <div style="margin-top:24px"><div class="ld"><span>Распилено от прихода</span><b>${A ? fmt(W / A * 100, 0) : 0}%</b></div><div class="ld"><span>Продано от распила</span><b>${W ? fmt(V / W * 100, 0) : 0}%</b></div></div>`;
-    countUp(box);
-  } catch (e) { box.innerHTML = none('Не удалось загрузить отчёт', esc(e.message)); }
+    const [d,pd]=await Promise.all([api(sQ(a,b)),pr?api(sQ(...pr)).catch(()=>null):null]);
+    if(request!==statsRequest||!box.isConnected)return;
+    const g=(o,k)=>o?+o[k]||0:null;
+    const R=g(d,'total_sales_amount'),A=g(d,'total_logs_arrived_volume'),W=g(d,'total_logs_sawed_volume'),V=g(d,'total_sales_volume');
+    const produced = d.total_boards_produced_volume;
+    const yieldPct = W > 0 && produced != null ? produced / W * 100 : null;
+    const [yieldLabel, yieldColor] = yieldPct == null ? ['', 't2'] : yieldPct >= 60 ? ['Отлично', 'ok'] : yieldPct >= 50 ? ['Норма', 'warn'] : ['Низкий выход', 'err'];
+    const PR=g(pd,'total_sales_amount'),PA=g(pd,'total_logs_arrived_volume'),PW=g(pd,'total_logs_sawed_volume'),PV=g(pd,'total_sales_volume');
+    const mx=Math.max(A,W,V,.0001);
+    box.innerHTML=`<section class="rev"><p class="lbl">Выручка за период</p><div class="big">${fmt(R,0)} ₽</div><div class="rv-d">${pd ? dchip(R,PR)+'<span class="mut">Было '+fmt(PR,0)+' ₽</span>' : '<span class="mut">Прошлый период недоступен</span>'}</div></section>
+    ${tots([['Продано, м³',fmt(V,2)],['Пришло сырья, м³',fmt(A,2)],['Распилено, м³',fmt(W,2)]])}
+    <section class="workspace-card stats-production"><h2>Динамика и КПД производства</h2>
+    ${cmpRow('Пришло сырья',A,PA,mx)}${cmpRow('Распилено',W,PW,mx)}${cmpRow('Продано',V,PV,mx)}
+    <div class="efficiency"><div><span>Распилено от прихода</span><b>${A?fmt(W/A*100,0)+'%':'—'}</b></div><div><span>Продано от распила</span><b>${W?fmt(V/W*100,0)+'%':'—'}</b></div></div></section>
+    <section class="workspace-card stats-production"><h2>Выход пиломатериала и потери</h2>
+      <div class="dl"><span>Распилено сырья</span><b>${fmt(W,3)} м³</b></div>
+      <div class="dl"><span>Получено досок</span><b>${produced == null ? '—' : fmt(produced,3)+' м³'}</b></div>
+      <div class="dl"><span>Средний выход годной доски</span><b style="color:var(--${yieldColor})">${yieldPct == null ? '—' : fmt(yieldPct,1)+'% · '+yieldLabel}</b></div>
+      <div class="dl"><span>Потери (опилки, горбыль, усушка)</span><b>${yieldPct == null ? '—' : fmt(W-produced,3)+' м³ · '+fmt(100-yieldPct,1)+'%'}</b></div>
+    </section>
+    <section class="workspace-card stats-firewood"><h2>Сводка по дровам за период</h2><div id="fw-report">${sk(2)}</div></section>`;
+    const fw=await fwPromise;
+    if(request!==statsRequest||!box.isConnected)return;
+    const out=$('#fw-report',box);
+    if(!fw){out.innerHTML='<p class="mut">Не удалось загрузить данные по дровам.</p>';return;}
+    const [arr,proc,stock]=fw;
+    const row=(l,v)=>`<div class="dl"><span>${l}</span><b>${fmt(v,2)} м³</b></div>`;
+    out.innerHTML=row('Пришло берёзы',sum(arr,'volume_m3'))+row('Получено колотых',sum(proc.filter(x=>x.kind==='split'),'volume_m3'))+row('Получено чурбаков',sum(proc.filter(x=>x.kind==='round'),'volume_m3'))+row('Списано сырья в переработку',sum(proc,'raw_m3'))+
+      '<h3 class="section-label">Остатки сейчас</h3>'+row('Сырьё',stock.raw_m3)+row('Колотые',stock.split_m3)+row('Чурбаки',stock.round_m3);
+  } catch(e) { if(request===statsRequest&&box.isConnected)box.innerHTML=none('Не удалось загрузить отчёт',esc(e.message)); }
 }
 
 /* ---------- профиль и вход ---------- */
 function vProfile() {
   const j = jwt() || {};
-  $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><h2>${esc(S.name)}</h2><p class="mut">${esc(ROLE[S.role] || S.role)}</p></div>
-    <div class="ld"><span>ID сотрудника</span><b>${esc(j.user_id || '—')}</b></div>
-    <div class="ld"><div><span>Экономный режим</span><p class="mut sm">Меньше анимаций, телефон меньше греется</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
-    ${S.role === 'manager' ? '<button class="btn" style="margin-top:24px" data-a="go" data-v="staff">Сотрудники</button><button class="btn" style="margin-top:12px" data-a="go" data-v="cons">Контрагенты</button><button class="btn" style="margin-top:12px" data-a="go" data-v="adjlog">Корректировки склада</button>' : ''}
-    ${inTg ? '' : '<button class="btn ghost" style="margin-top:32px" data-a="logout">Выйти</button>'}`;
+  $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><div><h2>${esc(S.name)}</h2><p class="profile-meta"><span class="role-badge">${esc(ROLE[S.role] || S.role)}</span> ${S.isSuperAdmin ? '<span class="role-badge">Супер-Админ</span>' : ''} · ID ${esc(j.user_id || '—')}</p></div></div>
+    <h2 class="profile-heading">Настройки приложения</h2>
+    <div class="profile-group settings-group">
+      <div class="profile-setting"><div><b>Оформление</b><p class="mut sm">${document.documentElement.dataset.t === 'dark' ? 'Тёмная тема' : 'Светлая тема'}</p></div><button class="sw" role="switch" aria-checked="${document.documentElement.dataset.t === 'dark'}" aria-label="Тёмная тема" data-a="theme"></button></div>
+      <div class="profile-setting"><div><b>Экономный режим</b><p class="mut sm">Меньше анимаций</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
+    </div>
+    ${S.isSuperAdmin ? `<div class="profile-group role-preview"><b>Смотреть интерфейс как</b>
+      <div class="seg">${STAFF_ROLES.map(role => `<button data-a="previewrole" data-v="${role}" class="${S.previewRole === role ? 'on' : ''}" aria-pressed="${S.previewRole === role}">${ROLE[role]}</button>`).join('')}</div>
+      ${S.previewRole ? '<button class="lnk" data-a="previewrole" data-v="">Вернуться в режим супер-админа</button>' : ''}
+    </div>` : ''}
+    ${S.role === 'manager' ? `<h2 class="profile-heading">Управление</h2><div class="profile-group">${[['staff','user','Сотрудники'],['cons','box','Контрагенты'],['adjlog','box','Корректировки склада'],['stats','chart','Отчёты']].map(([v,i,t])=>`<button class="profile-link" data-a="go" data-v="${v}"><span class="profile-icon">${ic(i)}</span><b>${t}</b>${ic('chev')}</button>`).join('')}</div>` : ''}
+    ${canSuper() ? '<button class="btn ghost admin-delete profile-logout" data-a="resetdata">Очистить тестовые данные (Сброс склада и заказов)</button>' : ''}
+    ${inTg ? '' : '<button class="btn ghost profile-logout" data-a="logout">Выйти</button>'}`;
 }
-
 /* ---------- корректировки склада (только руководитель) ---------- */
 const ADJ = {defect: 'Брак', loss: 'Потеря, недостача', own_use: 'Использовано на свои нужды', surplus: 'Излишек (нашли)', other: 'Другое'};
 async function vAdjLog() {
@@ -785,7 +1322,7 @@ async function vCons() {
   if (S.cur !== 'cons') return;
   if (!list) { v.innerHTML = fail('Не удалось загрузить контрагентов', 'cons'); return; }
   D.cl = list; D.con = {}; list.forEach(c => D.con[c.id] = c.name);
-  v.innerHTML = `<button class="btn" data-a="cedit" data-v="new">Новый контрагент</button>
+  v.innerHTML = `
     <div class="srch" style="margin-top:16px">${ic('search')}<input id="cq" placeholder="Поиск по названию" aria-label="Поиск" value="${esc(S.cq)}"></div><div id="cl"></div>`;
   conList();
 }
@@ -796,17 +1333,34 @@ function conList() {
 }
 
 /* ---------- сотрудники (только руководитель) ---------- */
-const tgId = u => u.username.slice(3);
-const staffName = u => (u.kind === 'telegram' ? (u.name || 'Telegram ' + tgId(u)) : u.username) + (u.id == uid() ? ' (вы)' : '');
-const staffSub = u => u.kind === 'telegram' ? (u.tg_username ? '@' + u.tg_username + ' · ' : '') + 'ID ' + tgId(u) : 'Вход по паролю';
+const tgId = u => String(u.username || '').replace(/^tg_/,'');
+const staffBaseName = u => { const name=String(u.kind==='telegram'?u.name||'':u.username||'').trim();return /[\p{L}\p{N}]/u.test(name)?name:u.tg_username?'@'+u.tg_username:'Сотрудник #'+u.id; };
+const staffName = u => staffBaseName(u)+(u.id==uid()?' (вы)':'');
+const staffSub = u => u.kind==='telegram' ? (u.tg_username && staffBaseName(u)!=='@'+u.tg_username?'@'+u.tg_username:'Telegram') : 'Вход по паролю';
 async function vStaff() {
-  const v = $('#view'); v.innerHTML = sk(4);
-  const list = await safe('/users');
-  if (S.cur !== 'staff') return;
-  if (!list) { v.innerHTML = fail('Не удалось загрузить сотрудников', 'staff'); return; }
-  D.staff = list;
-  const rows = list.map(u => li(esc(staffName(u)), esc(staffSub(u)), esc(ROLE[u.role] || u.role), esc(new Date(u.created_at).toLocaleDateString('ru-RU')), {a: 'staff', d: u.id})).join('');
-  v.innerHTML = `<button class="btn" data-a="new" data-v="user">Новый сотрудник</button>` + grp('Сотрудники', list.length, rows);
+  const v=$('#view');v.innerHTML=sk(4);
+  const list=await safe('/users');if(S.cur!=='staff')return;
+  if(!list){v.innerHTML=fail('Не удалось загрузить сотрудников','staff');return;}
+  D.staff=list;
+  v.innerHTML=`<div class="filterbar"><div class="srch">${ic('search')}<input id="staffq" placeholder="Поиск по имени, логину, роли" aria-label="Поиск сотрудников" value="${esc(S.staffq||'')}"></div></div><div id="stafflist"></div>`;
+  staffList();
+}
+function staffList(){
+  const q=(S.staffq||'').trim().toLowerCase();
+  const list=(D.staff||[]).filter(u=>[staffName(u),u.tg_username,u.username,ROLE[u.role]].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>Number(b.role==='pending')-Number(a.role==='pending'));
+  $('#stafflist').innerHTML=grp('Сотрудники',list.length,list.map(u=>`<button class="staff-card" data-a="staff" data-v="${esc(u.id)}"><span class="staff-avatar">${esc(Array.from(staffBaseName(u).replace(/^@/,''))[0]?.toUpperCase()||'?')}</span><span class="staff-main"><b>${esc(staffName(u))}</b><small>${esc(staffSub(u))}</small></span><span class="staff-end"><span class="staff-role ${Object.hasOwn(ROLE,u.role)?u.role:'worker'}">${esc(u.role === 'pending' ? 'Ожидает доступа' : canSuper() && u.is_super_admin ? 'Супер-Админ' : ROLE[u.role]||u.role)}</span><small>${esc(sdate(u.created_at))}</small></span></button>`).join('')||none('Сотрудники не найдены'));
+}
+function vPending() {
+  closeSheet();
+  S.cur = 'pending'; S.role = 'pending'; S.previewRole = '';
+  document.body.classList.add('noauth');
+  $('#tabs').replaceChildren();
+  try { tg.BackButton.hide(); } catch (e) {}
+  $('#view').innerHTML = `<section class="login"><div class="logo">${ic('lock')}</div>
+    <h1>Доступ ожидает подтверждения</h1>
+    <p class="sub">Ваша учётная запись зарегистрирована (ID: ${esc(jwt()?.user_id || '—')}). Попросите руководителя подтвердить ваш доступ в разделе «Сотрудники».</p>
+    <button class="btn" data-a="checkaccess">Проверить доступ</button></section>`;
 }
 function vLogin(msg) {
   document.body.classList.add('noauth'); S.cur = 'login';
@@ -831,7 +1385,10 @@ async function login() {
 }
 function finish(tkn, name) {
   localStorage.setItem('jwt_token', tkn);
-  S.role = jwt()?.role || 'worker'; S.name = name || localStorage.getItem('uname') || 'Сотрудник';
+  const account = jwt() || {};
+  S.accountRole = account.role || 'worker'; S.isSuperAdmin = account.is_super_admin === true; S.previewRole = '';
+  S.role = S.isSuperAdmin ? 'manager' : S.accountRole; S.name = name || localStorage.getItem('uname') || 'Сотрудник';
+  if (S.accountRole === 'pending') { vPending(); loadConfig(); return; }
   document.body.classList.remove('noauth'); buildTabs(); loadConfig(); go('home'); perfProbe();
 }
 async function tgAuth() {
@@ -849,10 +1406,99 @@ const SIZES = ['25×100', '40×100', '50×100', '50×150', '50×200', '100×100'
 const SRC = {
   con: () => Object.entries(D.con),
   sup: () => conOpts('is_supplier'), car: () => conOpts('is_carrier'), cli: () => conOpts('is_client'),
-  boards: () => D.boards.map(b => [b.id, `${boardLabel(b)} · ${b.count} шт`]),
+  boards: () => D.boards.map(b => [b.id, `№${b.id} · ${boardLabel(b)} · ${b.count} шт`]),
   logs: () => D.logs.map(l => [l.id, `${l.species || 'Бревно'} Ø${l.diameter_mm} × ${lenM(l.length_mm)} · ${l.count} шт · ${fmt(l.volume_m3, 2)} м³ · партия №${l.arrival_id}`])
 };
 const pwBytes = x => new TextEncoder().encode(x || '').length;
+const FW_NAMES = {split: 'Колотые', round: 'Чурбаки (пиленые)'};
+
+// ГОСТ 2708-75, таблица 1. Столбцы: 120, 140, …, 520 мм по верхнему торцу.
+// https://meganorm.ru/Data2/1/4294852/4294852358.htm
+const GOST_LOG_VOLUMES = {
+  3000: [.038,.052,.069,.086,.107,.130,.157,.185,.220,.25,.28,.32,.36,.39,.43,.47,.52,.57,.62,.67,.73],
+  4000: [.053,.073,.095,.120,.147,.178,.210,.250,.290,.33,.38,.43,.48,.53,.58,.64,.70,.77,.84,.91,.99],
+  4500: [.063,.084,.110,.138,.170,.200,.240,.280,.330,.38,.43,.49,.54,.60,.66,.73,.80,.87,.95,1.03,1.12],
+  5000: [.073,.097,.124,.156,.190,.230,.270,.320,.370,.42,.48,.54,.60,.67,.74,.81,.89,.98,1.06,1.15,1.25],
+  6000: [.093,.123,.155,.194,.23,.28,.33,.39,.45,.52,.59,.66,.74,.82,.90,1,1.09,1.19,1.30,1.41,1.53]
+};
+const positiveInt = n => Number.isInteger(n) && n > 0 && n <= 2147483647;
+const rounded = (n, scale) => Math.round(n * scale) / scale;
+function logVolume(length, diameter) {
+  const exact = GOST_LOG_VOLUMES[length]?.[(diameter - 120) / 20];
+  if (exact != null) return {volume: exact, exact: true};
+  if (!positiveInt(length) || !positiveInt(diameter)) return {volume: 0};
+  const referenceLength = [3000,4000,4500,5000,6000].reduce((a,b) => Math.abs(b-length) < Math.abs(a-length) ? b : a);
+  const index = Math.max(0, Math.min(20, Math.round((diameter - 120) / 20)));
+  const referenceVolume = GOST_LOG_VOLUMES[referenceLength][index];
+  // Подбираем сбег (мм/м), чтобы формула по срединному сечению совпала с ближайшим табличным объёмом.
+  const middleDiameter = 2000 * Math.sqrt(referenceVolume / (Math.PI * (referenceLength / 1000)));
+  const taper = Math.max(0, 2 * (middleDiameter - (120 + index * 20)) / (referenceLength / 1000));
+  const middle = diameter + taper * (length / 1000) / 2;
+  return {volume: Math.PI * (middle / 2000) ** 2 * (length / 1000), exact: false};
+}
+
+const FORM_ROWS = {
+  board: {title: 'Доска', fields: [
+    {k: 'board', l: 'Доска со склада', t: 'sel', src: 'boards'},
+    {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1},
+    {k: 'price', l: 'Цена за м³, ₽', t: 'num', v: 9000, s: 500, half: 1, m: 1}
+  ]},
+  firewood: {title: 'Дрова', fields: [
+    {k: 'kind', l: 'Вид дров', t: 'sel', o: Object.entries(FW_NAMES)},
+    {k: 'vol', l: 'Объём, м³', t: 'num', v: 3, s: .1, half: 1},
+    {k: 'price', l: 'Цена за м³, ₽', t: 'num', v: 2000, s: 100, half: 1}
+  ]},
+  log: {title: 'Брёвна', fields: [
+    {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1},
+    {k: 'len', l: 'Длина, мм', t: 'num', v: 6000, s: 100, half: 1},
+    {k: 'dia', l: 'Диаметр верхнего торца, мм', t: 'num', v: 220, s: 10, half: 1},
+    {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1},
+    {k: 'vol', l: 'Объём, м³', t: 'num', v: 0, s: .1, half: 1}
+  ]}
+};
+const ARRIVAL_ROWS = {log: '+ Ещё диаметр/порода в машине'};
+const ORDER_ROWS = {board: '+ Добавить ещё доску', firewood: '+ Добавить дрова'};
+function orderDraft(v) {
+  const boards = new Map(D.boards.map(b => [String(b.id), b]));
+  const requested = new Map();
+  let volume = 0, total = rounded(v.delivery, 100) + rounded(v.extra, 100), error = '';
+  for (const row of v.rows) {
+    if (!Number.isFinite(row.price) || row.price < 0) error ||= 'Укажите неотрицательную цену каждой позиции';
+    let lineVolume = 0, key, label, available, amount, unit;
+    if (row.type === 'board') {
+      const board = boards.get(row.board);
+      if (!board) { error ||= 'Выберите доску со склада'; continue; }
+      if (!positiveInt(row.cnt)) { error ||= 'Укажите целое количество досок больше нуля'; continue; }
+      key = 'board:' + row.board;
+      label = `№${board.id} · ${boardLabel(board)}`;
+      available = board.count;
+      amount = row.cnt;
+      unit = 'шт';
+      lineVolume = available > 0 ? rounded(board.volume_m3 / available * amount, 1000) : 0;
+    } else {
+      if (!(row.vol >= .001 && row.vol <= 100000) || rounded(row.vol, 1000) !== row.vol) {
+        error ||= 'Объём дров: от 0,001 до 100 000 м³, до трёх знаков после запятой';
+        continue;
+      }
+      if (row.price > 100000000) error ||= 'Цена дров не может превышать 100 000 000 ₽ за м³';
+      key = row.kind;
+      label = FW_NAMES[row.kind];
+      available = D.fw[key + '_m3'] || 0;
+      amount = row.vol;
+      unit = 'м³';
+      lineVolume = row.vol;
+    }
+    const needed = rounded((requested.get(key)?.amount || 0) + amount, 1000);
+    requested.set(key, {label, available, unit, amount: needed, short: needed > available + 1e-9});
+    volume += lineVolume;
+    total += rounded(lineVolume * rounded(row.price, 100), 100);
+  }
+  const stock = [...requested.values()];
+  const shortage = stock.find(s => s.short);
+  if (shortage) error ||= `Не хватает на складе: ${shortage.label}`;
+  return {volume, total, stock, error};
+}
+const orderSummary = draft => `${fmt(draft.volume, 3)} м³ · ${Number.isFinite(draft.total) ? fmt(draft.total, 2) + ' ₽' : '—'}`;
 const FORMS = {
   user: {
     t: 'Новый сотрудник', e: 'user', ok: 'Создать сотрудника', path: '/users', done: 'Сотрудник создан', after: 'back', need: [],
@@ -864,18 +1510,36 @@ const FORMS = {
     body: v => ({username: v.login, password: v.pass, role: v.role})
   },
   arrival: {
-    t: 'Приход леса', e: 'arrival', ok: 'Сохранить приход', path: '/arrivals', done: 'Приход зарегистрирован', after: 'home', auto: 'vol', need: ['con'],
+    t: 'Приход леса', e: 'arrival', ok: 'Сохранить приход', path: '/arrivals', done: 'Приход зарегистрирован', after: 'home', need: ['con'], rows: ARRIVAL_ROWS,
+    f: [{k: 'supplier', l: 'Поставщик', t: 'sel', src: 'sup', half: 1, m: 1}, {k: 'carrier', l: 'Перевозчик', t: 'sel', src: 'car', half: 1, m: 1},
+      {k: 'truck', l: 'Номер машины', t: 'txt', ph: 'А000АА000', m: 1}],
+    pv: v => `<div class="pvr"><span>Всего в машине</span><b>${fmt(sum(v.rows, 'cnt'),0)} шт · ${fmt(sum(v.rows, 'vol'),3)} м³</b></div>`,
+    req: v => {
+      if (!v.supplier || !v.carrier) return 'Выберите поставщика и перевозчика';
+      if (!v.truck || v.truck.length > 20) return 'Укажите номер машины до 20 символов';
+      if (!v.rows.length) return 'Добавьте брёвна в приход';
+      for (const [i, row] of v.rows.entries()) {
+        if (!row.species || row.species.length > 64) return `Укажите породу в позиции ${i + 1}`;
+        if (![row.len, row.dia, row.cnt].every(positiveInt)) return `Укажите целые положительные размеры и количество в позиции ${i + 1}`;
+        if (!Number.isFinite(row.vol) || rounded(row.vol, 1000) < .001 || rounded(row.vol, 1000) >= 1e9) return `Проверьте объём в позиции ${i + 1}`;
+      }
+      return null;
+    },
+    sum: v => `Машина ${v.truck} · ${fmt(sum(v.rows, 'cnt'), 0)} шт · ${fmt(sum(v.rows, 'vol'), 3)} м³\n` +
+      v.rows.map(r => `${r.species} Ø${r.dia} × ${r.len} мм: ${r.cnt} шт, ${fmt(r.vol, 3)} м³`).join('\n'),
+    mem: ['supplier', 'carrier', 'truck'],
+    body: v => ({supplier_id: +v.supplier, carrier_id: +v.carrier, truck_number: v.truck, arrival_date: ymd(new Date()),
+      items: v.rows.map(r => ({species: r.species, length_mm: r.len, diameter_mm: r.dia, count: r.cnt, volume_m3: rounded(r.vol,1000)}))})
+  },
+  fwarr: {
+    t: 'Приход дров', e: 'arrival', ok: 'Сохранить приход', path: '/firewood/arrivals', done: 'Приход дров записан', after: 'home', need: ['con'],
     f: [{k: 'supplier', l: 'Поставщик', t: 'sel', src: 'sup', half: 1, m: 1}, {k: 'carrier', l: 'Перевозчик', t: 'sel', src: 'car', half: 1, m: 1},
       {k: 'truck', l: 'Номер машины', t: 'txt', ph: 'А000АА000', m: 1},
-      {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1, h: 'Бревна в партии'},
-      {k: 'len', l: 'Длина, мм', t: 'num', v: 6000, s: 100, half: 1}, {k: 'dia', l: 'Диаметр, мм', t: 'num', v: 220, s: 10, half: 1},
-      {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1}, {k: 'vol', l: 'Объём, м³', t: 'num', v: 0, s: .1, half: 1}],
-    calc: v => ({vol: Math.PI * (v.dia / 2000) ** 2 * (v.len / 1000) * v.cnt}),
-    req: v => !Object.keys(D.con).length ? 'Не загружен список поставщиков и перевозчиков' : !v.supplier || !v.carrier ? 'Выберите поставщика и перевозчика' : !v.truck ? 'Укажите номер машины' : v.cnt <= 0 ? 'Укажите количество бревен' : v.vol <= 0 ? 'Объём должен быть больше нуля' : null,
-    sum: v => `${v.species}: ${fmt(v.cnt, 0)} шт, ${fmt(v.vol, 3)} м³, машина ${v.truck}`,
-    mem: ['supplier', 'carrier', 'truck', 'species'],
-    body: v => ({supplier_id: +v.supplier, carrier_id: +v.carrier, truck_number: v.truck, arrival_date: ymd(new Date()),
-      items: [{species: v.species, length_mm: Math.round(v.len), diameter_mm: Math.round(v.dia), count: Math.round(v.cnt), volume_m3: v.vol}]})
+      {k: 'vol', l: 'Объём берёзовых дров, м³', t: 'num', v: 0, s: .5, h: 'Общая кубатура машины'}],
+    req: v => !Object.keys(D.con).length ? 'Не загружен список поставщиков и перевозчиков' : !v.supplier || !v.carrier ? 'Выберите поставщика и перевозчика' : !v.truck ? 'Укажите номер машины' : !(v.vol > 0) ? 'Укажите объём' : null,
+    sum: v => `Дрова (берёза): ${fmt(v.vol, 3)} м³, машина ${v.truck}`,
+    mem: ['supplier', 'carrier', 'truck'],
+    body: v => ({supplier_id: +v.supplier, carrier_id: +v.carrier, truck_number: v.truck, arrival_date: ymd(new Date()), volume_m3: v.vol})
   },
   sawing: {
     t: 'Распиловка', e: 'sawing', ok: 'Сохранить распиловку', path: '/sawing', done: 'Распиловка сохранена', after: 'home', auto: 'vol', need: ['logs'],
@@ -894,38 +1558,117 @@ const FORMS = {
       boards: [{species: v.species, grade: v.grade, height_mm: Math.round(v.th), width_mm: Math.round(v.wd), length_mm: Math.round(v.len), count: Math.round(v.cnt), volume_m3: v.vol}]})
   },
   order: {
-    t: 'Новый заказ', e: 'order', ok: 'Создать заказ', path: '/orders', done: 'Заказ создан', after: 'orders', need: ['con', 'boards'],
-    f: [{k: 'con', l: 'Клиент', t: 'sel', src: 'cli', m: 1}, {k: 'board', l: 'Доска со склада', t: 'sel', src: 'boards'},
-      {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1}, {k: 'price', l: 'Цена за 1 м³, ₽', t: 'num', v: 9000, s: 500, half: 1, m: 1}],
+    t: 'Новый заказ', e: 'order', ok: 'Создать заказ', path: '/orders', done: 'Заказ создан', after: 'orders', need: ['con', 'boards'], rows: ORDER_ROWS,
+    f: [{k: 'con', l: 'Клиент', t: 'sel', src: 'cli', m: 1},
+      {k: 'delivery', l: 'Доставка, ₽', t: 'num', v: 0, s: 100, half: 1}, {k: 'extra', l: 'Дополнительно, ₽', t: 'num', v: 0, s: 100, half: 1},
+      {k: 'notes', l: 'Примечание', t: 'txt'}],
     pv: v => {
-      const b = D.boards.find(x => x.id == v.board); if (!b || !(b.count > 0)) return '<span class="hint">Выберите доску со склада</span>';
-      const vol = v.cnt === b.count ? b.volume_m3 : b.volume_m3 / b.count * v.cnt;
-      return `<div class="pvr"><span class="hint">Объём заказа</span><b>${fmt(vol, 3)} м³</b></div><div class="pvr"><span class="hint">Сумма</span><b>${fmt(vol * v.price, 0)} ₽</b></div>
-        <div class="pvr"><span class="hint">На складе</span><b style="font-size:16px;color:${v.cnt > b.count ? 'var(--err)' : 'inherit'}">${b.count} шт${v.cnt > b.count ? ' · не хватает' : ''}</b></div>`;
+      const draft = orderDraft(v);
+      return `<div class="pvr"><span>Итого</span><b>${orderSummary(draft)}</b></div>
+        ${draft.stock.map(({label, available, amount, unit, short}) => `<div class="dl"><span>${esc(label)}</span><b${short ? ' class="form-error"' : ''}>Нужно ${fmt(amount,3)} из ${fmt(available,3)} ${unit}${short ? ' · не хватает' : ''}</b></div>`).join('')}
+        ${draft.error ? `<p class="form-error">${esc(draft.error)}</p>` : ''}`;
     },
-    req: v => !Object.keys(D.con).length ? 'Не загружен список клиентов' : !v.con ? 'Выберите клиента' : !v.board ? 'Выберите доску' : v.cnt <= 0 ? 'Укажите количество' : null,
-    sum: v => { const b = D.boards.find(x => x.id == v.board); return `${b ? boardTitle(b) + ' · ' + lenM(b.length_mm) + ': ' : ''}${fmt(v.cnt, 0)} шт по ${fmt(v.price, 0)} ₽ за м³, клиент: ${D.con[v.con] || 'не выбран'}`; },
-    mem: ['con', 'price'],
-    body: v => ({contractor_id: +v.con, status: 'new', delivery_price: 0, extra_price: 0, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
+    req: v => !v.con ? 'Выберите клиента' : !v.rows.length ? 'Добавьте позиции заказа' :
+      [v.delivery, v.extra].some(x => !Number.isFinite(x) || x < 0) ? 'Укажите неотрицательную стоимость доставки и дополнительных услуг' :
+      v.notes.length > 1000 ? 'Примечание: до 1000 символов' : orderDraft(v).error,
+    sum: v => `${D.con[v.con]} · позиций: ${v.rows.length} · ${orderSummary(orderDraft(v))}`,
+    mem: ['con'],
+    body: v => ({contractor_id: +v.con, notes: v.notes, delivery_price: rounded(v.delivery,100), extra_price: rounded(v.extra,100),
+      items: v.rows.filter(r => r.type === 'board').map(r => ({board_id: +r.board, count: r.cnt, price: rounded(r.price,100)})),
+      firewood_items: v.rows.filter(r => r.type === 'firewood').map(r => ({kind: r.kind, volume_m3: r.vol, price: rounded(r.price,100)}))})
   }
 };
-let FK = null;
-const fe = k => $(`input[data-k="${k}"],select[data-k="${k}"]`);
+FORMS.fwproc = {
+ t:'Напилили / Накололи',e:'sawing',ok:'Записать переработку',path:'/firewood/processing',done:'Переработка записана',after:'stock',need:[],mem:[],
+ f:[{k:'kind',l:'Готовые дрова',t:'sel',o:Object.entries(FW_NAMES)},{k:'vol',l:'Получено готовых дров, м³',t:'num',v:3,s:.1},{k:'performer',l:'Кто делал',t:'txt'},{k:'date',l:'Дата (ГГГГ-ММ-ДД)',t:'txt',v:ymd(new Date())},{k:'comment',l:'Комментарий',t:'txt'}],
+ req:v=>!(v.vol>0)?'Укажите объём':!v.performer?'Укажите исполнителя':null,
+ sum:v=>`${FW_NAMES[v.kind]}: ${fmt(v.vol,3)} м³; ${v.performer}, ${v.date}`,
+ body:v=>({kind:v.kind,volume_m3:v.vol,performer:v.performer,date:v.date,comment:v.comment})
+};
+FORMS.fwsettings = {
+ t:'Коэффициенты дров',e:'sawing',ok:'Сохранить коэффициенты',path:'/firewood/settings',done:'Коэффициенты сохранены',after:'stock',need:[],mem:[],
+ f:[{k:'split',l:'Колотые (навалом)',t:'num',s:.01},{k:'round',l:'Чурбаки (навалом)',t:'num',s:.01}],
+ req:v=>!(v.split>0&&v.split<=1&&v.round>0&&v.round<=1)?'Коэффициенты должны быть больше 0 и не больше 1':null,
+ sum:v=>`Колотые: ${v.split}; чурбаки: ${v.round}. Изменятся только новые операции.`,body:v=>v
+};
+async function fwHistory(offset=0){
+ try { const rows=await api('/firewood/processing?limit=50&offset='+offset);
+ sheet('<h2>Переработка дров</h2>'+rows.map(p=>`<div class="dl"><div><b>${esc(FW_NAMES[p.kind])}: ${fmt(p.volume_m3,3)} м³</b><p>${esc(p.date)} · ${esc(p.performer)}</p><p>Сырьё: ${fmt(p.raw_m3,4)} м³ · коэффициент ${p.coefficient}</p><p>${esc(p.comment)}</p></div>${S.role==='manager'?`<button class="lnk" data-a="fwdelete" data-v="${p.id}">Удалить</button>`:''}</div>`).join('')+`${offset?`<button class="btn ghost" data-a="fwhistory" data-v="${Math.max(0,offset-50)}">Назад</button>`:''}${rows.length===50?`<button class="btn ghost" data-a="fwhistory" data-v="${offset+50}">Далее</button>`:''}`);
+ }catch(e){toast(e.message,'err')}
+}
+let FK = null, formParams = {}, rowSerial = 0;
+const fe = (k, scope = document) => $(`input[data-k="${k}"],select[data-k="${k}"]`, scope);
 const fval = (f, x) => (f.m && MEM[f.k] != null) ? MEM[f.k] : (x ?? f.v ?? '');
-function fld(f) {
+function fld(f, id = '') {
   let c;
-  if (f.t === 'sel') c = `<div class="sel"><select data-k="${f.k}">${(f.o || []).map(o => `<option value="${o[0]}">${esc(o[1])}</option>`).join('')}</select></div>`;
-  else if (f.t === 'num') c = `<div class="num"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="-1" aria-label="Меньше">${ic('minus')}</button><input data-k="${f.k}" inputmode="decimal" value="${esc(fval(f))}"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="1" aria-label="Больше">${ic('plus')}</button></div>`;
+  const attr = id ? ` id="${id}"` : '';
+  if (f.t === 'sel') c = `<div class="sel"><select${attr} data-k="${f.k}">${(f.o || []).map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select></div>`;
+  else if (f.t === 'num') c = `<div class="num"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="-1" aria-label="Меньше">${ic('minus')}</button><input${attr} data-k="${f.k}" inputmode="decimal" value="${esc(fval(f))}"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="1" aria-label="Больше">${ic('plus')}</button></div>`;
   else if (f.t === 'acc') c = `<input data-k="${f.k}" value="${esc(fval(f))}" placeholder="${esc(f.ph || '')}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">`;
-  else if (f.t === 'txt') c = `<input data-k="${f.k}" value="${esc(fval(f))}" placeholder="${esc(f.ph || '')}" autocomplete="off">`;
+  else if (f.t === 'txt') c = `<input${attr} data-k="${f.k}" value="${esc(fval(f))}" placeholder="${esc(f.ph || '')}" autocomplete="off">`;
   else c = '';
   const ch = f.c ? `<div class="chips">${f.c.map(x => `<button type="button" class="chip rip" data-a="${f.t === 'pre' ? 'size' : 'chip'}" data-k="${f.k}" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : '';
-  return `${f.h ? `<h3 class="fs">${f.h}</h3>` : ''}<div class="fld${f.half ? ' half' : ''}"><label>${f.l}</label>${c}${ch}</div>`;
+  return `${f.h ? `<h3 class="fs">${f.h}</h3>` : ''}<div class="fld${f.half ? ' half' : ''}"><label${id ? ` for="${id}"` : ''}>${f.l}</label>${c}${ch}</div>`;
+}
+function readFields(fields, scope = document, strict = false) {
+  const v = {};
+  for (const f of fields) {
+    const el = fe(f.k, scope);
+    if (!el) continue;
+    const value = el.value.trim();
+    v[f.k] = f.t === 'num' ? (strict ? Number(value.replace(',', '.')) : num(value)) : value;
+  }
+  return v;
 }
 function vals() {
-  const v = {};
-  FORMS[FK].f.forEach(f => { const el = fe(f.k); if (el) v[f.k] = f.t === 'num' ? num(el.value) : el.value.trim(); });
+  const F = FORMS[FK], v = readFields(F.f, document, !!F.rows);
+  if (F.rows) v.rows = $$('[data-form-row]').map(row => {
+    const type = row.dataset.formRow;
+    return {type, ...readFields(FORM_ROWS[type].fields, row, true)};
+  });
   return v;
+}
+function fillSelect(f, scope, want) {
+  const el = fe(f.k, scope), options = SRC[f.src]();
+  el.innerHTML = options.length ? options.map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join('') : '<option value="">Нет данных</option>';
+  if (want != null && options.some(([id]) => String(id) === String(want))) el.value = want;
+}
+function updateLogRow(row, field) {
+  const input = fe('vol', row), {len, dia, cnt} = readFields(FORM_ROWS.log.fields, row, true);
+  if (field === 'vol') row.dataset.manual = 'true';
+  const {volume, exact} = logVolume(len, dia);
+  const manual = row.dataset.manual === 'true';
+  if (!manual) input.value = (positiveInt(cnt) ? volume * cnt : 0).toFixed(3);
+  $('[data-a="logauto"]', row).hidden = !manual;
+  $('.log-method', row).textContent = manual ? 'Объём указан вручную' : !volume ? 'Укажите длину и диаметр' :
+    exact ? 'Расчёт по ГОСТ 2708-75' : 'Оценка по сбегу на основе ГОСТ 2708-75';
+}
+function addFormRow(type, boardId) {
+  const list = $('#form-rows'), {title, fields} = FORM_ROWS[type];
+  if (type !== 'log' && $$('[data-form-row]', list).filter(r => r.dataset.formRow === type).length >= 100) {
+    toast('Можно добавить до 100 позиций каждого типа', 'err');
+    return;
+  }
+  const id = ++rowSerial;
+  list.insertAdjacentHTML('beforeend', `<section class="form-row" data-form-row="${type}">
+    <div class="form-row-head"><b>${title}</b><button type="button" class="lnk" data-a="removerow">Удалить строку</button></div>
+    <div class="fgrid">${fields.map(f => fld(f, `row-${id}-${f.k}`)).join('')}</div>
+    ${type === 'log' ? '<p class="hint log-method"></p><button type="button" class="lnk" data-a="logauto" hidden>Пересчитать объём</button>' : ''}
+  </section>`);
+  const row = list.lastElementChild;
+  if (type === 'board') {
+    const used = new Set($$('[data-form-row="board"] select', list).map(s => s.value));
+    const preferred = boardId ?? D.boards.find(b => !used.has(String(b.id)))?.id;
+    fillSelect(fields[0], row, preferred);
+    const stock = D.boards.find(b => String(b.id) === fe('board', row).value);
+    if (stock) fe('cnt', row).value = Math.min(stock.count, 10);
+  }
+  if (type === 'log') updateLogRow(row);
+  return row;
+}
+function rowFormChanged(el, row = el.closest('[data-form-row]')) {
+  if (row?.dataset.formRow === 'log') updateLogRow(row, el.dataset.k);
+  calcForm(!row && el.dataset.k === FORMS[FK].auto);
 }
 function calcForm(fromAuto) {
   const F = FORMS[FK]; if (!F) return;
@@ -934,32 +1677,49 @@ function calcForm(fromAuto) {
   const pv = $('#pv'); if (pv && F.pv) pv.innerHTML = F.pv(v);
 }
 async function vForm(kind, p = {}) {
-  const F = FORMS[kind]; FK = kind;
-  $('#view').innerHTML = `<div class="fgrid">${F.f.map(fld).join('')}</div>${F.pv ? '<section class="pv" id="pv"></section>' : ''}`;
-  $('#ok').textContent = F.ok;
+  const F = FORMS[kind], target = $('#formbody') || $('#view');
+  FK = kind; formParams = p;
+  const layout = F.f.map(f => fld(kind === 'user' && f.k === 'role' && canSuper() ?
+    {...f, o:[...f.o,['manager',ROLE.manager]]} : f)).join('');
+  target.innerHTML = `<div class="fgrid">${layout}</div>${F.rows ? '<div id="form-rows" class="form-rows"></div><div class="form-row-tools"></div>' : ''}${F.pv ? '<section class="pv" id="pv"></section>' : ''}`;
+  const fields = target.firstElementChild;
+  const active = () => fields.isConnected && (dockOrigin !== null ? FK === kind : S.cur === kind);
+  $('#ok').textContent = F.ok; $('#ok').disabled = true;
   const needs = await Promise.all([F.need.includes('con') ? ensureCon() : true, F.need.some(n => n !== 'con') ? loadStock() : true]);
-  if (S.cur !== kind) return;
-  if (needs.some(ok => !ok)) { $('#view').innerHTML = `<div class="empty"><b>Не удалось загрузить данные для формы</b><button class="btn ghost" data-a="retryform">Повторить</button></div>`; $('#ok').disabled = true; return; }
+  if (!active()) return;
+  if (needs.some(ok => !ok)) { target.innerHTML = `<div class="empty"><b>Не удалось загрузить данные для формы</b><button class="btn ghost" data-a="retryform">Повторить</button></div>`; $('#ok').disabled = true; return; }
   $('#ok').disabled = false;
   F.f.forEach(f => {
     if (f.t !== 'sel' || !f.src) return;
-    const el = fe(f.k), o = SRC[f.src]();
-    el.innerHTML = o.length ? o.map(x => `<option value="${esc(x[0])}">${esc(x[1])}</option>`).join('') : '<option value="">Нет данных</option>';
-    const want = p[f.k] ?? (f.m ? MEM[f.k] : null);
-    if (want != null && o.some(x => String(x[0]) === String(want))) el.value = want;
+    fillSelect(f, target, p[f.k] ?? (f.m ? MEM[f.k] : null));
   });
+  if (F.rows) {
+    $('.form-row-tools', target).innerHTML = Object.entries(F.rows).map(([type, label]) =>
+      `<button type="button" class="btn ghost" data-a="addrow" data-v="${type}">${label}</button>`).join('');
+    addFormRow(kind === 'arrival' ? 'log' : D.boards.length || p.board ? 'board' : 'firewood', p.board);
+  }
+  if (kind === 'fwsettings' || kind === 'fwproc') {
+    try {const settings=await api('/firewood/settings');
+      if(!active())return;
+      if(kind==='fwsettings'){fe('split').value=settings.split;fe('round').value=settings.round;}
+      else {FORMS.fwproc.pv=v=>`<div class="pvr"><span>Списание сырья</span><b>${fmt(v.vol*settings[v.kind],4)} м³</b></div><p class="hint">Коэффициент: ${settings[v.kind]}. При сохранении применяется актуальный коэффициент из настроек.</p>`;if(!$('#pv'))target.insertAdjacentHTML('beforeend','<section class="pv" id="pv"></section>');}
+    }catch(e){toast(e.message,'err');$('#ok').disabled=true;return;}
+  }
   if (kind === 'sawing') syncLog();
   calcForm();
 }
 function syncLog() { const l = D.logs.find(x => x.id == fe('log').value); if (l) fe('lvol').value = (+l.volume_m3).toFixed(3); }
 async function submitForm() {
-  const F = FORMS[FK], v = vals(), e = F.req(v);
+  const kind = FK, F = FORMS[kind], v = vals(), e = F.req(v);
   if (e) { notify('error'); toast(e, 'err'); return; }
   if (!await ask(F.e, F.t, F.sum(v), 'Сохранить')) return;
   const b = $('#ok'); b.disabled = true; b.classList.add('busy');
   try {
     await api(F.path, {method: 'POST', body: JSON.stringify(F.body(v))});
     F.mem.forEach(k => mem(k, v[k]));
+    const firstBoard = kind === 'order' && v.rows.find(r => r.type === 'board');
+    if (firstBoard) mem('price', firstBoard.price);
+    if (kind === 'arrival') mem('species', v.rows[0].species);
     notify('success'); toast(F.done); F.after === 'back' ? back() : go(F.after);
   } catch (er) { notify('error'); toast(er.message, 'err'); }
   b.disabled = false; b.classList.remove('busy');
@@ -967,18 +1727,125 @@ async function submitForm() {
 
 /* ---------- события ---------- */
 const find = (t, id) => (t === 'boards' ? D.boards : D.logs).find(x => x.id == id);
+const ADMIN_DELETE = {
+  order: ['/orders', 'Заказ и его оплаты будут удалены. У завершённого заказа отгрузка отменится и товар вернётся на склад.'],
+  arrival: ['/arrivals', 'Брёвна из этого прихода будут сняты со склада, если они ещё не израсходованы.'],
+  fwarr: ['/firewood/arrivals', 'Объём прихода будет вычтен из остатка сырья.'],
+  sawing: ['/sawing', 'Сырьё вернётся в партии, а выпущенные доски будут сняты со склада, если их нет в заказах и продажах.'],
+  sale: ['/sales', 'Проданные доски вернутся на склад.'],
+  staff: ['/users', 'Сотрудник потеряет доступ к приложению. Его операции останутся в журнале.']
+};
+const deleteButton = (kind, id, label = 'Удалить запись') => canSuper() ?
+  `<button class="btn ghost admin-delete" data-a="opdelete" data-v="${kind}:${esc(id)}">${label}</button>` : '';
+function stockEditor(key, title, item, fields) {
+  sheet(`<h3>${esc(title)}</h3><form id="stockedit">
+    <div class="fgrid">${fields.map(([name, label, mode, optional]) =>
+      `<div class="fld half"><label for="edit-${name}">${label}</label>
+        <input id="edit-${name}" data-stock-field="${name}" inputmode="${mode}" value="${esc(item[name] ?? '')}" ${optional ? '' : 'required'} autocomplete="off"></div>`).join('')}</div>
+    <button type="submit" class="btn" data-stock-save="${esc(key)}">Сохранить</button>
+  </form>`);
+}
+const BOARD_EDITOR = [
+  ['species','Порода','text'], ['grade','Сорт','text',true],
+  ['height_mm','Толщина, мм','numeric'], ['width_mm','Ширина, мм','numeric'], ['length_mm','Длина, мм','numeric'],
+  ['count','Количество, шт','numeric'], ['volume_m3','Объём, м³','decimal'], ['price_per_m3','Цена за м³, ₽','decimal',true]
+];
+const FW_STOCK_EDITOR = [
+  ['raw_m3','Сырьё, м³','decimal'], ['split_m3','Колотые, м³','decimal'], ['round_m3','Чурбаки, м³','decimal']
+];
 const ACT = {
-  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK),
+ fwhistory:v=>fwHistory(+v||0),
+ fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){toast(e.message,'err')}},
+  theme: toggleTheme,
+  previewrole: role => {
+    if (!S.isSuperAdmin || (role && !STAFF_ROLES.includes(role))) return;
+    S.previewRole = role; S.role = role || 'manager'; S.tab = 'home'; S.stack = [];
+    buildTabs(); show('profile');
+  },
+  checkaccess: async (_, button) => {
+    button.disabled = true;
+    if (inTg) await tgAuth();
+    else if (!await loadConfig()) {
+      if ((jwt()?.exp || 0) * 1000 <= Date.now()) vLogin();
+      else toast('Не удалось проверить доступ. Повторите попытку.', 'err');
+    } else if (S.cur === 'pending') toast('Доступ ещё ожидает подтверждения');
+    button.disabled = false;
+  },
+  resetdata: () => {
+    if (!canSuper()) return;
+    sheet(`<h3>Очистить тестовые данные</h3>
+      <p class="mut">Все заказы, оплаты, продажи, приходы, распилы и корректировки будут удалены. Остатки обнулятся, нумерация заказов начнётся с №1.</p>
+      <div class="fld"><label for="reset-word">Для подтверждения введите СБРОС</label><input id="reset-word" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false"></div>
+      <button class="btn ghost admin-delete" data-a="resetdataok">Очистить данные</button>`);
+  },
+  resetdataok: async (_, button) => {
+    if (!canSuper()) return;
+    const input = $('#sheet.on #sb input#reset-word');
+    if (!input) return;
+    const confirm = input.value.trim().toUpperCase().replace(/C/g,'С').replace(/B/g,'Б').replace(/P/g,'Р').replace(/O/g,'О');
+    if (confirm !== 'СБРОС') { input.focus(); toast('Для подтверждения введите СБРОС', 'err'); return; }
+    button.disabled = true;
+    try {
+      await api('/admin/reset-test-data', {method:'POST', body:JSON.stringify({confirm})});
+      if (button.isConnected) go('home');
+      notify('success'); toast('Тестовые данные очищены');
+    } catch (e) { notify('error'); toast(e.message, 'err'); }
+    finally { button.disabled = false; }
+  },
+  homekpi: v => { if(['boards','logs','firewood'].includes(v)){S.wt=v;S.wq='';S.wsp='';go('stock');}else{if(v==='orders'){S.of='open';S.oq='';}go(v);} },
+  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK, formParams),
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
   new: v => { closeSheet(); go(v); },
   order: v => {
     const o = D.orders.find(x => x.id == v); if (!o) return;
+    const positions = (o.items?.length || 0) + (o.firewood_items?.length || 0);
     sheet(`<h3>Заказ №${esc(o.id)}</h3>
       <div class="dl"><span class="mut">Клиент</span><b>${esc(D.con[o.contractor_id] || 'Клиент №' + o.contractor_id)}</b></div>
-      <div class="dl"><span class="mut">Статус</span>${stl(o.status, 1)}</div>
-      ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div><div class="dl"><span class="mut">Оплата</span><b>${esc(payTxt(o) || '—')}</b></div>` : ''}${(o.items || []).length ? `<div class="dl"><span class="mut">Позиций</span><b>${o.items.length}</b></div>` : ''}
+      <div class="dl"><span class="mut">Статус</span>${stl(o.status, 1)}</div><div class="order-content">${orderContents({...o,firewood_items:[]}).map(x=>`<span>${esc(x)}</span>`).join('')}</div>
+${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}</span><b>${fmt(p.volume_m3,3)} м³ × ${fmt(p.price,2)} ₽</b></div>`).join('')}
+      ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div><div class="dl"><span class="mut">Оплата</span><b>${esc(payTxt(o) || '—')}</b></div>` : ''}${positions ? `<div class="dl"><span class="mut">Позиций</span><b>${positions}</b></div>` : ''}
       <div class="dl"><span class="mut">Создан</span><b>${esc(odate(o, {day: 'numeric', month: 'long', year: 'numeric'}) || '—')}</b></div>
-      <div class="stackb">${isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}${canOrd() && o.status !== 'canceled' && osum(o) > 0 ? `<button class="btn ghost" data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button></div>`);
+      <div class="stackb">${canOrd() && isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}${orderStatusButtons(o,true)}${canOrd() && o.status !== 'canceled' && osum(o) > 0 ? `<button class="btn ghost" data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button>${deleteButton('order',o.id)}</div>`);
+  },
+  opdetail: key => {
+    const op = journalLinks.get(key);
+    if (!canSuper() || !op) return;
+    const {kind, item, title, sub, value, unit, details} = op;
+    const action = kind === 'sale' && item.is_order_sale ?
+      '<p class="hint">Продажу по заказу можно удалить из карточки заказа.</p>' : deleteButton(kind, item.id);
+    sheet(`<h3>${esc(title)}</h3><div class="dl"><span>${esc(sub)}</span><b>${esc(value)} · ${esc(unit)}</b></div>
+      <div class="order-content">${lines(details)}</div><div class="stackb">${action}</div>`);
+  },
+  opdelete: async key => {
+    const [kind, id] = key.split(':'), action = ADMIN_DELETE[kind], view = S.cur;
+    if (!canSuper() || !action || (kind === 'staff' && id == uid())) return;
+    const [path, description] = action;
+    if (!await ask('ok', kind === 'staff' ? 'Удалить сотрудника?' : 'Удалить запись №' + id + '?', description, 'Удалить')) return;
+    try {
+      await api(`${path}/${id}`, {method:'DELETE'});
+      notify('success'); toast(kind === 'staff' ? 'Сотрудник удалён' : 'Запись удалена');
+      if (S.cur === view && !$('#sheet').classList.contains('on')) show(view);
+    } catch (e) {
+      if (S.cur === view && !$('#sheet').classList.contains('on')) {
+        if (kind === 'order' || kind === 'staff') ACT[kind](id);
+        else ACT.opdetail(key);
+      }
+      notify('error'); toast(e.message,'err');
+    }
+  },
+  ostatus: async (v, el) => {
+    const [id, status] = v.split(':'), cancel = status === 'canceled';
+    const fromDetail = !!el.closest('#sheet'), view = S.cur;
+    if (cancel && !await ask('order', `Отменить заказ №${id}?`, 'Отменённый заказ будет закрыт.', 'Отменить заказ')) return;
+    el.disabled = true;
+    try {
+      await api(`/orders/${id}/status`, {method:'PUT', body:JSON.stringify({status})});
+      notify('success'); toast(cancel ? 'Заказ отменён' : 'Заказ взят в работу');
+      if (S.cur === view) show(view);
+    } catch (e) {
+      if (cancel && fromDetail && S.cur === view && !$('#sheet').classList.contains('on')) ACT.order(id);
+      notify('error'); toast(e.message, 'err');
+    } finally { el.disabled = false; }
   },
   debtc: v => {
     const a = D.debts.filter(d => d.contractor_id == v);
@@ -1057,21 +1924,27 @@ const ACT = {
   },
   staff: v => {
     const u = (D.staff || []).find(x => x.id == v); if (!u) return;
-    const btns = (u.role === 'manager' ? '' : ['master', 'worker'].filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">Назначить: ${esc(ROLE[r])}</button>`).join('')) + (u.kind === 'password' ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '');
+    const self = u.id == uid(), protectedAccount = u.is_super_admin && !canSuper();
+    const roles = self || protectedAccount ? [] : canSuper() ? Object.keys(ROLE) : u.role === 'manager' ? [] : ['master','worker','pending'];
+    const btns = roles.filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">${r === 'pending' ? 'Заблокировать доступ' : 'Назначить: ' + esc(ROLE[r])}</button>`).join('') +
+      (u.kind === 'password' && !protectedAccount ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '') +
+      (self ? '' : deleteButton('staff', u.id, 'Удалить сотрудника'));
     sheet(`<h3>${esc(staffName(u))}</h3>
       <div class="dl"><span class="mut">Вход</span><b>${u.kind === 'telegram' ? 'Через Telegram' : 'Логин и пароль'}</b></div>
       ${u.kind === 'telegram' ? `<div class="dl"><span class="mut">Telegram</span><b>${esc(u.tg_username ? '@' + u.tg_username : 'ник не задан')} · ID ${esc(tgId(u))}</b></div>` : ''}
-      <div class="dl"><span class="mut">Роль</span><b>${esc(ROLE[u.role] || u.role)}</b></div>
-      ${btns ? `<div class="stackb">${btns}</div>` : ''}
-      <p class="mut sm" style="margin-top:16px">${u.role === 'manager' ? 'Роль руководителя изменить нельзя.' : 'Новая роль заработает, когда человек заново откроет приложение или войдёт.'}</p>`);
+      <div class="dl"><span class="mut">Роль</span><b>${esc(ROLE[u.role] || u.role)}${canSuper() && u.is_super_admin ? ' · Супер-Админ' : ''}</b></div>
+      ${btns ? `<div class="stackb">${btns}</div>` : ''}`);
   },
-  srole: v => {
+  srole: async (v, button) => {
     const [id, role] = v.split(':'), u = D.staff.find(x => x.id == id); if (!u) return;
-    ask('user', 'Изменить роль', `${staffName(u)}: ${ROLE[role]}`, 'Изменить').then(async ok => {
-      if (!ok) return;
-      try { await api(`/users/${id}/role`, {method: 'PUT', body: JSON.stringify({role})}); notify('success'); toast('Роль изменена'); vStaff(); }
-      catch (e) { notify('error'); toast(e.message, 'err'); }
-    });
+    if (u.role !== 'pending' && !await ask('user', 'Изменить роль', `${staffName(u)}: ${ROLE[role]}`, 'Изменить')) return;
+    button.disabled = true;
+    try {
+      await api(`/users/${id}/role`, {method: 'PUT', body: JSON.stringify({role})});
+      if (S.cur === 'staff') { closeSheet(); vStaff(); }
+      notify('success'); toast('Роль изменена');
+    } catch (e) { notify('error'); toast(e.message, 'err'); }
+    finally { button.disabled = false; }
   },
   spw: v => {
     const u = D.staff.find(x => x.id == v); if (!u) return;
@@ -1089,19 +1962,34 @@ const ACT = {
   jt: v => { S.jt = v; vJournal(); },
   wt: v => { S.wt = v; S.wsp = ''; vStock(false); },
   sp: v => { S.wsp = v; vStock(false); },
+  donefilter: v => {S.donefilter=v;orderList();},
   of: v => { S.of = v; vOrders(false); },
   range: v => { S.range = v; vStats(); },
+  boardgroup: key => {
+    const batches=D.boards.filter(x=>boardGroupKey(x)===key);
+    if(!batches.length)return;
+    sheet(`<h3>${esc(boardTitle(batches[0]))}</h3><p class="mut">${fmt(sum(batches,'count'),0)} шт · ${fmt(sum(batches,'volume_m3'),3)} м³</p><p class="mut sm">Выберите партию для заказа или корректировки остатка.</p>${batches.map(x=>li('Позиция №'+esc(x.id),esc([lenM(x.length_mm),sdate(x.created_at)].filter(Boolean).join(' · ')),fmt(x.volume_m3,3)+' м³',fmt(x.count,0)+' шт',{a:'item',d:'boards:'+x.id})).join('')}`);
+  },
   item: v => {
     const [t, id] = v.split(':'), x = find(t, id); if (!x) return;
     sheet(`<h3>${t === 'boards' ? esc(boardTitle(x)) : `Бревно Ø${esc(x.diameter_mm)}`}</h3>
-      <div class="dl"><span class="hint">Порода</span><b>${esc(x.species || 'не указана')}</b></div>
+      <div class="dl"><span class="hint">Позиция склада</span><b>№${esc(x.id)}</b></div><div class="dl"><span class="hint">Порода</span><b>${esc(x.species || 'не указана')}</b></div>
       <div class="dl"><span class="hint">Длина</span><b>${lenM(x.length_mm)}</b></div>
       ${t === 'boards' ? `<div class="dl"><span class="hint">Сорт</span><b>${esc(x.grade || '1')}</b></div>` : `<div class="dl"><span class="hint">Партия прихода</span><b>№${esc(x.arrival_id)}</b></div>`}
       <div class="dl"><span class="hint">Остаток</span><b>${esc(x.count)} шт${t === 'boards' && (+x.count || 0) <= LOW_STOCK_PCS ? ' · мало на складе' : ''}</b></div>
       <div class="dl"><span class="hint">Объём</span><b>${fmt(x.volume_m3, 3)} м³</b></div>
       ${t === 'boards' && canOrd() ? `<button class="btn rip" style="margin-top:14px" data-a="mk" data-v="order:board:${x.id}">Создать заказ на эту позицию</button>` : ''}
+      ${t === 'boards' && canSuper() ? `<button class="btn ghost" style="margin-top:10px" data-a="boardedit" data-v="${x.id}">Редактировать позицию</button>` : ''}
       ${t === 'logs' ? `<button class="btn rip" style="margin-top:14px" data-a="mk" data-v="sawing:log:${x.id}">Записать распиловку из этой партии</button>` : ''}
       ${S.role === 'manager' ? `<button class="btn ghost" style="margin-top:10px" data-a="adj" data-v="${t}:${x.id}">Списать или исправить остаток</button>` : ''}`);
+  },
+  boardedit: id => {
+    const b = find('boards', id);
+    if (canSuper() && b) stockEditor('board:' + id, 'Позиция склада №' + id, b, BOARD_EDITOR);
+  },
+  fwstockedit: () => {
+    if (canSuper()) stockEditor('firewood', 'Остатки дров, м³', {...D.fw, raw_m3: (+D.fw.raw_m3 || 0).toFixed(7),
+      split_m3: D.fw.split_m3 || 0, round_m3: D.fw.round_m3 || 0}, FW_STOCK_EDITOR);
   },
   adj: v => {
     const [t, id] = v.split(':'), x = find(t, id); if (!x) return;
@@ -1132,30 +2020,66 @@ const ACT = {
   mk: v => { const [f, k, id] = v.split(':'); closeSheet(); go(f, {[k]: id}); },
   done: (v, el) => ask('ok', 'Завершить заказ №' + v, 'Товары будут списаны со склада и проведены как продажа.', 'Завершить').then(ok => ok && doComplete(v, el)),
   pdf: v => pdfSheet(v), pdfsend: (v, el) => pdfDo('send', v, el), pdfdl: (v, el) => pdfDo('dl', v, el), pdfview: (v, el) => pdfDo('view', v, el),
-  chip: (v, el) => { fe(el.dataset.k).value = v; calcForm(); },
+  addrow: type => { const row = addFormRow(type); row?.querySelector('input,select')?.focus(); calcForm(); },
+  removerow: (_, el) => { el.closest('[data-form-row]').remove(); $('#form-rows + .form-row-tools button')?.focus(); calcForm(); },
+  logauto: (_, el) => {
+    const row = el.closest('[data-form-row]');
+    delete row.dataset.manual; updateLogRow(row); fe('vol', row).focus(); calcForm();
+  },
+  chip: (v, el) => {
+    const row = el.closest('[data-form-row]');
+    fe(el.dataset.k, row || document).value = v; rowFormChanged(el, row);
+  },
   size: v => { const [a, b] = v.split('×'); fe('th').value = a; fe('wd').value = b; calcForm(); },
   st: (v, el) => {
-    const f = FORMS[FK].f.find(x => x.k === el.dataset.k), i = fe(f.k);
-    i.value = Math.max(0, Math.round((num(i.value) + (+v) * (f.s || 1)) * 1000) / 1000); calcForm(f.k === FORMS[FK].auto);
+    const row = el.closest('[data-form-row]');
+    const fields = row ? FORM_ROWS[row.dataset.formRow].fields : FORMS[FK].f;
+    const f = fields.find(x => x.k === el.dataset.k), i = fe(f.k, row || document);
+    i.value = Math.max(0, rounded(num(i.value) + (+v) * (f.s || 1), 1000)); rowFormChanged(el, row);
   }
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return;
   const f = ACT[el.dataset.a]; if (f) { hap(); f(el.dataset.v, el); }
 });
+document.addEventListener('submit', async e => {
+  const form = e.target;
+  if (form.id !== 'stockedit') return;
+  e.preventDefault();
+  if (!canSuper()) return;
+  const button = $('[data-stock-save]', form);
+  const [kind, id] = button.dataset.stockSave.split(':');
+  const patch = {};
+  for (const input of $$('[data-stock-field]', form)) {
+    const key = input.dataset.stockField, raw = input.value.trim();
+    patch[key] = input.inputMode === 'text' ? raw : raw === '' && !input.required ? null : Number(raw.replace(',', '.'));
+    if (typeof patch[key] === 'number' && !Number.isFinite(patch[key])) {
+      input.focus(); toast('Проверьте числовое значение', 'err'); return;
+    }
+  }
+  button.disabled = true;
+  try {
+    await api(kind === 'board' ? '/boards/' + id : '/firewood/stock', {method:'PUT', body:JSON.stringify(patch)});
+    notify('success'); toast('Остатки обновлены');
+    if (form.isConnected && S.cur === 'stock') show('stock');
+  } catch (err) { toast(err.message, 'err'); }
+  finally { button.disabled = false; }
+});
 document.addEventListener('input', e => {
   const t = e.target;
-  if (t.id === 'q') { S.wq = t.value; clearTimeout(DEB); DEB = setTimeout(() => stockList(false), 120); }
+  if(t.id === 'staffq'){S.staffq=t.value;staffList();}
+  else if(t.id === 'jq') { S.jq=t.value; filterJournal(); }
+  else if (t.id === 'q') { S.wq = t.value; clearTimeout(DEB); DEB = setTimeout(() => stockList(false), 120); }
   else if (t.id === 'cq') { S.cq = t.value; clearTimeout(DEB); DEB = setTimeout(conList, 120); }
   else if (t.id === 'oq') { S.oq = t.value; clearTimeout(DEB); DEB = setTimeout(() => orderList(false), 120); }
   else if (t.id === 'd1' || t.id === 'd2') { S.range = 'custom'; $$('[data-a="range"]').forEach(b => b.classList.remove('on')); loadStats(); }
-  else if (t.dataset.k && FK) calcForm(t.dataset.k === FORMS[FK].auto);
+  else if (t.dataset.k && FK) rowFormChanged(t);
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.tagName === 'SELECT' && t.dataset.k && FK) { if (FK === 'sawing' && t.dataset.k === 'log') syncLog(); calcForm(); }
+  if (t.tagName === 'SELECT' && t.dataset.k && FK) { if (FK === 'sawing' && t.dataset.k === 'log') syncLog(); rowFormChanged(t); }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'lp') login(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape' && $('#sheet').classList.contains('on')) { settle(false); return; } if (e.key === 'Enter' && e.target.id === 'lp') login(); });
 
 /* ---------- старт ---------- */
 if (inTg) tgAuth();

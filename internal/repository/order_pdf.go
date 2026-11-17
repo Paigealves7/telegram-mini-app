@@ -33,7 +33,23 @@ func (r *Repository) GetOrderLines(ctx context.Context, orderID int64) ([]domain
 		}
 		lines = append(lines, l)
 	}
-	return lines, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	fw, err := r.db.Query(ctx, `SELECT kind,volume_m3,price FROM order_firewood WHERE order_id=$1 ORDER BY id`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer fw.Close()
+	for fw.Next() {
+		var l domain.OrderLine
+		if err = fw.Scan(&l.FirewoodKind, &l.VolumeM3, &l.Price); err != nil {
+			return nil, err
+		}
+		lines = append(lines, l)
+	}
+	return lines, fw.Err()
 }
 
 // GetContractorName возвращает название клиента.
