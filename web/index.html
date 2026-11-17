@@ -494,6 +494,27 @@ html[data-t="light"] .seg button.on,html[data-t="light"] .utab.on{background:#ff
 .efficiency b{font-size:20px}.stats-firewood .dl{font-size:13px;padding:10px 0}
 @media(min-width:1440px){#sr{grid-template-columns:repeat(2,minmax(0,1fr))}#sr>.rev{grid-column:1/-1}}
 
+
+html.in-telegram body.sub #hb{display:none}
+body[data-view="home"] #hact{gap:8px}
+body[data-view="home"] #hact .home-reports{display:flex;width:auto;min-width:0;height:38px;padding:0 12px;gap:6px;border:1px solid var(--line);border-radius:999px;background:var(--s2);color:var(--t1)}
+body[data-view="home"] #hact .home-reports span{display:inline;font-size:13px}
+body[data-view="home"] #hact .avatar{display:flex;width:38px;min-width:38px;height:38px;border:1px solid var(--line2);border-radius:50%;background:var(--s2);color:var(--t1)}
+.who{display:flex;align-items:center;gap:14px;text-align:left;padding:16px;background:var(--s1);border:1px solid var(--line);border-radius:var(--r-card);margin-bottom:16px}
+.who .avatar{width:52px;height:52px;margin:0;flex:none;font-size:22px}
+.who h2{font-size:18px;line-height:24px}.profile-meta{font-size:12px;color:var(--t2);margin-top:4px}
+.role-badge{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--s2);color:var(--t1)}
+.profile-heading{font-size:13px;line-height:20px;color:var(--t2);font-weight:600;margin:0 0 8px}
+.profile-group{background:var(--s1);border:1px solid var(--line);border-radius:var(--r-card);padding:0 16px;margin-bottom:16px}
+.profile-setting{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;padding:8px 0}
+.profile-setting+ .profile-setting,.profile-link+ .profile-link{border-top:1px solid var(--line)}
+.profile-setting b,.profile-link b{font-size:14px;font-weight:500}.profile-setting p{font-size:11px}
+.profile-link{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:0;border:0;background:transparent;text-align:left}
+.profile-link b{flex:1}.profile-link>svg{width:18px;height:18px;color:var(--t3)}
+.profile-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--s2)}
+.profile-icon svg{width:18px;height:18px}
+.profile-logout{min-height:44px;margin-top:0}
+
 </style>
 </head>
 <body class="noauth">
@@ -510,6 +531,7 @@ html[data-t="light"] .seg button.on,html[data-t="light"] .utab.on{background:#ff
 
 <script>
 const tg = window.Telegram.WebApp, inTg = !!tg.initData;
+document.documentElement.classList.toggle('in-telegram', inTg);
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const NF = {};
@@ -579,6 +601,7 @@ function toggleTheme() {
   chosenTheme = document.documentElement.dataset.t === 'dark' ? 'light' : 'dark';
   try { localStorage.setItem('theme', chosenTheme); } catch (e) {}
   theme();
+  const label = document.querySelector('.profile-setting .mut'); if(label) label.textContent = document.documentElement.dataset.t === 'dark' ? 'Тёмная тема' : 'Светлая тема';
 }
 theme(); tg.onEvent('themeChanged', theme);
 try { tg.MainButton.hide(); } catch (e) {}
@@ -708,15 +731,15 @@ function buildTabs() {
   if (canOrd()) t.push(['orders', 'order', 'Заказы']);
   t.push(['journal', 'journal', 'Журнал']);
   if(S.role==='manager') t.push(['stats','chart','Отчёты']);
-  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+'<span>Лесопилка<small>Рабочее пространство</small></span></div>' + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile">${ic('user')}<span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span></button><button class="theme-button" data-a="theme" aria-label="Сменить тему"></button></div>`;
+  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+'<span>Лесопилка<small>Рабочее пространство</small></span></div>' + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile">${ic('user')}<span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span></button></div>`;
   theme();
 }
 const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-label="Создать: ${l}" title="Создать: ${l}">${ic('plus')}<span>${l}</span></button>`;
 function setAct(v) {
   const actions = v === 'orders' ? hbtn('order', 'Доски') + hbtn('fworder', 'Дрова')
     : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
-  $('#hact').innerHTML = (v === 'home' ? '<button class="rbtn" data-a="theme" aria-label="Сменить тему"></button>' +
-    (S.role === 'manager' ? '<button class="rbtn" data-a="go" data-v="stats" aria-label="Отчёты" title="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
+  $('#hact').innerHTML = (v === 'home' ?
+    (S.role === 'manager' ? '<button class="hbtn home-reports" data-a="go" data-v="stats" aria-label="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
     '<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль" title="Профиль">' + esc((S.name || '?')[0].toUpperCase()) + '</button>' : '') + actions;
   theme();
 }
@@ -1090,14 +1113,15 @@ async function loadStats() {
 /* ---------- профиль и вход ---------- */
 function vProfile() {
   const j = jwt() || {};
-  $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><h2>${esc(S.name)}</h2><p class="mut">${esc(ROLE[S.role] || S.role)}</p></div>
-    <div class="ld"><div><span>Тёмная тема</span><p class="mut sm">Оформление приложения</p></div><button class="sw" role="switch" aria-checked="${document.documentElement.dataset.t === 'dark'}" aria-label="Тёмная тема" data-a="theme"></button></div>
-    <div class="ld"><span>ID сотрудника</span><b>${esc(j.user_id || '—')}</b></div>
-    <div class="ld"><div><span>Экономный режим</span><p class="mut sm">Меньше анимаций, телефон меньше греется</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
-    ${S.role === 'manager' ? `<h2 class="section-label">Управление</h2><div class="resource-grid">${[['staff','user','Сотрудники','Доступ, роли и пароли'],['cons','order','Контрагенты','Клиенты, поставщики и перевозчики'],['adjlog','box','Корректировки склада','История списаний и исправлений']].map(([v,i,t,s])=>`<button class="srow" data-a="go" data-v="${v}"><span class="e">${ic(i)}</span><span><b>${t}</b><small>${s}</small></span>${ic('chev')}</button>`).join('')}</div>` : ''}
-    ${inTg ? '' : '<button class="btn ghost" style="margin-top:32px" data-a="logout">Выйти</button>'}`;
+  $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><div><h2>${esc(S.name)}</h2><p class="profile-meta"><span class="role-badge">${esc(ROLE[S.role] || S.role)}</span> · ID ${esc(j.user_id || '—')}</p></div></div>
+    <h2 class="profile-heading">Настройки приложения</h2>
+    <div class="profile-group settings-group">
+      <div class="profile-setting"><div><b>Оформление</b><p class="mut sm">${document.documentElement.dataset.t === 'dark' ? 'Тёмная тема' : 'Светлая тема'}</p></div><button class="sw" role="switch" aria-checked="${document.documentElement.dataset.t === 'dark'}" aria-label="Тёмная тема" data-a="theme"></button></div>
+      <div class="profile-setting"><div><b>Экономный режим</b><p class="mut sm">Меньше анимаций</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
+    </div>
+    ${S.role === 'manager' ? `<h2 class="profile-heading">Управление</h2><div class="profile-group">${[['staff','user','Сотрудники'],['cons','box','Контрагенты'],['adjlog','box','Корректировки склада'],['stats','chart','Отчёты']].map(([v,i,t])=>`<button class="profile-link" data-a="go" data-v="${v}"><span class="profile-icon">${ic(i)}</span><b>${t}</b>${ic('chev')}</button>`).join('')}</div>` : ''}
+    ${inTg ? '' : '<button class="btn ghost profile-logout" data-a="logout">Выйти</button>'}`;
 }
-
 /* ---------- корректировки склада (только руководитель) ---------- */
 const ADJ = {defect: 'Брак', loss: 'Потеря, недостача', own_use: 'Использовано на свои нужды', surplus: 'Излишек (нашли)', other: 'Другое'};
 async function vAdjLog() {
