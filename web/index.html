@@ -515,6 +515,22 @@ body[data-view="home"] #hact .avatar{display:flex;width:38px;min-width:38px;heig
 .profile-icon svg{width:18px;height:18px}
 .profile-logout{min-height:44px;margin-top:0}
 
+
+body[data-view="home"] .quickbar,body[data-view="home"] .qa{position:static}
+body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+#tdy{margin-bottom:12px}#tdy .sh{margin-top:0}
+.home-order{display:flex;align-items:center;gap:8px;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;font-size:12px}
+.home-order:last-child{border-bottom:0}.home-order>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-order b{white-space:nowrap}.home-order .st{font-size:10px;gap:4px;white-space:nowrap}
+.grp b{letter-spacing:0;word-spacing:normal;font-variant-numeric:tabular-nums}
+.staff-card{display:flex;align-items:center;gap:12px;width:100%;margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--s1);text-align:left}
+.staff-avatar{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:50%;background:var(--s2);font-weight:600}
+.staff-main{flex:1;min-width:0}.staff-main b{display:block;overflow-wrap:anywhere;font-size:14px;font-weight:500}
+.staff-main small,.staff-end small{display:block;font-size:11px;color:var(--t2)}
+.staff-end{display:grid;justify-items:end;gap:4px;flex:none}
+.staff-role{font-size:10px;padding:4px 8px;border-radius:999px;background:var(--s2);color:var(--t2)}
+.staff-role.manager{background:rgba(193,145,40,.16);color:var(--warn)}.staff-role.master{background:rgba(60,150,120,.16);color:var(--ok)}
+
 </style>
 </head>
 <body class="noauth">
@@ -736,7 +752,7 @@ function buildTabs() {
 }
 const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-label="Создать: ${l}" title="Создать: ${l}">${ic('plus')}<span>${l}</span></button>`;
 function setAct(v) {
-  const actions = v === 'orders' ? hbtn('order', 'Доски') + hbtn('fworder', 'Дрова')
+  const actions = v === 'staff' ? hbtn('user','Сотрудник') : v === 'cons' ? '<button class="hbtn" data-a="cedit" data-v="new">'+ic('plus')+'<span>Контрагент</span></button>' : v === 'orders' ? hbtn('order', 'Доски') + hbtn('fworder', 'Дрова')
     : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
   $('#hact').innerHTML = (v === 'home' ?
     (S.role === 'manager' ? '<button class="hbtn home-reports" data-a="go" data-v="stats" aria-label="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
@@ -803,7 +819,7 @@ const sdate = s => { const d = s ? new Date(s) : null; return d && !isNaN(d) ? d
 const oPaid = o => +o.paid_amount || 0;
 const oDue = o => Math.max(osum(o) - oPaid(o), 0);
 const payTxt = o => { const t = osum(o); if (t <= 0 || o.status === 'canceled') return ''; return oPaid(o) >= t - .005 ? 'оплачен' : oPaid(o) > 0 ? 'долг ' + fmt(oDue(o), 0) + ' ₽' : 'не оплачен'; };
-const orderContents = o => [...(o.items || []).map(p => { const b = D.boards.find(x=>x.id==p.board_id) || p; return `${b.height_mm ? boardTitle(b) + ' · ' + lenM(b.length_mm) : 'Доски · позиция №' + p.board_id} — ${fmt(p.count,0)} шт${p.volume_m3 != null ? ' · '+fmt(p.volume_m3,3)+' м³' : ''}`; }), ...(o.firewood_items || []).map(p=>`${FW_NAMES[p.kind] || 'Дрова'} — ${fmt(p.volume_m3,3)} м³`)];
+const orderContents = o => [...(o.items || []).map(p => { const b = p.height_mm ? p : D.boards.find(x=>x.id==p.board_id) || p; return `${b.height_mm ? boardTitle(b) + ' · ' + lenM(b.length_mm) : 'Доски · позиция №' + p.board_id} — ${fmt(p.count,0)} шт${p.volume_m3 != null ? ' · '+fmt(p.volume_m3,3)+' м³' : ''}`; }), ...(o.firewood_items || []).map(p=>`${FW_NAMES[p.kind] || 'Дрова'} — ${fmt(p.volume_m3,3)} м³`)];
 const oRow = o => { const t = osum(o), paid=oPaid(o), contents=orderContents(o); return `<article class="order-card">
 <button class="order-head" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(o.id)}</b><small>${esc(D.con[o.contractor_id] || 'Клиент №'+o.contractor_id)}</small></span>${stl(o.status)}</button>
 ${contents.length ? `<div class="order-content">${contents.map(x=>`<span>${esc(x)}</span>`).join('')}</div>` : ''}
@@ -836,6 +852,7 @@ const sQ = (a, b) => `/statistics?start_date=${encodeURIComponent(a)}&end_date=$
 
 const quickActions = () => [canOrd() && ['arrival','Приход леса','arrival'], canOrd() && ['fwarr','Дрова','box'], S.role !== 'master' && ['sawing','Распил','sawing'], canOrd() && ['order','Заказ','order'], !canOrd() && ['fwproc','Переработка дров','box']].filter(Boolean);
 const quickBar = () => quickActions().map(([k,l,i]) => `<button class="quick-btn" data-a="new" data-v="${k}">${ic(i)}<span>${l}</span></button>`).join('');
+const homeOrderRow = o => `<button class="home-order" data-a="order" data-v="${esc(o.id)}"><span>Заказ №${esc(o.id)} · ${esc(D.con[o.contractor_id] || "Клиент №"+o.contractor_id)}</span><b>${fmt(osum(o),0)} ₽</b>${stl(o.status)}</button>`;
 async function vHome() {
   const v = $('#view');
   v.innerHTML = `<div class="quickbar">${quickBar()}</div><div id="hd">${sk(4)}</div>`;
@@ -845,22 +862,14 @@ async function vHome() {
   if (orders) D.orders = orders;
   const bv = sum(D.boards,'volume_m3'), bc = sum(D.boards,'count'), lv = sum(D.logs,'volume_m3');
   const open = D.orders.filter(isOpen), fw = D.fw, ready = (+fw.split_m3 || 0) + (+fw.round_m3 || 0);
-  const metric = (label,value,sub,tab) => `<button class="metric" data-a="go" data-v="${tab}"><span>${label}</span><strong>${value}</strong><small>${sub}</small></button>`;
-  const by = {};
-  D.boards.filter(b=>+b.count>0).forEach(b => { const e = by[b.species || 'Без породы'] ||= {v:0,c:0}; e.v += +b.volume_m3 || 0; e.c += +b.count || 0; });
-  const row = (n,value,sub,max) => `<div class="balance-row"><div><b>${esc(n)}</b><strong>${fmt(value,2)} м³</strong></div><div class="bar"><i style="--w:${Math.min(100,Math.max(0,value/Math.max(max,.001)*100))}%"></i></div><small class="mut">${sub}</small></div>`;
+  const metric = (label,value,sub,tab) => `<button class="metric" data-a="homekpi" data-v="${tab}"><span>${label}</span><strong>${value}</strong><small>${sub}</small></button>`;
   $('#hd').innerHTML = `<div class="metrics">
-    ${metric('Готовая продукция',fmt(bv,2)+' м³',fmt(bc,0)+' шт','stock')}
-    ${metric('Сырьё · брёвна',fmt(lv,2)+' м³',D.logs.length+' '+pl(D.logs.length,['партия','партии','партий']),'stock')}
-    ${metric('Дрова · сырьё',fmt(fw.raw_m3,2)+' м³','Готовые: '+fmt(ready,2)+' м³','stock')}
+    ${metric('Готовая продукция',fmt(bv,2)+' м³',fmt(bc,0)+' шт','boards')}
+    ${metric('Сырьё · брёвна',fmt(lv,2)+' м³',D.logs.length+' '+pl(D.logs.length,['партия','партии','партий']),'logs')}
+    ${metric('Дрова · сырьё',fmt(fw.raw_m3,2)+' м³','Готовые: '+fmt(ready,2)+' м³','firewood')}
     ${canOrd() ? metric('Активные заказы',orders ? open.length : '—',orders ? 'В работе' : 'Не удалось загрузить','orders') : metric('Производство','Распил','Перейти в журнал','journal')}
-    </div><div class="home-grid"><section class="workspace-card"><div class="sh"><h2>Остатки по породам и дровам</h2><button class="lnk" data-a="go" data-v="stock">Склад →</button></div>
-    ${Object.entries(by).sort((a,b)=>b[1].v-a[1].v).map(([n,e])=>row(n,e.v,fmt(e.c,0)+' шт · '+fmt(e.v/Math.max(bv,.001)*100,0)+'% досок',bv)).join('') || '<p class="mut">Пиломатериалов пока нет</p>'}
-    <h3 class="section-label">Дрова · берёза</h3>
-    ${row('Сырьё',+fw.raw_m3||0,'Для переработки',Math.max(+fw.raw_m3||0,ready))}
-    ${Object.entries(FW_NAMES).map(([k,n])=>row(n,+fw[k+'_m3']||0,'Готово к продаже',ready)).join('')}
-    <div id="tdy"></div></section><div class="home-feed">
-    ${canOrd() ? `<section class="workspace-card"><div class="sh"><h2>Заказы в работе <span class="tag">${open.length}</span></h2><button class="lnk" data-a="go" data-v="orders">Все →</button></div>${orders ? (open.length ? open.slice(0,3).map(oRow).join('') : '<p class="mut">Все заказы выполнены</p>') : '<p class="mut">Заказы временно недоступны</p>'}</section>` : ''}
+    </div><section id="tdy" class="workspace-card"></section><div class="home-grid"><div class="home-feed">
+    ${canOrd() ? `<section class="workspace-card"><div class="sh"><h2>Заказы в работе <span class="tag">${open.length}</span></h2><button class="lnk" data-a="go" data-v="orders">Все →</button></div>${orders ? (open.length ? open.slice(0,3).map(homeOrderRow).join('') : '<p class="mut">Все заказы выполнены</p>') : '<p class="mut">Заказы временно недоступны</p>'}</section>` : ''}
     <section id="rcn" class="workspace-card">${sk(3)}</section></div></div>`;
   v.prepend($('.metrics'));
   homeExtra(open);
@@ -877,13 +886,6 @@ async function homeExtra(open) {
   if (sal) { const a = sal.filter(x => dayKey(x.created_at) === td), amt = tot(a, x => x.total_price); tl.push(['Продано', fmt(tot(a, x => x.total_volume), 2), 'м³' + (amt > 0 ? ' · ' + fmt(amt, 0) + ' ₽' : '')]); }
   if (canOrd()) tl.push(['Активные', fmt(open.length, 0), pl(open.length, ['заказ', 'заказа', 'заказов'])]);
   $('#tdy').innerHTML = tl.length ? `<div class="sh"><h2>Сегодня</h2></div><div class="tiles" style="--n:${tl.length}">${tl.map(([l, x, t]) => `<div class="tile"><span class="tl">${l}</span><b class="tv">${x}</b><span class="ts">${t}</span></div>`).join('')}</div>` : '';
-  if (saw && sal && $('#hdl')) {
-    const full = (l, f) => l.length < 100 || l.some(x => dayKey(f(x)) < w0);
-    if (full(saw, x => x.date) && full(sal, x => x.created_at)) {
-      const d = tot(saw.filter(x => dayKey(x.date) >= w0), sOut) - tot(sal.filter(x => dayKey(x.created_at) >= w0), x => x.total_volume);
-      if (Math.abs(d) >= 0.05) $('#hdl').innerHTML = `<div class="dlt ${d > 0 ? 'up' : 'dn'}">${ic(d > 0 ? 'trend' : 'trendDown')}${d > 0 ? '+' : '−'}${fmt(Math.abs(d), 1)} м³ за 7 дней</div>`;
-    }
-  }
   const ev = [];
   (arr || []).forEach(x => ev.push({id: x.id, d: x.arrival_date, i: 'arrival', t: 'Приход леса', s: D.con[x.supplier_id] || 'Поставщик №' + x.supplier_id, v: fmt(sum(x.items || [], 'volume_m3'), 2) + ' м³'}));
   (saw || []).forEach(x => ev.push({id: x.id, d: x.date, i: 'sawing', t: 'Распил', s: 'Сырья ' + fmt(sIn(x), 2) + ' м³', v: fmt(sOut(x), 2) + ' м³'}));
@@ -1143,7 +1145,7 @@ async function vCons() {
   if (S.cur !== 'cons') return;
   if (!list) { v.innerHTML = fail('Не удалось загрузить контрагентов', 'cons'); return; }
   D.cl = list; D.con = {}; list.forEach(c => D.con[c.id] = c.name);
-  v.innerHTML = `<button class="btn" data-a="cedit" data-v="new">Новый контрагент</button>
+  v.innerHTML = `
     <div class="srch" style="margin-top:16px">${ic('search')}<input id="cq" placeholder="Поиск по названию" aria-label="Поиск" value="${esc(S.cq)}"></div><div id="cl"></div>`;
   conList();
 }
@@ -1154,17 +1156,22 @@ function conList() {
 }
 
 /* ---------- сотрудники (только руководитель) ---------- */
-const tgId = u => u.username.slice(3);
-const staffName = u => (u.kind === 'telegram' ? (u.name || 'Telegram ' + tgId(u)) : u.username) + (u.id == uid() ? ' (вы)' : '');
-const staffSub = u => u.kind === 'telegram' ? (u.tg_username ? '@' + u.tg_username + ' · ' : '') + 'ID ' + tgId(u) : 'Вход по паролю';
+const tgId = u => String(u.username || '').replace(/^tg_/,'');
+const staffBaseName = u => { const name=String(u.kind==='telegram'?u.name||'':u.username||'').trim();return /[\p{L}\p{N}]/u.test(name)?name:u.tg_username?'@'+u.tg_username:'Сотрудник #'+u.id; };
+const staffName = u => staffBaseName(u)+(u.id==uid()?' (вы)':'');
+const staffSub = u => u.kind==='telegram' ? (u.tg_username && staffBaseName(u)!=='@'+u.tg_username?'@'+u.tg_username:'Telegram') : 'Вход по паролю';
 async function vStaff() {
-  const v = $('#view'); v.innerHTML = sk(4);
-  const list = await safe('/users');
-  if (S.cur !== 'staff') return;
-  if (!list) { v.innerHTML = fail('Не удалось загрузить сотрудников', 'staff'); return; }
-  D.staff = list;
-  const rows = list.map(u => li(esc(staffName(u)), esc(staffSub(u)), esc(ROLE[u.role] || u.role), esc(new Date(u.created_at).toLocaleDateString('ru-RU')), {a: 'staff', d: u.id})).join('');
-  v.innerHTML = `<button class="btn" data-a="new" data-v="user">Новый сотрудник</button>` + grp('Сотрудники', list.length, rows);
+  const v=$('#view');v.innerHTML=sk(4);
+  const list=await safe('/users');if(S.cur!=='staff')return;
+  if(!list){v.innerHTML=fail('Не удалось загрузить сотрудников','staff');return;}
+  D.staff=list;
+  v.innerHTML=`<div class="filterbar"><div class="srch">${ic('search')}<input id="staffq" placeholder="Поиск по имени, логину, роли" aria-label="Поиск сотрудников" value="${esc(S.staffq||'')}"></div></div><div id="stafflist"></div>`;
+  staffList();
+}
+function staffList(){
+  const q=(S.staffq||'').trim().toLowerCase();
+  const list=(D.staff||[]).filter(u=>[staffName(u),u.tg_username,u.username,ROLE[u.role]].join(' ').toLowerCase().includes(q));
+  $('#stafflist').innerHTML=grp('Сотрудники',list.length,list.map(u=>`<button class="staff-card" data-a="staff" data-v="${esc(u.id)}"><span class="staff-avatar">${esc(Array.from(staffBaseName(u).replace(/^@/,''))[0]?.toUpperCase()||'?')}</span><span class="staff-main"><b>${esc(staffName(u))}</b><small>${esc(staffSub(u))}</small></span><span class="staff-end"><span class="staff-role ${['manager','master','worker'].includes(u.role)?u.role:'worker'}">${esc(ROLE[u.role]||u.role)}</span><small>${esc(sdate(u.created_at))}</small></span></button>`).join('')||none('Сотрудники не найдены'));
 }
 function vLogin(msg) {
   document.body.classList.add('noauth'); S.cur = 'login';
@@ -1374,6 +1381,7 @@ const ACT = {
  fwhistory:v=>fwHistory(+v||0),
  fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){toast(e.message,'err')}},
   theme: toggleTheme,
+  homekpi: v => { if(['boards','logs','firewood'].includes(v)){S.wt=v;S.wq='';S.wsp='';go('stock');}else{if(v==='orders'){S.of='open';S.oq='';}go(v);} },
   go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK),
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
   new: v => { closeSheet(); go(v); },
@@ -1557,7 +1565,8 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   const t = e.target;
-  if(t.id === 'jq') { S.jq=t.value; filterJournal(); }
+  if(t.id === 'staffq'){S.staffq=t.value;staffList();}
+  else if(t.id === 'jq') { S.jq=t.value; filterJournal(); }
   else if (t.id === 'q') { S.wq = t.value; clearTimeout(DEB); DEB = setTimeout(() => stockList(false), 120); }
   else if (t.id === 'cq') { S.cq = t.value; clearTimeout(DEB); DEB = setTimeout(conList, 120); }
   else if (t.id === 'oq') { S.oq = t.value; clearTimeout(DEB); DEB = setTimeout(() => orderList(false), 120); }

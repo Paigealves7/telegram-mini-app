@@ -111,6 +111,11 @@ const (
 )
 
 type OrderItem struct {
+	Species  string  `json:"species"`
+	Grade    string  `json:"grade"`
+	HeightMM int     `json:"height_mm"`
+	WidthMM  int     `json:"width_mm"`
+	LengthMM int     `json:"length_mm"`
 	ID       int64   `json:"id"`
 	OrderID  int64   `json:"order_id"`
 	BoardID  int64   `json:"board_id" validate:"required,gt=0"`

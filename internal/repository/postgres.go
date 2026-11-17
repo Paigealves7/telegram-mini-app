@@ -805,7 +805,7 @@ func (r *Repository) GetOrderByID(ctx context.Context, id int64) (*domain.Order,
 }
 
 func (r *Repository) GetOrderItems(ctx context.Context, orderID int64) ([]domain.OrderItem, error) {
-	query := `SELECT id, order_id, board_id, count, volume_m3, price FROM order_boards WHERE order_id = $1`
+	query := `SELECT ob.id, ob.order_id, ob.board_id, ob.count, ob.volume_m3, ob.price, COALESCE(b.species, ''), COALESCE(b.grade, ''), COALESCE(b.height_mm, 0), COALESCE(b.width_mm, 0), COALESCE(b.length_mm, 0) FROM order_boards ob LEFT JOIN boards b ON b.id = ob.board_id WHERE ob.order_id = $1 ORDER BY ob.id`
 	rows, err := r.db.Query(ctx, query, orderID)
 	if err != nil {
 		return nil, err
@@ -815,7 +815,7 @@ func (r *Repository) GetOrderItems(ctx context.Context, orderID int64) ([]domain
 	items := make([]domain.OrderItem, 0)
 	for rows.Next() {
 		var i domain.OrderItem
-		if err := rows.Scan(&i.ID, &i.OrderID, &i.BoardID, &i.Count, &i.VolumeM3, &i.Price); err != nil {
+		if err := rows.Scan(&i.ID, &i.OrderID, &i.BoardID, &i.Count, &i.VolumeM3, &i.Price, &i.Species, &i.Grade, &i.HeightMM, &i.WidthMM, &i.LengthMM); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
