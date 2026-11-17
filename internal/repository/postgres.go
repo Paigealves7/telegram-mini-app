@@ -244,6 +244,8 @@ var (
 	ErrBoardEmpty              = errors.New("этой позиции нет на складе")
 	ErrOrderNotFound           = errors.New("заказ не найден")
 	ErrOrderClosed             = errors.New("заказ уже завершен или отменен")
+	ErrOrderHasPayments        = errors.New("Сначала удалите принятые оплаты по заказу")
+	ErrInvalidOrderStatus      = errors.New("допустимые статусы: «В работе» и «Отменён»")
 	ErrOrderEmpty              = errors.New("невозможно завершить пустой заказ")
 )
 
@@ -779,8 +781,18 @@ func (r *Repository) GetStatisticsSummary(ctx context.Context, startDate, endDat
 		return nil, err
 	}
 
-	q2 := `SELECT COALESCE(SUM(sl.volume_m3), 0) FROM sawed_logs sl JOIN sawing_operations so ON sl.sawing_id = so.id WHERE so.date >= $1 AND so.date <= $2`
-	if err := r.db.QueryRow(ctx, q2, startDate, endDate).Scan(&stats.TotalLogsSawedVolume); err != nil {
+	// boards хранит текущий остаток. Восстанавливаем выпуск по продажам
+	// и всем корректировкам партий, напиленных в выбранном периоде.
+	q2 := `WITH operations AS (
+		SELECT id FROM sawing_operations WHERE date >= $1 AND date <= $2
+	), produced AS (
+		SELECT b.id, b.volume_m3 FROM boards b JOIN operations so ON b.sawing_id = so.id
+	)
+	SELECT (SELECT COALESCE(SUM(sl.volume_m3), 0) FROM sawed_logs sl JOIN operations so ON sl.sawing_id = so.id),
+		(SELECT COALESCE(SUM(volume_m3), 0) FROM produced)
+		+ (SELECT COALESCE(SUM(sb.volume_m3), 0) FROM sale_boards sb JOIN produced b ON b.id = sb.board_id)
+		- (SELECT COALESCE(SUM(a.delta_volume), 0) FROM stock_adjustments a JOIN produced b ON b.id = a.item_id WHERE a.kind = 'board')`
+	if err := r.db.QueryRow(ctx, q2, startDate, endDate).Scan(&stats.TotalLogsSawedVolume, &stats.TotalBoardsProducedVolume); err != nil {
 		return nil, err
 	}
 
@@ -827,8 +839,39 @@ func (r *Repository) GetOrderItems(ctx context.Context, orderID int64) ([]domain
 }
 
 func (r *Repository) UpdateOrderStatus(ctx context.Context, id int64, status domain.OrderStatus) error {
-	_, err := r.db.Exec(ctx, `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`, status, id)
-	return err
+	if status != domain.OrderStatusInProgress && status != domain.OrderStatusCanceled {
+		return ErrInvalidOrderStatus
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// AddPayment и CompleteOrder блокируют ту же строку заказа.
+	var current domain.OrderStatus
+	if err := tx.QueryRow(ctx, `SELECT status FROM orders WHERE id = $1 FOR UPDATE`, id).Scan(&current); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrOrderNotFound
+		}
+		return err
+	}
+	if current != domain.OrderStatusNew && current != domain.OrderStatusInProgress {
+		return ErrOrderClosed
+	}
+	if status == domain.OrderStatusCanceled {
+		var paid float64
+		if err := tx.QueryRow(ctx, `SELECT `+orderPaidExpr+` FROM orders o WHERE o.id = $1`, id).Scan(&paid); err != nil {
+			return err
+		}
+		if paid > 0 {
+			return ErrOrderHasPayments
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`, status, id); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) GetUserByID(ctx context.Context, id int64) (*domain.User, error) {

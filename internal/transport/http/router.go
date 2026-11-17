@@ -167,6 +167,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Get("/orders", orderHandler.GetOrders)
 				r.Post("/orders", orderHandler.CreateOrder)
 				r.Put("/orders/{id}/complete", orderHandler.CompleteOrder)
+				r.Put("/orders/{id}/status", orderHandler.UpdateStatus)
 				r.Get("/orders/{id}/payments", paymentHandler.List)
 				r.Post("/orders/{id}/payments", paymentHandler.Add)
 				r.Get("/debts", paymentHandler.Debts)

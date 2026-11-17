@@ -382,6 +382,14 @@ body[data-view="home"] #view{display:block}
 .order-actions{display:flex;gap:6px;flex-wrap:wrap}
 .order-actions button{flex:1;min-height:36px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--s2);font-size:11px;white-space:nowrap}
 .order-actions .primary{background:var(--wood);color:var(--ink)}
+.order-cancel,.btn.order-cancel,.form-error{color:var(--err)}
+.form-rows{display:grid;gap:12px;margin-bottom:12px}
+.form-row{border:1px solid var(--line);border-radius:var(--r-fld);padding:12px;min-width:0}
+.form-row-head,.form-row-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.form-row-head{justify-content:space-between;margin-bottom:8px}
+.form-row-head .lnk,.form-row .lnk{padding:8px 0}
+.form-row-tools{margin-bottom:16px}
+.form-row-tools .btn{flex:1 1 auto;width:auto;min-height:42px;padding:0 12px;font-size:14px}
 .home-feed .order-card{background:var(--bg)}
 .resource-grid{display:grid;gap:10px}.resource-grid .srow{margin:0;border-radius:14px}.resource-grid small{font-size:12px}
 .who{display:grid;grid-template-columns:56px 1fr;gap:2px 14px;text-align:left;align-items:center;padding:8px 0 20px}
@@ -856,7 +864,7 @@ function buildTabs() {
 }
 const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-label="Создать: ${l}" title="Создать: ${l}">${ic('plus')}<span>${l}</span></button>`;
 function setAct(v) {
-  const actions = v === 'staff' ? hbtn('user','Сотрудник') : v === 'cons' ? '<button class="hbtn" data-a="cedit" data-v="new">'+ic('plus')+'<span>Контрагент</span></button>' : v === 'orders' ? hbtn('order', 'Доски') + hbtn('fworder', 'Дрова')
+  const actions = v === 'staff' ? hbtn('user','Сотрудник') : v === 'cons' ? '<button class="hbtn" data-a="cedit" data-v="new">'+ic('plus')+'<span>Контрагент</span></button>' : v === 'orders' ? hbtn('order', 'Новый заказ')
     : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
   $('#hact').innerHTML = (v === 'home' ?
     (S.role === 'manager' ? '<button class="hbtn home-reports" data-a="go" data-v="stats" aria-label="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
@@ -913,7 +921,13 @@ const dayLabel = k => {
 };
 const byDay = (list, kf, rf) => { const g = new Map(); list.forEach(x => { const k = dayKey(kf(x)); if (!g.has(k)) g.set(k, []); g.get(k).push(x); }); return [...g].map(([k, a]) => grp(dayLabel(k), '', a.map(rf).join(''))).join(''); };
 const lines = a => a.map(l => `<span>${esc(l)}</span>`).join('');
-const isOpen = o => o.status !== 'completed' && o.status !== 'canceled';
+const isOpen = o => o.status === 'new' || o.status === 'in_progress';
+function orderStatusButtons(o, detail = false) {
+  if (!canOrd() || !isOpen(o)) return '';
+  const cls = detail ? 'btn ghost' : '';
+  return `${o.status === 'new' ? `<button class="${cls}" data-a="ostatus" data-v="${esc(o.id)}:in_progress">Взять в работу</button>` : ''}
+    <button class="${cls} order-cancel" data-a="ostatus" data-v="${esc(o.id)}:canceled">Отменить заказ</button>`;
+}
 const STC = {new: '#d8c7a1', in_progress: '#9db8d8', completed: '#86d4ae', canceled: '#e8a29a'};
 const SI = {new: 'sNew', in_progress: 'sProg', completed: 'sDone', canceled: 'sCanc'};
 const stl = (s, big) => `<span class="st" style="--c:${STC[s] || '#a1a1aa'}">${big && SI[s] ? ic(SI[s]) : '<i></i>'}${esc(ST[s] || s)}</span>`;
@@ -931,7 +945,7 @@ ${contents.length ? `<div class="order-content">${contents.map(x=>`<span>${esc(x
 <div class="payment-summary"><span>Оплачено <b>${fmt(paid,0)} ₽</b></span><span>${o.status==='canceled' ? 'Отменён' : 'Долг '+fmt(oDue(o),0)+' ₽'}</span></div>
 <div class="bar"><i style="--w:${t>0 ? Math.min(100,paid/t*100) : 0}%"></i></div>
 <div class="order-meta"><span>${esc(odate(o,{day:'numeric',month:'short'}))}</span><b>${fmt(t,0)} ₽</b></div>
-<div class="order-actions"><button data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button>${canOrd() && o.status!=='canceled' && t>0 ? `<button data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}${canOrd() && isOpen(o) ? `<button class="primary" data-a="done" data-v="${esc(o.id)}">Завершить</button>` : ''}</div></article>`; };
+<div class="order-actions"><button data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button>${canOrd() && o.status!=='canceled' && t>0 ? `<button data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}${canOrd() && isOpen(o) ? `<button class="primary" data-a="done" data-v="${esc(o.id)}">Завершить</button>` : ''}${orderStatusButtons(o)}</div></article>`; };
 const pl = (n, f) => { n = Math.abs(n) % 100; const k = n % 10; return n > 10 && n < 20 ? f[2] : k > 1 && k < 5 ? f[1] : k === 1 ? f[0] : f[2]; };
 const fmtR = n => n >= 1e6 ? fmt(n / 1e6, 1) + ' млн' : fmt(n, 0);
 const tot = (a, f) => a.reduce((x, y) => x + (+f(y) || 0), 0);
@@ -1202,6 +1216,9 @@ async function loadStats() {
     if(request!==statsRequest||!box.isConnected)return;
     const g=(o,k)=>o?+o[k]||0:null;
     const R=g(d,'total_sales_amount'),A=g(d,'total_logs_arrived_volume'),W=g(d,'total_logs_sawed_volume'),V=g(d,'total_sales_volume');
+    const produced = d.total_boards_produced_volume;
+    const yieldPct = W > 0 && produced != null ? produced / W * 100 : null;
+    const [yieldLabel, yieldColor] = yieldPct == null ? ['', 't2'] : yieldPct >= 60 ? ['Отлично', 'ok'] : yieldPct >= 50 ? ['Норма', 'warn'] : ['Низкий выход', 'err'];
     const PR=g(pd,'total_sales_amount'),PA=g(pd,'total_logs_arrived_volume'),PW=g(pd,'total_logs_sawed_volume'),PV=g(pd,'total_sales_volume');
     const mx=Math.max(A,W,V,.0001);
     box.innerHTML=`<section class="rev"><p class="lbl">Выручка за период</p><div class="big">${fmt(R,0)} ₽</div><div class="rv-d">${pd ? dchip(R,PR)+'<span class="mut">Было '+fmt(PR,0)+' ₽</span>' : '<span class="mut">Прошлый период недоступен</span>'}</div></section>
@@ -1209,6 +1226,12 @@ async function loadStats() {
     <section class="workspace-card stats-production"><h2>Динамика и КПД производства</h2>
     ${cmpRow('Пришло сырья',A,PA,mx)}${cmpRow('Распилено',W,PW,mx)}${cmpRow('Продано',V,PV,mx)}
     <div class="efficiency"><div><span>Распилено от прихода</span><b>${A?fmt(W/A*100,0)+'%':'—'}</b></div><div><span>Продано от распила</span><b>${W?fmt(V/W*100,0)+'%':'—'}</b></div></div></section>
+    <section class="workspace-card stats-production"><h2>Выход пиломатериала и потери</h2>
+      <div class="dl"><span>Распилено сырья</span><b>${fmt(W,3)} м³</b></div>
+      <div class="dl"><span>Получено досок</span><b>${produced == null ? '—' : fmt(produced,3)+' м³'}</b></div>
+      <div class="dl"><span>Средний выход годной доски</span><b style="color:var(--${yieldColor})">${yieldPct == null ? '—' : fmt(yieldPct,1)+'% · '+yieldLabel}</b></div>
+      <div class="dl"><span>Потери (опилки, горбыль, усушка)</span><b>${yieldPct == null ? '—' : fmt(W-produced,3)+' м³ · '+fmt(100-yieldPct,1)+'%'}</b></div>
+    </section>
     <section class="workspace-card stats-firewood"><h2>Сводка по дровам за период</h2><div id="fw-report">${sk(2)}</div></section>`;
     const fw=await fwPromise;
     if(request!==statsRequest||!box.isConnected)return;
@@ -1323,10 +1346,99 @@ const SIZES = ['25×100', '40×100', '50×100', '50×150', '50×200', '100×100'
 const SRC = {
   con: () => Object.entries(D.con),
   sup: () => conOpts('is_supplier'), car: () => conOpts('is_carrier'), cli: () => conOpts('is_client'),
-  boards: () => D.boards.map(b => [b.id, `${boardLabel(b)} · ${b.count} шт`]),
+  boards: () => D.boards.map(b => [b.id, `№${b.id} · ${boardLabel(b)} · ${b.count} шт`]),
   logs: () => D.logs.map(l => [l.id, `${l.species || 'Бревно'} Ø${l.diameter_mm} × ${lenM(l.length_mm)} · ${l.count} шт · ${fmt(l.volume_m3, 2)} м³ · партия №${l.arrival_id}`])
 };
 const pwBytes = x => new TextEncoder().encode(x || '').length;
+const FW_NAMES = {split: 'Колотые', round: 'Чурбаки (пиленые)'};
+
+// ГОСТ 2708-75, таблица 1. Столбцы: 120, 140, …, 520 мм по верхнему торцу.
+// https://meganorm.ru/Data2/1/4294852/4294852358.htm
+const GOST_LOG_VOLUMES = {
+  3000: [.038,.052,.069,.086,.107,.130,.157,.185,.220,.25,.28,.32,.36,.39,.43,.47,.52,.57,.62,.67,.73],
+  4000: [.053,.073,.095,.120,.147,.178,.210,.250,.290,.33,.38,.43,.48,.53,.58,.64,.70,.77,.84,.91,.99],
+  4500: [.063,.084,.110,.138,.170,.200,.240,.280,.330,.38,.43,.49,.54,.60,.66,.73,.80,.87,.95,1.03,1.12],
+  5000: [.073,.097,.124,.156,.190,.230,.270,.320,.370,.42,.48,.54,.60,.67,.74,.81,.89,.98,1.06,1.15,1.25],
+  6000: [.093,.123,.155,.194,.23,.28,.33,.39,.45,.52,.59,.66,.74,.82,.90,1,1.09,1.19,1.30,1.41,1.53]
+};
+const positiveInt = n => Number.isInteger(n) && n > 0 && n <= 2147483647;
+const rounded = (n, scale) => Math.round(n * scale) / scale;
+function logVolume(length, diameter) {
+  const exact = GOST_LOG_VOLUMES[length]?.[(diameter - 120) / 20];
+  if (exact != null) return {volume: exact, exact: true};
+  if (!positiveInt(length) || !positiveInt(diameter)) return {volume: 0};
+  const referenceLength = [3000,4000,4500,5000,6000].reduce((a,b) => Math.abs(b-length) < Math.abs(a-length) ? b : a);
+  const index = Math.max(0, Math.min(20, Math.round((diameter - 120) / 20)));
+  const referenceVolume = GOST_LOG_VOLUMES[referenceLength][index];
+  // Подбираем сбег (мм/м), чтобы формула по срединному сечению совпала с ближайшим табличным объёмом.
+  const middleDiameter = 2000 * Math.sqrt(referenceVolume / (Math.PI * (referenceLength / 1000)));
+  const taper = Math.max(0, 2 * (middleDiameter - (120 + index * 20)) / (referenceLength / 1000));
+  const middle = diameter + taper * (length / 1000) / 2;
+  return {volume: Math.PI * (middle / 2000) ** 2 * (length / 1000), exact: false};
+}
+
+const FORM_ROWS = {
+  board: {title: 'Доска', fields: [
+    {k: 'board', l: 'Доска со склада', t: 'sel', src: 'boards'},
+    {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1},
+    {k: 'price', l: 'Цена за м³, ₽', t: 'num', v: 9000, s: 500, half: 1, m: 1}
+  ]},
+  firewood: {title: 'Дрова', fields: [
+    {k: 'kind', l: 'Вид дров', t: 'sel', o: Object.entries(FW_NAMES)},
+    {k: 'vol', l: 'Объём, м³', t: 'num', v: 3, s: .1, half: 1},
+    {k: 'price', l: 'Цена за м³, ₽', t: 'num', v: 2000, s: 100, half: 1}
+  ]},
+  log: {title: 'Брёвна', fields: [
+    {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1},
+    {k: 'len', l: 'Длина, мм', t: 'num', v: 6000, s: 100, half: 1},
+    {k: 'dia', l: 'Диаметр верхнего торца, мм', t: 'num', v: 220, s: 10, half: 1},
+    {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1},
+    {k: 'vol', l: 'Объём, м³', t: 'num', v: 0, s: .1, half: 1}
+  ]}
+};
+const ARRIVAL_ROWS = {log: '+ Ещё диаметр/порода в машине'};
+const ORDER_ROWS = {board: '+ Добавить ещё доску', firewood: '+ Добавить дрова'};
+function orderDraft(v) {
+  const boards = new Map(D.boards.map(b => [String(b.id), b]));
+  const requested = new Map();
+  let volume = 0, total = rounded(v.delivery, 100) + rounded(v.extra, 100), error = '';
+  for (const row of v.rows) {
+    if (!Number.isFinite(row.price) || row.price < 0) error ||= 'Укажите неотрицательную цену каждой позиции';
+    let lineVolume = 0, key, label, available, amount, unit;
+    if (row.type === 'board') {
+      const board = boards.get(row.board);
+      if (!board) { error ||= 'Выберите доску со склада'; continue; }
+      if (!positiveInt(row.cnt)) { error ||= 'Укажите целое количество досок больше нуля'; continue; }
+      key = 'board:' + row.board;
+      label = `№${board.id} · ${boardLabel(board)}`;
+      available = board.count;
+      amount = row.cnt;
+      unit = 'шт';
+      lineVolume = available > 0 ? rounded(board.volume_m3 / available * amount, 1000) : 0;
+    } else {
+      if (!(row.vol >= .001 && row.vol <= 100000) || rounded(row.vol, 1000) !== row.vol) {
+        error ||= 'Объём дров: от 0,001 до 100 000 м³, до трёх знаков после запятой';
+        continue;
+      }
+      if (row.price > 100000000) error ||= 'Цена дров не может превышать 100 000 000 ₽ за м³';
+      key = row.kind;
+      label = FW_NAMES[row.kind];
+      available = D.fw[key + '_m3'] || 0;
+      amount = row.vol;
+      unit = 'м³';
+      lineVolume = row.vol;
+    }
+    const needed = rounded((requested.get(key)?.amount || 0) + amount, 1000);
+    requested.set(key, {label, available, unit, amount: needed, short: needed > available + 1e-9});
+    volume += lineVolume;
+    total += rounded(lineVolume * rounded(row.price, 100), 100);
+  }
+  const stock = [...requested.values()];
+  const shortage = stock.find(s => s.short);
+  if (shortage) error ||= `Не хватает на складе: ${shortage.label}`;
+  return {volume, total, stock, error};
+}
+const orderSummary = draft => `${fmt(draft.volume, 3)} м³ · ${Number.isFinite(draft.total) ? fmt(draft.total, 2) + ' ₽' : '—'}`;
 const FORMS = {
   user: {
     t: 'Новый сотрудник', e: 'user', ok: 'Создать сотрудника', path: '/users', done: 'Сотрудник создан', after: 'back', need: [],
@@ -1338,18 +1450,26 @@ const FORMS = {
     body: v => ({username: v.login, password: v.pass, role: v.role})
   },
   arrival: {
-    t: 'Приход леса', e: 'arrival', ok: 'Сохранить приход', path: '/arrivals', done: 'Приход зарегистрирован', after: 'home', auto: 'vol', need: ['con'],
+    t: 'Приход леса', e: 'arrival', ok: 'Сохранить приход', path: '/arrivals', done: 'Приход зарегистрирован', after: 'home', need: ['con'], rows: ARRIVAL_ROWS,
     f: [{k: 'supplier', l: 'Поставщик', t: 'sel', src: 'sup', half: 1, m: 1}, {k: 'carrier', l: 'Перевозчик', t: 'sel', src: 'car', half: 1, m: 1},
-      {k: 'truck', l: 'Номер машины', t: 'txt', ph: 'А000АА000', m: 1},
-      {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1, h: 'Бревна в партии'},
-      {k: 'len', l: 'Длина, мм', t: 'num', v: 6000, s: 100, half: 1}, {k: 'dia', l: 'Диаметр, мм', t: 'num', v: 220, s: 10, half: 1},
-      {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1}, {k: 'vol', l: 'Объём, м³', t: 'num', v: 0, s: .1, half: 1}],
-    calc: v => ({vol: Math.PI * (v.dia / 2000) ** 2 * (v.len / 1000) * v.cnt}),
-    req: v => !Object.keys(D.con).length ? 'Не загружен список поставщиков и перевозчиков' : !v.supplier || !v.carrier ? 'Выберите поставщика и перевозчика' : !v.truck ? 'Укажите номер машины' : v.cnt <= 0 ? 'Укажите количество бревен' : v.vol <= 0 ? 'Объём должен быть больше нуля' : null,
-    sum: v => `${v.species}: ${fmt(v.cnt, 0)} шт, ${fmt(v.vol, 3)} м³, машина ${v.truck}`,
-    mem: ['supplier', 'carrier', 'truck', 'species'],
+      {k: 'truck', l: 'Номер машины', t: 'txt', ph: 'А000АА000', m: 1}],
+    pv: v => `<div class="pvr"><span>Всего в машине</span><b>${fmt(sum(v.rows, 'cnt'),0)} шт · ${fmt(sum(v.rows, 'vol'),3)} м³</b></div>`,
+    req: v => {
+      if (!v.supplier || !v.carrier) return 'Выберите поставщика и перевозчика';
+      if (!v.truck || v.truck.length > 20) return 'Укажите номер машины до 20 символов';
+      if (!v.rows.length) return 'Добавьте брёвна в приход';
+      for (const [i, row] of v.rows.entries()) {
+        if (!row.species || row.species.length > 64) return `Укажите породу в позиции ${i + 1}`;
+        if (![row.len, row.dia, row.cnt].every(positiveInt)) return `Укажите целые положительные размеры и количество в позиции ${i + 1}`;
+        if (!Number.isFinite(row.vol) || rounded(row.vol, 1000) < .001 || rounded(row.vol, 1000) >= 1e9) return `Проверьте объём в позиции ${i + 1}`;
+      }
+      return null;
+    },
+    sum: v => `Машина ${v.truck} · ${fmt(sum(v.rows, 'cnt'), 0)} шт · ${fmt(sum(v.rows, 'vol'), 3)} м³\n` +
+      v.rows.map(r => `${r.species} Ø${r.dia} × ${r.len} мм: ${r.cnt} шт, ${fmt(r.vol, 3)} м³`).join('\n'),
+    mem: ['supplier', 'carrier', 'truck'],
     body: v => ({supplier_id: +v.supplier, carrier_id: +v.carrier, truck_number: v.truck, arrival_date: ymd(new Date()),
-      items: [{species: v.species, length_mm: Math.round(v.len), diameter_mm: Math.round(v.dia), count: Math.round(v.cnt), volume_m3: v.vol}]})
+      items: v.rows.map(r => ({species: r.species, length_mm: r.len, diameter_mm: r.dia, count: r.cnt, volume_m3: rounded(r.vol,1000)}))})
   },
   fwarr: {
     t: 'Приход дров', e: 'arrival', ok: 'Сохранить приход', path: '/firewood/arrivals', done: 'Приход дров записан', after: 'home', need: ['con'],
@@ -1378,23 +1498,26 @@ const FORMS = {
       boards: [{species: v.species, grade: v.grade, height_mm: Math.round(v.th), width_mm: Math.round(v.wd), length_mm: Math.round(v.len), count: Math.round(v.cnt), volume_m3: v.vol}]})
   },
   order: {
-    t: 'Новый заказ', e: 'order', ok: 'Создать заказ', path: '/orders', done: 'Заказ создан', after: 'orders', need: ['con', 'boards'],
-    f: [{k: 'con', l: 'Клиент', t: 'sel', src: 'cli', m: 1}, {k: 'board', l: 'Доска со склада', t: 'sel', src: 'boards'},
-      {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1}, {k: 'price', l: 'Цена за 1 м³, ₽', t: 'num', v: 9000, s: 500, half: 1, m: 1},
-      {k: 'delivery', l: 'Доставка, ₽', t: 'num', v: 0, s: 100, half: 1}, {k: 'extra', l: 'Дополнительно, ₽', t: 'num', v: 0, s: 100, half: 1}],
+    t: 'Новый заказ', e: 'order', ok: 'Создать заказ', path: '/orders', done: 'Заказ создан', after: 'orders', need: ['con', 'boards'], rows: ORDER_ROWS,
+    f: [{k: 'con', l: 'Клиент', t: 'sel', src: 'cli', m: 1},
+      {k: 'delivery', l: 'Доставка, ₽', t: 'num', v: 0, s: 100, half: 1}, {k: 'extra', l: 'Дополнительно, ₽', t: 'num', v: 0, s: 100, half: 1},
+      {k: 'notes', l: 'Примечание', t: 'txt'}],
     pv: v => {
-      const b = D.boards.find(x => x.id == v.board); if (!b || !(b.count > 0)) return '<span class="hint">Выберите доску со склада</span>';
-      const vol = v.cnt === b.count ? b.volume_m3 : b.volume_m3 / b.count * v.cnt;
-      return `<div class="pvr"><span class="hint">Объём заказа</span><b>${fmt(vol, 3)} м³</b></div><div class="pvr"><span class="hint">Сумма</span><b>${fmt(Math.round(vol * v.price * 100) / 100 + v.delivery + v.extra, 2)} ₽</b></div>
-        <div class="pvr"><span class="hint">На складе</span><b style="font-size:16px;color:${v.cnt > b.count ? 'var(--err)' : 'inherit'}">${b.count} шт${v.cnt > b.count ? ' · не хватает' : ''}</b></div>`;
+      const draft = orderDraft(v);
+      return `<div class="pvr"><span>Итого</span><b>${orderSummary(draft)}</b></div>
+        ${draft.stock.map(({label, available, amount, unit, short}) => `<div class="dl"><span>${esc(label)}</span><b${short ? ' class="form-error"' : ''}>Нужно ${fmt(amount,3)} из ${fmt(available,3)} ${unit}${short ? ' · не хватает' : ''}</b></div>`).join('')}
+        ${draft.error ? `<p class="form-error">${esc(draft.error)}</p>` : ''}`;
     },
-    req: v => !Object.keys(D.con).length ? 'Не загружен список клиентов' : !v.con ? 'Выберите клиента' : !v.board ? 'Выберите доску' : v.cnt <= 0 ? 'Укажите количество' : v.price < 0 || v.delivery < 0 || v.extra < 0 ? 'Цена не может быть отрицательной' : null,
-    sum: v => { const b = D.boards.find(x => x.id == v.board); return `${b ? boardTitle(b) + ' · ' + lenM(b.length_mm) + ': ' : ''}${fmt(v.cnt, 0)} шт по ${fmt(v.price, 0)} ₽ за м³, клиент: ${D.con[v.con] || 'не выбран'}, доставка: ${fmt(v.delivery, 2)} ₽, дополнительно: ${fmt(v.extra, 2)} ₽`; },
-    mem: ['con', 'price'],
-    body: v => ({contractor_id: +v.con, status: 'new', delivery_price: v.delivery, extra_price: v.extra, items: [{board_id: +v.board, count: Math.round(v.cnt), price: v.price}]})
+    req: v => !v.con ? 'Выберите клиента' : !v.rows.length ? 'Добавьте позиции заказа' :
+      [v.delivery, v.extra].some(x => !Number.isFinite(x) || x < 0) ? 'Укажите неотрицательную стоимость доставки и дополнительных услуг' :
+      v.notes.length > 1000 ? 'Примечание: до 1000 символов' : orderDraft(v).error,
+    sum: v => `${D.con[v.con]} · позиций: ${v.rows.length} · ${orderSummary(orderDraft(v))}`,
+    mem: ['con'],
+    body: v => ({contractor_id: +v.con, notes: v.notes, delivery_price: rounded(v.delivery,100), extra_price: rounded(v.extra,100),
+      items: v.rows.filter(r => r.type === 'board').map(r => ({board_id: +r.board, count: r.cnt, price: rounded(r.price,100)})),
+      firewood_items: v.rows.filter(r => r.type === 'firewood').map(r => ({kind: r.kind, volume_m3: r.vol, price: rounded(r.price,100)}))})
   }
 };
-const FW_NAMES = {split: 'Колотые', round: 'Чурбаки (пиленые)'};
 FORMS.fwproc = {
  t:'Напилили / Накололи',e:'sawing',ok:'Записать переработку',path:'/firewood/processing',done:'Переработка записана',after:'stock',need:[],mem:[],
  f:[{k:'kind',l:'Готовые дрова',t:'sel',o:Object.entries(FW_NAMES)},{k:'vol',l:'Получено готовых дров, м³',t:'num',v:3,s:.1},{k:'performer',l:'Кто делал',t:'txt'},{k:'date',l:'Дата (ГГГГ-ММ-ДД)',t:'txt',v:ymd(new Date())},{k:'comment',l:'Комментарий',t:'txt'}],
@@ -1413,31 +1536,79 @@ async function fwHistory(offset=0){
  sheet('<h2>Переработка дров</h2>'+rows.map(p=>`<div class="dl"><div><b>${esc(FW_NAMES[p.kind])}: ${fmt(p.volume_m3,3)} м³</b><p>${esc(p.date)} · ${esc(p.performer)}</p><p>Сырьё: ${fmt(p.raw_m3,4)} м³ · коэффициент ${p.coefficient}</p><p>${esc(p.comment)}</p></div>${S.role==='manager'?`<button class="lnk" data-a="fwdelete" data-v="${p.id}">Удалить</button>`:''}</div>`).join('')+`${offset?`<button class="btn ghost" data-a="fwhistory" data-v="${Math.max(0,offset-50)}">Назад</button>`:''}${rows.length===50?`<button class="btn ghost" data-a="fwhistory" data-v="${offset+50}">Далее</button>`:''}`);
  }catch(e){toast(e.message,'err')}
 }
-FORMS.fworder={
- t:'Заказ на дрова',e:'order',ok:'Создать заказ',path:'/orders',done:'Заказ создан',after:'orders',need:['con','stock'],mem:['con','price'],
- f:[{k:'con',l:'Клиент',t:'sel',src:'cli',m:1},{k:'kind',l:'Вид дров',t:'sel',o:Object.entries(FW_NAMES)},{k:'vol',l:'Объём готовых дров, м³',t:'num',v:3,s:.1},{k:'price',l:'Цена за м³, ₽',t:'num',v:2000,s:100},{k:'delivery',l:'Доставка, ₽',t:'num',v:0,s:100},{k:'extra',l:'Дополнительно, ₽',t:'num',v:0,s:100},{k:'notes',l:'Примечание',t:'txt'}],
- pv:v=>`<div class="pvr"><span>На складе</span><b>${fmt(D.fw[v.kind+'_m3']||0,3)} м³</b></div><div class="pvr"><span>Сумма</span><b>${fmt(Math.round(v.vol*v.price*100)/100+v.delivery+v.extra,2)} ₽</b></div>`,
- req:v=>!v.con?'Выберите клиента':!(v.vol>0)?'Укажите объём':v.price<0||v.delivery<0||v.extra<0?'Цена не может быть отрицательной':null,
- sum:v=>`${FW_NAMES[v.kind]}: ${fmt(v.vol,3)} м³ по ${fmt(v.price,2)} ₽/м³`,
- body:v=>({contractor_id:+v.con,notes:v.notes,delivery_price:v.delivery,extra_price:v.extra,firewood_items:[{kind:v.kind,volume_m3:v.vol,price:v.price}]})
-};
-let FK = null;
-const fe = k => $(`input[data-k="${k}"],select[data-k="${k}"]`);
+let FK = null, formParams = {}, rowSerial = 0;
+const fe = (k, scope = document) => $(`input[data-k="${k}"],select[data-k="${k}"]`, scope);
 const fval = (f, x) => (f.m && MEM[f.k] != null) ? MEM[f.k] : (x ?? f.v ?? '');
-function fld(f) {
+function fld(f, id = '') {
   let c;
-  if (f.t === 'sel') c = `<div class="sel"><select data-k="${f.k}">${(f.o || []).map(o => `<option value="${o[0]}">${esc(o[1])}</option>`).join('')}</select></div>`;
-  else if (f.t === 'num') c = `<div class="num"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="-1" aria-label="Меньше">${ic('minus')}</button><input data-k="${f.k}" inputmode="decimal" value="${esc(fval(f))}"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="1" aria-label="Больше">${ic('plus')}</button></div>`;
+  const attr = id ? ` id="${id}"` : '';
+  if (f.t === 'sel') c = `<div class="sel"><select${attr} data-k="${f.k}">${(f.o || []).map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select></div>`;
+  else if (f.t === 'num') c = `<div class="num"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="-1" aria-label="Меньше">${ic('minus')}</button><input${attr} data-k="${f.k}" inputmode="decimal" value="${esc(fval(f))}"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="1" aria-label="Больше">${ic('plus')}</button></div>`;
   else if (f.t === 'acc') c = `<input data-k="${f.k}" value="${esc(fval(f))}" placeholder="${esc(f.ph || '')}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">`;
-  else if (f.t === 'txt') c = `<input data-k="${f.k}" value="${esc(fval(f))}" placeholder="${esc(f.ph || '')}" autocomplete="off">`;
+  else if (f.t === 'txt') c = `<input${attr} data-k="${f.k}" value="${esc(fval(f))}" placeholder="${esc(f.ph || '')}" autocomplete="off">`;
   else c = '';
   const ch = f.c ? `<div class="chips">${f.c.map(x => `<button type="button" class="chip rip" data-a="${f.t === 'pre' ? 'size' : 'chip'}" data-k="${f.k}" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : '';
-  return `${f.h ? `<h3 class="fs">${f.h}</h3>` : ''}<div class="fld${f.half ? ' half' : ''}"><label>${f.l}</label>${c}${ch}</div>`;
+  return `${f.h ? `<h3 class="fs">${f.h}</h3>` : ''}<div class="fld${f.half ? ' half' : ''}"><label${id ? ` for="${id}"` : ''}>${f.l}</label>${c}${ch}</div>`;
+}
+function readFields(fields, scope = document, strict = false) {
+  const v = {};
+  for (const f of fields) {
+    const el = fe(f.k, scope);
+    if (!el) continue;
+    const value = el.value.trim();
+    v[f.k] = f.t === 'num' ? (strict ? Number(value.replace(',', '.')) : num(value)) : value;
+  }
+  return v;
 }
 function vals() {
-  const v = {};
-  FORMS[FK].f.forEach(f => { const el = fe(f.k); if (el) v[f.k] = f.t === 'num' ? num(el.value) : el.value.trim(); });
+  const F = FORMS[FK], v = readFields(F.f, document, !!F.rows);
+  if (F.rows) v.rows = $$('[data-form-row]').map(row => {
+    const type = row.dataset.formRow;
+    return {type, ...readFields(FORM_ROWS[type].fields, row, true)};
+  });
   return v;
+}
+function fillSelect(f, scope, want) {
+  const el = fe(f.k, scope), options = SRC[f.src]();
+  el.innerHTML = options.length ? options.map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join('') : '<option value="">Нет данных</option>';
+  if (want != null && options.some(([id]) => String(id) === String(want))) el.value = want;
+}
+function updateLogRow(row, field) {
+  const input = fe('vol', row), {len, dia, cnt} = readFields(FORM_ROWS.log.fields, row, true);
+  if (field === 'vol') row.dataset.manual = 'true';
+  const {volume, exact} = logVolume(len, dia);
+  const manual = row.dataset.manual === 'true';
+  if (!manual) input.value = (positiveInt(cnt) ? volume * cnt : 0).toFixed(3);
+  $('[data-a="logauto"]', row).hidden = !manual;
+  $('.log-method', row).textContent = manual ? 'Объём указан вручную' : !volume ? 'Укажите длину и диаметр' :
+    exact ? 'Расчёт по ГОСТ 2708-75' : 'Оценка по сбегу на основе ГОСТ 2708-75';
+}
+function addFormRow(type, boardId) {
+  const list = $('#form-rows'), {title, fields} = FORM_ROWS[type];
+  if (type !== 'log' && $$('[data-form-row]', list).filter(r => r.dataset.formRow === type).length >= 100) {
+    toast('Можно добавить до 100 позиций каждого типа', 'err');
+    return;
+  }
+  const id = ++rowSerial;
+  list.insertAdjacentHTML('beforeend', `<section class="form-row" data-form-row="${type}">
+    <div class="form-row-head"><b>${title}</b><button type="button" class="lnk" data-a="removerow">Удалить строку</button></div>
+    <div class="fgrid">${fields.map(f => fld(f, `row-${id}-${f.k}`)).join('')}</div>
+    ${type === 'log' ? '<p class="hint log-method"></p><button type="button" class="lnk" data-a="logauto" hidden>Пересчитать объём</button>' : ''}
+  </section>`);
+  const row = list.lastElementChild;
+  if (type === 'board') {
+    const used = new Set($$('[data-form-row="board"] select', list).map(s => s.value));
+    const preferred = boardId ?? D.boards.find(b => !used.has(String(b.id)))?.id;
+    fillSelect(fields[0], row, preferred);
+    const stock = D.boards.find(b => String(b.id) === fe('board', row).value);
+    if (stock) fe('cnt', row).value = Math.min(stock.count, 10);
+  }
+  if (type === 'log') updateLogRow(row);
+  return row;
+}
+function rowFormChanged(el, row = el.closest('[data-form-row]')) {
+  if (row?.dataset.formRow === 'log') updateLogRow(row, el.dataset.k);
+  calcForm(!row && el.dataset.k === FORMS[FK].auto);
 }
 function calcForm(fromAuto) {
   const F = FORMS[FK]; if (!F) return;
@@ -1446,23 +1617,28 @@ function calcForm(fromAuto) {
   const pv = $('#pv'); if (pv && F.pv) pv.innerHTML = F.pv(v);
 }
 async function vForm(kind, p = {}) {
-  const F = FORMS[kind], target = $('#formbody') || $('#view'); FK = kind;
-  target.innerHTML = `<div class="fgrid">${F.f.map(fld).join('')}</div>${F.pv ? '<section class="pv" id="pv"></section>' : ''}`;
-  $('#ok').textContent = F.ok;
+  const F = FORMS[kind], target = $('#formbody') || $('#view');
+  FK = kind; formParams = p;
+  target.innerHTML = `<div class="fgrid">${F.f.map(f => fld(f)).join('')}</div>${F.rows ? '<div id="form-rows" class="form-rows"></div><div class="form-row-tools"></div>' : ''}${F.pv ? '<section class="pv" id="pv"></section>' : ''}`;
+  const fields = target.firstElementChild;
+  const active = () => fields.isConnected && (dockOrigin !== null ? FK === kind : S.cur === kind);
+  $('#ok').textContent = F.ok; $('#ok').disabled = true;
   const needs = await Promise.all([F.need.includes('con') ? ensureCon() : true, F.need.some(n => n !== 'con') ? loadStock() : true]);
-  if (!target.isConnected || (dockOrigin !== null ? FK !== kind : S.cur !== kind)) return;
+  if (!active()) return;
   if (needs.some(ok => !ok)) { target.innerHTML = `<div class="empty"><b>Не удалось загрузить данные для формы</b><button class="btn ghost" data-a="retryform">Повторить</button></div>`; $('#ok').disabled = true; return; }
   $('#ok').disabled = false;
   F.f.forEach(f => {
     if (f.t !== 'sel' || !f.src) return;
-    const el = fe(f.k), o = SRC[f.src]();
-    el.innerHTML = o.length ? o.map(x => `<option value="${esc(x[0])}">${esc(x[1])}</option>`).join('') : '<option value="">Нет данных</option>';
-    const want = p[f.k] ?? (f.m ? MEM[f.k] : null);
-    if (want != null && o.some(x => String(x[0]) === String(want))) el.value = want;
+    fillSelect(f, target, p[f.k] ?? (f.m ? MEM[f.k] : null));
   });
+  if (F.rows) {
+    $('.form-row-tools', target).innerHTML = Object.entries(F.rows).map(([type, label]) =>
+      `<button type="button" class="btn ghost" data-a="addrow" data-v="${type}">${label}</button>`).join('');
+    addFormRow(kind === 'arrival' ? 'log' : D.boards.length || p.board ? 'board' : 'firewood', p.board);
+  }
   if (kind === 'fwsettings' || kind === 'fwproc') {
     try {const settings=await api('/firewood/settings');
-      if(!target.isConnected || (dockOrigin !== null ? FK !== kind : S.cur !== kind))return;
+      if(!active())return;
       if(kind==='fwsettings'){fe('split').value=settings.split;fe('round').value=settings.round;}
       else {FORMS.fwproc.pv=v=>`<div class="pvr"><span>Списание сырья</span><b>${fmt(v.vol*settings[v.kind],4)} м³</b></div><p class="hint">Коэффициент: ${settings[v.kind]}. При сохранении применяется актуальный коэффициент из настроек.</p>`;if(!$('#pv'))target.insertAdjacentHTML('beforeend','<section class="pv" id="pv"></section>');}
     }catch(e){toast(e.message,'err');$('#ok').disabled=true;return;}
@@ -1472,13 +1648,16 @@ async function vForm(kind, p = {}) {
 }
 function syncLog() { const l = D.logs.find(x => x.id == fe('log').value); if (l) fe('lvol').value = (+l.volume_m3).toFixed(3); }
 async function submitForm() {
-  const F = FORMS[FK], v = vals(), e = F.req(v);
+  const kind = FK, F = FORMS[kind], v = vals(), e = F.req(v);
   if (e) { notify('error'); toast(e, 'err'); return; }
   if (!await ask(F.e, F.t, F.sum(v), 'Сохранить')) return;
   const b = $('#ok'); b.disabled = true; b.classList.add('busy');
   try {
     await api(F.path, {method: 'POST', body: JSON.stringify(F.body(v))});
     F.mem.forEach(k => mem(k, v[k]));
+    const firstBoard = kind === 'order' && v.rows.find(r => r.type === 'board');
+    if (firstBoard) mem('price', firstBoard.price);
+    if (kind === 'arrival') mem('species', v.rows[0].species);
     notify('success'); toast(F.done); F.after === 'back' ? back() : go(F.after);
   } catch (er) { notify('error'); toast(er.message, 'err'); }
   b.disabled = false; b.classList.remove('busy');
@@ -1491,18 +1670,33 @@ const ACT = {
  fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){toast(e.message,'err')}},
   theme: toggleTheme,
   homekpi: v => { if(['boards','logs','firewood'].includes(v)){S.wt=v;S.wq='';S.wsp='';go('stock');}else{if(v==='orders'){S.of='open';S.oq='';}go(v);} },
-  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK),
+  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK, formParams),
   logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
   new: v => { closeSheet(); go(v); },
   order: v => {
     const o = D.orders.find(x => x.id == v); if (!o) return;
+    const positions = (o.items?.length || 0) + (o.firewood_items?.length || 0);
     sheet(`<h3>Заказ №${esc(o.id)}</h3>
       <div class="dl"><span class="mut">Клиент</span><b>${esc(D.con[o.contractor_id] || 'Клиент №' + o.contractor_id)}</b></div>
       <div class="dl"><span class="mut">Статус</span>${stl(o.status, 1)}</div><div class="order-content">${orderContents({...o,firewood_items:[]}).map(x=>`<span>${esc(x)}</span>`).join('')}</div>
 ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}</span><b>${fmt(p.volume_m3,3)} м³ × ${fmt(p.price,2)} ₽</b></div>`).join('')}
-      ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div><div class="dl"><span class="mut">Оплата</span><b>${esc(payTxt(o) || '—')}</b></div>` : ''}${(o.items || []).length ? `<div class="dl"><span class="mut">Позиций</span><b>${o.items.length}</b></div>` : ''}
+      ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div><div class="dl"><span class="mut">Оплата</span><b>${esc(payTxt(o) || '—')}</b></div>` : ''}${positions ? `<div class="dl"><span class="mut">Позиций</span><b>${positions}</b></div>` : ''}
       <div class="dl"><span class="mut">Создан</span><b>${esc(odate(o, {day: 'numeric', month: 'long', year: 'numeric'}) || '—')}</b></div>
-      <div class="stackb">${isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}${canOrd() && o.status !== 'canceled' && osum(o) > 0 ? `<button class="btn ghost" data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button></div>`);
+      <div class="stackb">${canOrd() && isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}${orderStatusButtons(o,true)}${canOrd() && o.status !== 'canceled' && osum(o) > 0 ? `<button class="btn ghost" data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button></div>`);
+  },
+  ostatus: async (v, el) => {
+    const [id, status] = v.split(':'), cancel = status === 'canceled';
+    const fromDetail = !!el.closest('#sheet'), view = S.cur;
+    if (cancel && !await ask('order', `Отменить заказ №${id}?`, 'Отменённый заказ будет закрыт.', 'Отменить заказ')) return;
+    el.disabled = true;
+    try {
+      await api(`/orders/${id}/status`, {method:'PUT', body:JSON.stringify({status})});
+      notify('success'); toast(cancel ? 'Заказ отменён' : 'Заказ взят в работу');
+      if (S.cur === view) show(view);
+    } catch (e) {
+      if (cancel && fromDetail && S.cur === view && !$('#sheet').classList.contains('on')) ACT.order(id);
+      notify('error'); toast(e.message, 'err');
+    } finally { el.disabled = false; }
   },
   debtc: v => {
     const a = D.debts.filter(d => d.contractor_id == v);
@@ -1662,11 +1856,22 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
   mk: v => { const [f, k, id] = v.split(':'); closeSheet(); go(f, {[k]: id}); },
   done: (v, el) => ask('ok', 'Завершить заказ №' + v, 'Товары будут списаны со склада и проведены как продажа.', 'Завершить').then(ok => ok && doComplete(v, el)),
   pdf: v => pdfSheet(v), pdfsend: (v, el) => pdfDo('send', v, el), pdfdl: (v, el) => pdfDo('dl', v, el), pdfview: (v, el) => pdfDo('view', v, el),
-  chip: (v, el) => { fe(el.dataset.k).value = v; calcForm(); },
+  addrow: type => { const row = addFormRow(type); row?.querySelector('input,select')?.focus(); calcForm(); },
+  removerow: (_, el) => { el.closest('[data-form-row]').remove(); $('#form-rows + .form-row-tools button')?.focus(); calcForm(); },
+  logauto: (_, el) => {
+    const row = el.closest('[data-form-row]');
+    delete row.dataset.manual; updateLogRow(row); fe('vol', row).focus(); calcForm();
+  },
+  chip: (v, el) => {
+    const row = el.closest('[data-form-row]');
+    fe(el.dataset.k, row || document).value = v; rowFormChanged(el, row);
+  },
   size: v => { const [a, b] = v.split('×'); fe('th').value = a; fe('wd').value = b; calcForm(); },
   st: (v, el) => {
-    const f = FORMS[FK].f.find(x => x.k === el.dataset.k), i = fe(f.k);
-    i.value = Math.max(0, Math.round((num(i.value) + (+v) * (f.s || 1)) * 1000) / 1000); calcForm(f.k === FORMS[FK].auto);
+    const row = el.closest('[data-form-row]');
+    const fields = row ? FORM_ROWS[row.dataset.formRow].fields : FORMS[FK].f;
+    const f = fields.find(x => x.k === el.dataset.k), i = fe(f.k, row || document);
+    i.value = Math.max(0, rounded(num(i.value) + (+v) * (f.s || 1), 1000)); rowFormChanged(el, row);
   }
 };
 document.addEventListener('click', e => {
@@ -1681,11 +1886,11 @@ document.addEventListener('input', e => {
   else if (t.id === 'cq') { S.cq = t.value; clearTimeout(DEB); DEB = setTimeout(conList, 120); }
   else if (t.id === 'oq') { S.oq = t.value; clearTimeout(DEB); DEB = setTimeout(() => orderList(false), 120); }
   else if (t.id === 'd1' || t.id === 'd2') { S.range = 'custom'; $$('[data-a="range"]').forEach(b => b.classList.remove('on')); loadStats(); }
-  else if (t.dataset.k && FK) calcForm(t.dataset.k === FORMS[FK].auto);
+  else if (t.dataset.k && FK) rowFormChanged(t);
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.tagName === 'SELECT' && t.dataset.k && FK) { if (FK === 'sawing' && t.dataset.k === 'log') syncLog(); calcForm(); }
+  if (t.tagName === 'SELECT' && t.dataset.k && FK) { if (FK === 'sawing' && t.dataset.k === 'log') syncLog(); rowFormChanged(t); }
 });
 document.addEventListener('keydown', e => { if(e.key==='Escape' && $('#sheet').classList.contains('on')) { settle(false); return; } if (e.key === 'Enter' && e.target.id === 'lp') login(); });
 

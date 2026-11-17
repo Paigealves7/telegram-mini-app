@@ -95,6 +95,34 @@ func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(orders)
 }
 
+func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "неверный ID заказа", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Status domain.OrderStatus `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректный JSON", http.StatusBadRequest)
+		return
+	}
+	err = h.repo.UpdateOrderStatus(r.Context(), id, req.Status)
+	switch {
+	case err == nil:
+		w.WriteHeader(http.StatusNoContent)
+	case errors.Is(err, repository.ErrInvalidOrderStatus):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, repository.ErrOrderNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	case errors.Is(err, repository.ErrOrderClosed), errors.Is(err, repository.ErrOrderHasPayments):
+		http.Error(w, err.Error(), http.StatusConflict)
+	default:
+		serverError(w, r, "не удалось изменить статус заказа", err)
+	}
+}
+
 // НОВЫЙ МЕТОД: Завершение заказа
 func (h *OrderHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) {
 	orderIDStr := chi.URLParam(r, "id")

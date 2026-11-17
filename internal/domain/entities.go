@@ -204,10 +204,11 @@ type DebtOrder struct {
 }
 
 type StatisticsSummary struct {
-	TotalLogsArrivedVolume float64 `json:"total_logs_arrived_volume"`
-	TotalLogsSawedVolume   float64 `json:"total_logs_sawed_volume"`
-	TotalSalesVolume       float64 `json:"total_sales_volume"`
-	TotalSalesAmount       float64 `json:"total_sales_amount"`
+	TotalBoardsProducedVolume float64 `json:"total_boards_produced_volume"`
+	TotalLogsArrivedVolume    float64 `json:"total_logs_arrived_volume"`
+	TotalLogsSawedVolume      float64 `json:"total_logs_sawed_volume"`
+	TotalSalesVolume          float64 `json:"total_sales_volume"`
+	TotalSalesAmount          float64 `json:"total_sales_amount"`
 }
 
 type BoardFilter struct {
