@@ -17,6 +17,10 @@ func NewBoardHandler(repo *repository.Repository) *BoardHandler {
 }
 
 func (h *BoardHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	limit, offset := pageParams(r, 500, 1000)
 
 	filter := domain.BoardFilter{
@@ -33,7 +37,7 @@ func (h *BoardHandler) GetList(w http.ResponseWriter, r *http.Request) {
 		filter.LengthMM = val
 	}
 
-	boards, err := h.repo.GetAllBoards(r.Context(), filter, limit, offset)
+	boards, err := h.repo.GetAllBoards(r.Context(), orgID, filter, limit, offset)
 	if err != nil {
 		serverError(w, r, "не удалось получить список досок", err)
 		return

@@ -25,8 +25,12 @@ type CreateArrivalRequest struct {
 
 // GetList returns the paginated arrival history, including each arrival's tally.
 func (h *ArrivalHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	limit, offset := pageParams(r, 100, 500)
-	arrivals, err := h.repo.GetLogArrivals(r.Context(), limit, offset)
+	arrivals, err := h.repo.GetLogArrivals(r.Context(), orgID, limit, offset)
 	if err != nil {
 		serverError(w, r, "не удалось получить историю поступлений", err)
 		return
@@ -36,6 +40,10 @@ func (h *ArrivalHandler) GetList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	user, ok := currentUser(r)
 	if !ok {
 		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
@@ -66,7 +74,7 @@ func (h *ArrivalHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:   user.UserID, // из JWT, а не из тела запроса
 	}
 
-	result, err := h.repo.CreateLogArrival(r.Context(), arrival, req.Items)
+	result, err := h.repo.CreateLogArrival(r.Context(), orgID, arrival, req.Items)
 	if err != nil {
 		respondError(w, r, "не удалось сохранить приход", err)
 		return

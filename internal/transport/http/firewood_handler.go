@@ -24,6 +24,10 @@ func NewFirewoodHandler(repo *repository.Repository) *FirewoodHandler {
 }
 
 func (h *FirewoodHandler) CreateArrival(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	user, ok := currentUser(r)
 	if !ok {
 		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
@@ -62,7 +66,7 @@ func (h *FirewoodHandler) CreateArrival(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	a, err := h.repo.CreateFirewoodArrival(r.Context(), req.SupplierID, req.CarrierID, truck, math.Round(req.VolumeM3*1000)/1000, date, user.UserID)
+	a, err := h.repo.CreateFirewoodArrival(r.Context(), orgID, req.SupplierID, req.CarrierID, truck, math.Round(req.VolumeM3*1000)/1000, date, user.UserID)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
 		http.Error(w, "поставщик или перевозчик не найден", http.StatusBadRequest)
@@ -79,8 +83,12 @@ func (h *FirewoodHandler) CreateArrival(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *FirewoodHandler) GetArrivals(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	limit, offset := pageParams(r, 100, 1000)
-	list, err := h.repo.GetFirewoodArrivals(r.Context(), limit, offset)
+	list, err := h.repo.GetFirewoodArrivals(r.Context(), orgID, limit, offset)
 	if err != nil {
 		serverError(w, r, "не удалось получить приходы дров", err)
 		return
@@ -90,7 +98,11 @@ func (h *FirewoodHandler) GetArrivals(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *FirewoodHandler) GetStock(w http.ResponseWriter, r *http.Request) {
-	s, err := h.repo.GetFirewoodStock(r.Context())
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
+	s, err := h.repo.GetFirewoodStock(r.Context(), orgID)
 	if err != nil {
 		serverError(w, r, "не удалось получить склад дров", err)
 		return

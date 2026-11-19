@@ -25,6 +25,38 @@ const (
 	RolePending Role = "pending"
 )
 
+type Organization struct {
+	ID              int64     `json:"id"`
+	Name            string    `json:"name"`
+	CompanyInfo     string    `json:"company_info"`
+	IsDemo          bool      `json:"is_demo"`
+	IsActive        bool      `json:"is_active"`
+	LastOrderNumber int64     `json:"last_order_number"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+type UserOrganization struct {
+	OrganizationID int64  `json:"organization_id"`
+	Name           string `json:"name"`
+	CompanyInfo    string `json:"company_info"`
+	IsDemo         bool   `json:"is_demo"`
+	IsActive       bool   `json:"is_active"`
+	Role           Role   `json:"role"`
+}
+
+type OrganizationInvite struct {
+	ID             int64      `json:"id"`
+	OrganizationID int64      `json:"organization_id"`
+	Role           Role       `json:"role"`
+	MaxUses        int        `json:"max_uses"`
+	UsedCount      int        `json:"used_count"`
+	ExpiresAt      time.Time  `json:"expires_at"`
+	RevokedAt      *time.Time `json:"revoked_at,omitempty"`
+	CreatedBy      *int64     `json:"created_by,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	Code           string     `json:"code,omitempty"` // Заполняется только в ответе при создании.
+}
+
 type User struct {
 	ID           int64     `json:"id"`
 	Username     string    `json:"username"`
@@ -153,6 +185,7 @@ type OrderItem struct {
 }
 
 type Order struct {
+	OrderNumber   int64               `json:"order_number"`
 	FirewoodItems []FirewoodOrderItem `json:"firewood_items,omitempty"`
 	ID            int64               `json:"id"`
 	MasterID      int64               `json:"master_id"`
@@ -213,6 +246,7 @@ type StockAdjustment struct {
 
 // OrderPayments: заказ с итогами и историей оплат (для окна «Оплата»).
 type OrderPayments struct {
+	OrderNumber  int64       `json:"order_number"`
 	OrderID      int64       `json:"order_id"`
 	ContractorID int64       `json:"contractor_id"`
 	Status       OrderStatus `json:"status"`
@@ -223,6 +257,7 @@ type OrderPayments struct {
 
 // DebtOrder: завершённый заказ, по которому клиент ещё не расплатился.
 type DebtOrder struct {
+	OrderNumber  int64     `json:"order_number"`
 	OrderID      int64     `json:"order_id"`
 	ContractorID int64     `json:"contractor_id"`
 	CreatedAt    time.Time `json:"created_at"`

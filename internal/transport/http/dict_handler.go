@@ -21,7 +21,11 @@ func NewDictHandler(repo *repository.Repository) *DictHandler {
 }
 
 func (h *DictHandler) GetContractors(w http.ResponseWriter, r *http.Request) {
-	contractors, err := h.repo.GetContractors(r.Context())
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
+	contractors, err := h.repo.GetContractors(r.Context(), orgID)
 	if err != nil {
 		serverError(w, r, "не удалось получить список контрагентов", err)
 		return
@@ -40,7 +44,7 @@ type contractorReq struct {
 }
 
 // parseContractor читает и проверяет тело запроса; при ошибке сам отвечает клиенту.
-func (h *DictHandler) parseContractor(w http.ResponseWriter, r *http.Request, selfID int64) (*contractorReq, bool) {
+func (h *DictHandler) parseContractor(w http.ResponseWriter, r *http.Request, orgID, selfID int64) (*contractorReq, bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<12)
 	var req contractorReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -57,7 +61,7 @@ func (h *DictHandler) parseContractor(w http.ResponseWriter, r *http.Request, se
 		return nil, false
 	}
 	// Дубли без учёта регистра и лишних пробелов.
-	all, err := h.repo.GetContractors(r.Context())
+	all, err := h.repo.GetContractors(r.Context(), orgID)
 	if err != nil {
 		serverError(w, r, "не удалось проверить список контрагентов", err)
 		return nil, false
@@ -72,11 +76,15 @@ func (h *DictHandler) parseContractor(w http.ResponseWriter, r *http.Request, se
 }
 
 func (h *DictHandler) CreateContractor(w http.ResponseWriter, r *http.Request) {
-	req, ok := h.parseContractor(w, r, 0)
+	orgID, ok := requireOrgID(w, r)
 	if !ok {
 		return
 	}
-	contractor, err := h.repo.CreateContractorTyped(r.Context(), req.Name, req.IsSupplier, req.IsCarrier, req.IsClient)
+	req, ok := h.parseContractor(w, r, orgID, 0)
+	if !ok {
+		return
+	}
+	contractor, err := h.repo.CreateContractorTyped(r.Context(), orgID, req.Name, req.IsSupplier, req.IsCarrier, req.IsClient)
 	if err != nil {
 		respondError(w, r, "не удалось добавить контрагента", err)
 		return
@@ -97,15 +105,19 @@ func contractorID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 }
 
 func (h *DictHandler) UpdateContractor(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, ok := contractorID(w, r)
 	if !ok {
 		return
 	}
-	req, ok := h.parseContractor(w, r, id)
+	req, ok := h.parseContractor(w, r, orgID, id)
 	if !ok {
 		return
 	}
-	updated, err := h.repo.UpdateContractor(r.Context(), id, req.Name, req.IsSupplier, req.IsCarrier, req.IsClient, req.IsActive)
+	updated, err := h.repo.UpdateContractor(r.Context(), orgID, id, req.Name, req.IsSupplier, req.IsCarrier, req.IsClient, req.IsActive)
 	if err != nil {
 		respondError(w, r, "не удалось сохранить контрагента", err)
 		return
@@ -118,11 +130,15 @@ func (h *DictHandler) UpdateContractor(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DictHandler) DeleteContractor(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, ok := contractorID(w, r)
 	if !ok {
 		return
 	}
-	deleted, err := h.repo.DeleteContractor(r.Context(), id)
+	deleted, err := h.repo.DeleteContractor(r.Context(), orgID, id)
 	if errors.Is(err, repository.ErrContractorInUse) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return

@@ -7,7 +7,7 @@ import (
 )
 
 // Called under the shared firewood lock. Pending orders do not reserve stock.
-func checkFirewoodOrderStock(ctx context.Context, tx pgx.Tx, items []domain.FirewoodOrderItem) error {
+func checkFirewoodOrderStock(ctx context.Context, tx pgx.Tx, orgID int64, items []domain.FirewoodOrderItem) error {
 	requested := map[string]float64{}
 	for _, p := range items {
 		requested[p.Kind] += p.VolumeM3
@@ -15,7 +15,7 @@ func checkFirewoodOrderStock(ctx context.Context, tx pgx.Tx, items []domain.Fire
 	if len(requested) == 0 {
 		return nil
 	}
-	stock, err := readFirewoodStock(ctx, tx)
+	stock, err := readFirewoodStock(ctx, orgID, tx)
 	if err != nil {
 		return err
 	}
@@ -25,8 +25,8 @@ func checkFirewoodOrderStock(ctx context.Context, tx pgx.Tx, items []domain.Fire
 	}
 	return nil
 }
-func firewoodOrderItems(ctx context.Context, tx pgx.Tx, id int64) ([]domain.FirewoodOrderItem, error) {
-	rows, err := tx.Query(ctx, `SELECT kind,volume_m3,price FROM order_firewood WHERE order_id=$1 ORDER BY id`, id)
+func firewoodOrderItems(ctx context.Context, tx pgx.Tx, orgID int64, id int64) ([]domain.FirewoodOrderItem, error) {
+	rows, err := tx.Query(ctx, `SELECT kind,volume_m3,price FROM order_firewood WHERE organization_id = $1 AND order_id=$2 ORDER BY id`, orgID, id)
 	if err != nil {
 		return nil, err
 	}

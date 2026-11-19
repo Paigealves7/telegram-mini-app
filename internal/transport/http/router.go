@@ -47,7 +47,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	// Токен передаётся заголовком, куки не используются, поэтому AllowCredentials выключен.
 	corsOpts := cors.Options{
 		AllowedMethods: []string{"POST", "GET", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-Organization-ID"},
 		MaxAge:         300,
 	}
 	if origins := corsOrigins(); len(origins) > 0 {
@@ -77,7 +77,8 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	orderHandler := NewOrderHandler(repo, orderService, pdfService, botService)
 	tgAuthHandler := NewTelegramAuthHandler(repo, botToken, jwtSecret)
 	// Лимиты по IP клиента (см. client_ip.go). Значения подобраны так, чтобы бригада за одним IP не мешала друг другу.
-	loginLimiter := NewRateLimiter(5, 5)    // вход по паролю: 5 попыток подряд, затем 1 в 12 секунд (защита от подбора)
+	loginLimiter := NewRateLimiter(5, 5) // вход по паролю: 5 попыток подряд, затем 1 в 12 секунд (защита от подбора)
+	inviteLimiter := NewRateLimiter(10, 5)
 	tgLimiter := NewRateLimiter(60, 30)     // вход через Telegram: сотрудники за одним Wi-Fi
 	pdfLimiter := NewRateLimiter(30, 15)    // сборка накладных нагружает процессор
 	apiLimiter := NewRateLimiter(1200, 300) // общий потолок на один IP
@@ -148,8 +149,16 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			// 3. Прокидываем секрет в Middleware
 			r.Use(AuthMiddleware(jwtSecret))
 			r.Use(RefreshUser(repo))
-			r.Get("/config", ConfigHandler)
-			r = r.With(RequireRoles(domain.RoleManager, domain.RoleMaster, domain.RoleWorker))
+			r.Get("/config", ConfigHandler(repo))
+			organizations := OrganizationHandler{repo: repo}
+			r.Post("/invites/accept", inviteLimiter.Middleware(organizations.AcceptInvite))
+			adminOrganizations := r.With(RequireSuperAdmin)
+			adminOrganizations.Get("/admin/organizations", organizations.List)
+			adminOrganizations.Post("/admin/organizations", organizations.Create)
+			adminOrganizations.Put("/admin/organizations/{id}", organizations.Update)
+			adminOrganizations.Post("/admin/organizations/{id}/invites", organizations.CreateAdminInvite)
+			adminOrganizations.Post("/admin/organizations/{id}/reset-test-data", organizations.Reset)
+			r = r.With(ResolveOrganization(repo), RequireRoles(domain.RoleManager, domain.RoleMaster, domain.RoleWorker))
 
 			r.Get("/boards", boardHandler.GetList)
 			r.Get("/logs", logHandler.GetList)
@@ -201,6 +210,9 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager))
+				r.Get("/invites", organizations.ListInvites)
+				r.Post("/invites", organizations.CreateInvite)
+				r.Delete("/invites/{id}", organizations.RevokeInvite)
 				r.Post("/firewood/settings", firewoodHandler.SetSettings)
 				r.Delete("/firewood/processing/{id}", firewoodHandler.DeleteProcessing)
 				r.Get("/statistics", statsHandler.GetSummary)

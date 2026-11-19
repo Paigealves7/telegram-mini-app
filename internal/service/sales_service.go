@@ -15,7 +15,7 @@ func NewSalesService(repo *repository.Repository) *SalesService {
 	return &SalesService{repo: repo}
 }
 
-func (s *SalesService) CreateSale(ctx context.Context, sale *domain.Sale, items []domain.SaleItem) (*domain.Sale, error) {
+func (s *SalesService) CreateSale(ctx context.Context, orgID int64, sale *domain.Sale, items []domain.SaleItem) (*domain.Sale, error) {
 	if len(items) == 0 {
 		return nil, errors.New("позиции продажи не могут быть пустыми")
 	}
@@ -23,5 +23,5 @@ func (s *SalesService) CreateSale(ctx context.Context, sale *domain.Sale, items 
 	// Объём и суммы считает репозиторий внутри транзакции по данным склада
 	// (цена позиции = за 1 м³), значения от клиента не используются.
 
-	return s.repo.CreateSale(ctx, sale, items)
+	return s.repo.CreateSale(ctx, orgID, sale, items)
 }

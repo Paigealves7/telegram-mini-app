@@ -38,7 +38,11 @@ type staffItem struct {
 }
 
 func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
-	users, err := h.repo.ListUsers(r.Context())
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
+	users, err := h.repo.ListUsers(r.Context(), orgID)
 	if err != nil {
 		serverError(w, r, "не удалось получить список сотрудников", err)
 		return
@@ -65,6 +69,10 @@ func staffID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 }
 
 func (h *StaffHandler) SetRole(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, ok := staffID(w, r)
 	if !ok {
 		return
@@ -77,7 +85,7 @@ func (h *StaffHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
 		return
 	}
-	if req.Role != domain.RoleManager && req.Role != domain.RoleMaster && req.Role != domain.RoleWorker && req.Role != domain.RolePending {
+	if req.Role != domain.RoleManager && req.Role != domain.RoleMaster && req.Role != domain.RoleWorker {
 		http.Error(w, "неизвестная роль", http.StatusBadRequest)
 		return
 	}
@@ -94,7 +102,7 @@ func (h *StaffHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "управление ролями руководителей доступно только супер-админу", http.StatusForbidden)
 		return
 	}
-	updated, err := h.repo.UpdateUserRole(r.Context(), id, req.Role, actor.IsSuperAdmin)
+	updated, err := h.repo.UpdateUserRole(r.Context(), orgID, id, req.Role, actor.IsSuperAdmin)
 	if err != nil {
 		serverError(w, r, "не удалось изменить роль", err)
 		return
@@ -110,6 +118,19 @@ func (h *StaffHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *StaffHandler) staffTarget(w http.ResponseWriter, r *http.Request, id int64) *domain.User {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return nil
+	}
+	role, err := h.repo.GetUserOrganizationRole(r.Context(), orgID, id)
+	if errors.Is(err, repository.ErrOrganizationMembershipNotFound) {
+		http.Error(w, "сотрудник не найден", http.StatusNotFound)
+		return nil
+	}
+	if err != nil {
+		serverError(w, r, "не удалось проверить членство сотрудника", err)
+		return nil
+	}
 	target, err := h.repo.GetUserByID(r.Context(), id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "сотрудник не найден", http.StatusNotFound)
@@ -124,10 +145,15 @@ func (h *StaffHandler) staffTarget(w http.ResponseWriter, r *http.Request, id in
 		http.Error(w, "управление аккаунтом супер-админа запрещено", http.StatusForbidden)
 		return nil
 	}
+	target.Role = role
 	return target
 }
 
 func (h *StaffHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, ok := staffID(w, r)
 	if !ok {
 		return
@@ -137,11 +163,16 @@ func (h *StaffHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "нельзя удалить собственный аккаунт", http.StatusForbidden)
 		return
 	}
-	adminResult(w, r, "не удалось удалить сотрудника", h.repo.DeleteUser(r.Context(), id))
+	adminResult(w, r, "не удалось удалить сотрудника", h.repo.DeleteUser(r.Context(), orgID, id))
 }
 
 // SetPassword: новый пароль для аккаунта с паролем. У Telegram-аккаунтов пароля нет.
 func (h *StaffHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
+	actor, ok := currentUser(r)
+	if !ok || !actor.IsSuperAdmin {
+		http.Error(w, "смена пароля аккаунта доступна только супер-админу", http.StatusForbidden)
+		return
+	}
 	id, ok := staffID(w, r)
 	if !ok {
 		return

@@ -24,12 +24,17 @@ func TestCreateLogArrival_Transaction(t *testing.T) {
 
 	repo := NewRepository(pool)
 
-	supplier, err := repo.CreateContractor(ctx, "Тестовый Поставщик")
+	org, err := repo.CreateOrganization(ctx, "Тестовый приход", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	supplier, err := repo.CreateContractor(ctx, org.ID, "Тестовый Поставщик")
 	if err != nil {
 		t.Fatalf("ошибка создания тестового поставщика: %v", err)
 	}
 
-	carrier, err := repo.CreateContractor(ctx, "Тестовый Перевозчик")
+	carrier, err := repo.CreateContractor(ctx, org.ID, "Тестовый Перевозчик")
 	if err != nil {
 		t.Fatalf("ошибка создания тестового перевозчика: %v", err)
 	}
@@ -52,7 +57,7 @@ func TestCreateLogArrival_Transaction(t *testing.T) {
 		{LengthMM: 6000, DiameterMM: 240, Species: "Сосна", Count: 10, VolumeM3: 2.5},
 	}
 
-	result, err := repo.CreateLogArrival(ctx, arrival, items)
+	result, err := repo.CreateLogArrival(ctx, org.ID, arrival, items)
 	if err != nil {
 		t.Fatalf("ошибка выполнения транзакции: %v", err)
 	}

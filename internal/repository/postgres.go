@@ -19,9 +19,9 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) GetContractors(ctx context.Context) ([]domain.Contractor, error) {
-	query := `SELECT id, name, is_supplier, is_carrier, is_client, is_active FROM contractors ORDER BY id DESC`
-	rows, err := r.db.Query(ctx, query)
+func (r *Repository) GetContractors(ctx context.Context, orgID int64) ([]domain.Contractor, error) {
+	query := `SELECT id, name, is_supplier, is_carrier, is_client, is_active FROM contractors WHERE organization_id = $1 ORDER BY id DESC`
+	rows, err := r.db.Query(ctx, query, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -31,34 +31,52 @@ func (r *Repository) GetContractors(ctx context.Context) ([]domain.Contractor, e
 }
 
 // CreateContractor добавляет контрагента без разбора по типам (подходит всем ролям).
-func (r *Repository) CreateContractor(ctx context.Context, name string) (*domain.Contractor, error) {
-	return r.CreateContractorTyped(ctx, name, true, true, true)
+func (r *Repository) CreateContractor(ctx context.Context, orgID int64, name string) (*domain.Contractor, error) {
+	return r.CreateContractorTyped(ctx, orgID, name, true, true, true)
 }
 
-func (r *Repository) CreateContractorTyped(ctx context.Context, name string, supplier, carrier, client bool) (*domain.Contractor, error) {
-	query := `INSERT INTO contractors (name, is_supplier, is_carrier, is_client) VALUES ($1, $2, $3, $4)
+func (r *Repository) CreateContractorTyped(ctx context.Context, orgID int64, name string, supplier, carrier, client bool) (*domain.Contractor, error) {
+	tx, err := r.beginOrgWrite(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	query := `INSERT INTO contractors (organization_id, name, is_supplier, is_carrier, is_client) VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, name, is_supplier, is_carrier, is_client, is_active`
 	var c domain.Contractor
-	err := r.db.QueryRow(ctx, query, name, supplier, carrier, client).
+	err = tx.QueryRow(ctx, query, orgID, name, supplier, carrier, client).
 		Scan(&c.ID, &c.Name, &c.IsSupplier, &c.IsCarrier, &c.IsClient, &c.IsActive)
-	return &c, err
+	if err != nil {
+		return nil, err
+	}
+	return &c, tx.Commit(ctx)
 }
 
 // UpdateContractor меняет название, типы и признак «скрыт». Возвращает false, если контрагента нет.
-func (r *Repository) UpdateContractor(ctx context.Context, id int64, name string, supplier, carrier, client, active bool) (bool, error) {
-	tag, err := r.db.Exec(ctx, `UPDATE contractors SET name = $2, is_supplier = $3, is_carrier = $4, is_client = $5, is_active = $6 WHERE id = $1`,
-		id, name, supplier, carrier, client, active)
+func (r *Repository) UpdateContractor(ctx context.Context, orgID int64, id int64, name string, supplier, carrier, client, active bool) (bool, error) {
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE contractors SET name = $3, is_supplier = $4, is_carrier = $5, is_client = $6, is_active = $7 WHERE organization_id = $1 AND id = $2`,
+		orgID, id, name, supplier, carrier, client, active)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, tx.Commit(ctx)
 }
 
 var ErrContractorInUse = errors.New("у контрагента есть приходы, продажи или заказы: скройте его вместо удаления")
 
 // DeleteContractor удаляет контрагента, только если на него нет ссылок. Возвращает false, если его нет.
-func (r *Repository) DeleteContractor(ctx context.Context, id int64) (bool, error) {
-	tag, err := r.db.Exec(ctx, `DELETE FROM contractors WHERE id = $1`, id)
+func (r *Repository) DeleteContractor(ctx context.Context, orgID int64, id int64) (bool, error) {
+	tx, err := r.beginOrgWrite(ctx, orgID)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `DELETE FROM contractors WHERE organization_id = $1 AND id = $2`, orgID, id)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
@@ -66,7 +84,7 @@ func (r *Repository) DeleteContractor(ctx context.Context, id int64) (bool, erro
 		}
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return tag.RowsAffected() > 0, tx.Commit(ctx)
 }
 
 var ErrDeletedUser = errors.New("этот аккаунт удалён")
@@ -85,13 +103,9 @@ func (r *Repository) CreateUser(ctx context.Context, username, passwordHash stri
 	query := `
 		INSERT INTO users (id, username, password_hash, role)
 		SELECT $1::bigint, $2::text, $3::text, $4::role
-		WHERE NOT EXISTS (SELECT 1 FROM deleted_telegram_users WHERE username = $2)
 		RETURNING id, username, role, created_at`
 	var user domain.User
 	err := r.db.QueryRow(ctx, query, id, username, passwordHash, role).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrDeletedUser
-	}
 	return &user, err
 }
 
@@ -103,10 +117,10 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*d
 }
 
 // GetLogArrivals returns the most recent arrivals and their tally items.
-func (r *Repository) GetLogArrivals(ctx context.Context, limit, offset int) ([]domain.LogArrival, error) {
+func (r *Repository) GetLogArrivals(ctx context.Context, orgID int64, limit, offset int) ([]domain.LogArrival, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, COALESCE(supplier_id, 0), COALESCE(carrier_id, 0), truck_number, arrival_date::text, COALESCE(created_by, 0), created_at
-		FROM log_arrivals ORDER BY arrival_date DESC, id DESC LIMIT $1 OFFSET $2`, limit, offset)
+		FROM log_arrivals WHERE organization_id = $1 ORDER BY arrival_date DESC, id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +142,7 @@ func (r *Repository) GetLogArrivals(ctx context.Context, limit, offset int) ([]d
 	for i := range arrivals {
 		items, err := r.db.Query(ctx, `
 			SELECT id, arrival_id, length_mm, diameter_mm, species, count, volume_m3
-			FROM log_items WHERE arrival_id = $1 ORDER BY id`, arrivals[i].ID)
+			FROM log_items WHERE organization_id = $1 AND arrival_id = $2 ORDER BY id`, orgID, arrivals[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -150,25 +164,25 @@ func (r *Repository) GetLogArrivals(ctx context.Context, limit, offset int) ([]d
 	return arrivals, nil
 }
 
-func (r *Repository) CreateLogArrival(ctx context.Context, arrival *domain.LogArrival, items []domain.LogItem) (*domain.LogArrival, error) {
-	tx, err := r.db.Begin(ctx)
+func (r *Repository) CreateLogArrival(ctx context.Context, orgID int64, arrival *domain.LogArrival, items []domain.LogItem) (*domain.LogArrival, error) {
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
 	arrivalQuery := `
-		INSERT INTO log_arrivals (supplier_id, carrier_id, truck_number, arrival_date, created_by)
-		VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`
-	err = tx.QueryRow(ctx, arrivalQuery, arrival.SupplierID, arrival.CarrierID, arrival.TruckNumber, arrival.ArrivalDate, arrival.CreatedBy).Scan(&arrival.ID, &arrival.CreatedAt)
+		INSERT INTO log_arrivals (organization_id, supplier_id, carrier_id, truck_number, arrival_date, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`
+	err = tx.QueryRow(ctx, arrivalQuery, orgID, arrival.SupplierID, arrival.CarrierID, arrival.TruckNumber, arrival.ArrivalDate, arrival.CreatedBy).Scan(&arrival.ID, &arrival.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	itemQuery := `INSERT INTO log_items (arrival_id, length_mm, diameter_mm, species, count, volume_m3) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	itemQuery := `INSERT INTO log_items (organization_id, arrival_id, length_mm, diameter_mm, species, count, volume_m3) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
 	for i := range items {
 		items[i].ArrivalID = arrival.ID
-		err := tx.QueryRow(ctx, itemQuery, arrival.ID, items[i].LengthMM, items[i].DiameterMM, items[i].Species, items[i].Count, items[i].VolumeM3).Scan(&items[i].ID)
+		err := tx.QueryRow(ctx, itemQuery, orgID, arrival.ID, items[i].LengthMM, items[i].DiameterMM, items[i].Species, items[i].Count, items[i].VolumeM3).Scan(&items[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +194,7 @@ func (r *Repository) CreateLogArrival(ctx context.Context, arrival *domain.LogAr
 	return arrival, nil
 }
 
-func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.SawingOperation, sawedLogs []domain.SawedLog, producedBoards []domain.Board) (*domain.SawingOperation, error) {
+func (r *Repository) CreateSawingOperation(ctx context.Context, orgID int64, op *domain.SawingOperation, sawedLogs []domain.SawedLog, producedBoards []domain.Board) (*domain.SawingOperation, error) {
 	var inputVolume, outputVolume float64
 	for _, log := range sawedLogs {
 		inputVolume += log.VolumeM3
@@ -192,20 +206,20 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.Sawin
 		return nil, err
 	}
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
-	sawingQuery := `INSERT INTO sawing_operations (worker_id, date) VALUES ($1, $2) RETURNING id, created_at`
-	err = tx.QueryRow(ctx, sawingQuery, op.WorkerID, op.Date).Scan(&op.ID, &op.CreatedAt)
+	sawingQuery := `INSERT INTO sawing_operations (organization_id, worker_id, date) VALUES ($1, $2, $3) RETURNING id, created_at`
+	err = tx.QueryRow(ctx, sawingQuery, orgID, op.WorkerID, op.Date).Scan(&op.ID, &op.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	logQuery := `INSERT INTO sawed_logs (sawing_id, log_id, volume_m3, consumed_count, consumed_volume_m3)
-		VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	logQuery := `INSERT INTO sawed_logs (organization_id, sawing_id, log_id, volume_m3, consumed_count, consumed_volume_m3)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 	logIDs := make([]int64, 0, len(sawedLogs))
 	for _, item := range sawedLogs {
 		if item.LogID == nil {
@@ -213,7 +227,7 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.Sawin
 		}
 		logIDs = append(logIDs, *item.LogID)
 	}
-	if _, err := tx.Exec(ctx, `SELECT id FROM log_items WHERE id = ANY($1) ORDER BY id FOR UPDATE`, logIDs); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT id FROM log_items WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE`, orgID, logIDs); err != nil {
 		return nil, err
 	}
 	for i := range sawedLogs {
@@ -221,7 +235,7 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.Sawin
 
 		var remVol float64
 		var remCount int
-		err := tx.QueryRow(ctx, `SELECT remaining_volume_m3, remaining_count FROM log_items WHERE id = $1`, logID).Scan(&remVol, &remCount)
+		err := tx.QueryRow(ctx, `SELECT remaining_volume_m3, remaining_count FROM log_items WHERE organization_id = $1 AND id = $2`, orgID, logID).Scan(&remVol, &remCount)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil, ErrLogNotFound
@@ -232,20 +246,20 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, op *domain.Sawin
 		if err != nil {
 			return nil, err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE log_items SET remaining_volume_m3 = $1, remaining_count = $2 WHERE id = $3`, newVol, newCount, logID); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE log_items SET remaining_volume_m3 = $2, remaining_count = $3 WHERE organization_id = $1 AND id = $4`, orgID, newVol, newCount, logID); err != nil {
 			return nil, err
 		}
 
 		sawedLogs[i].SawingID = op.ID
-		err = tx.QueryRow(ctx, logQuery, op.ID, logID, sawedLogs[i].VolumeM3, remCount-newCount, round3(remVol-newVol)).Scan(&sawedLogs[i].ID)
+		err = tx.QueryRow(ctx, logQuery, orgID, op.ID, logID, sawedLogs[i].VolumeM3, remCount-newCount, round3(remVol-newVol)).Scan(&sawedLogs[i].ID)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	boardQuery := `INSERT INTO boards (height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3, sawing_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
+	boardQuery := `INSERT INTO boards (organization_id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3, sawing_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`
 	for i := range producedBoards {
-		err := tx.QueryRow(ctx, boardQuery, producedBoards[i].HeightMM, producedBoards[i].WidthMM, producedBoards[i].LengthMM, producedBoards[i].Species, producedBoards[i].Grade, producedBoards[i].Count, producedBoards[i].VolumeM3, producedBoards[i].PricePerM3, op.ID).Scan(&producedBoards[i].ID)
+		err := tx.QueryRow(ctx, boardQuery, orgID, producedBoards[i].HeightMM, producedBoards[i].WidthMM, producedBoards[i].LengthMM, producedBoards[i].Species, producedBoards[i].Grade, producedBoards[i].Count, producedBoards[i].VolumeM3, producedBoards[i].PricePerM3, op.ID).Scan(&producedBoards[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -280,11 +294,11 @@ func validateSawingYield(inputVolume, outputVolume float64) error {
 }
 
 // GetSales returns sales history with their line items.
-func (r *Repository) GetSales(ctx context.Context, limit, offset int) ([]domain.Sale, error) {
+func (r *Repository) GetSales(ctx context.Context, orgID int64, limit, offset int) ([]domain.Sale, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, contractor_id, truck_number, delivery_price, extra_price, total_volume,
 		       total_price, COALESCE(created_by, 0), created_at, order_id, (order_id IS NOT NULL OR legacy_order_sale)
-		FROM sales ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`, limit, offset)
+		FROM sales WHERE organization_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +317,7 @@ func (r *Repository) GetSales(ctx context.Context, limit, offset int) ([]domain.
 	}
 	rows.Close()
 	for i := range sales {
-		items, err := r.db.Query(ctx, `SELECT id, sale_id, board_id, count, volume_m3, price FROM sale_boards WHERE sale_id = $1 ORDER BY id`, sales[i].ID)
+		items, err := r.db.Query(ctx, `SELECT id, sale_id, board_id, count, volume_m3, price FROM sale_boards WHERE organization_id = $1 AND sale_id = $2 ORDER BY id`, orgID, sales[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -325,14 +339,14 @@ func (r *Repository) GetSales(ctx context.Context, limit, offset int) ([]domain.
 	return sales, nil
 }
 
-func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []domain.SaleItem) (*domain.Sale, error) {
-	tx, err := r.db.Begin(ctx)
+func (r *Repository) CreateSale(ctx context.Context, orgID int64, sale *domain.Sale, items []domain.SaleItem) (*domain.Sale, error) {
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
-	if err := r.createSaleTx(ctx, tx, sale, items); err != nil {
+	if err := r.createSaleTx(ctx, tx, orgID, sale, items); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -343,34 +357,34 @@ func (r *Repository) CreateSale(ctx context.Context, sale *domain.Sale, items []
 
 // createSaleTx проводит продажу внутри уже открытой транзакции (без Commit),
 // чтобы её можно было объединить с другими действиями, например с завершением заказа.
-func (r *Repository) createSaleTx(ctx context.Context, tx pgx.Tx, sale *domain.Sale, items []domain.SaleItem) error {
+func (r *Repository) createSaleTx(ctx context.Context, tx pgx.Tx, orgID int64, sale *domain.Sale, items []domain.SaleItem) error {
 	saleQuery := `
-		INSERT INTO sales (contractor_id, truck_number, delivery_price, extra_price, total_volume, total_price, created_by, order_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO sales (organization_id, contractor_id, truck_number, delivery_price, extra_price, total_volume, total_price, created_by, order_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at`
 
-	err := tx.QueryRow(ctx, saleQuery, sale.ContractorID, sale.TruckNumber, sale.DeliveryPrice, sale.ExtraPrice, sale.TotalVolume, sale.TotalPrice, sale.CreatedBy, sale.OrderID).Scan(&sale.ID, &sale.CreatedAt)
+	err := tx.QueryRow(ctx, saleQuery, orgID, sale.ContractorID, sale.TruckNumber, sale.DeliveryPrice, sale.ExtraPrice, sale.TotalVolume, sale.TotalPrice, sale.CreatedBy, sale.OrderID).Scan(&sale.ID, &sale.CreatedAt)
 	if err != nil {
 		return err
 	}
 
 	itemQuery := `
-		INSERT INTO sale_boards (sale_id, board_id, count, volume_m3, price)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO sale_boards (organization_id, sale_id, board_id, count, volume_m3, price)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id`
 
 	boardIDs := make([]int64, 0, len(items))
 	for _, item := range items {
 		boardIDs = append(boardIDs, item.BoardID)
 	}
-	if _, err := tx.Exec(ctx, `SELECT id FROM boards WHERE id = ANY($1) ORDER BY id FOR UPDATE`, boardIDs); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT id FROM boards WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE`, orgID, boardIDs); err != nil {
 		return err
 	}
 	var totalVolume, totalPrice float64
 	for i := range items {
 		var currentCount int
 		var currentVolume float64
-		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE id = $1`, items[i].BoardID).Scan(&currentCount, &currentVolume)
+		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE organization_id = $1 AND id = $2`, orgID, items[i].BoardID).Scan(&currentCount, &currentVolume)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrBoardNotFound
@@ -397,14 +411,14 @@ func (r *Repository) createSaleTx(ctx context.Context, tx pgx.Tx, sale *domain.S
 		// 2. Строку НЕ удаляем: на неё ссылаются sale_boards и order_boards (внешние ключи),
 		// из-за DELETE продажа всей позиции падала. Нулевые позиции скрывает фильтр
 		// count > 0 в GetAllBoards.
-		_, err = tx.Exec(ctx, `UPDATE boards SET count = $1, volume_m3 = $2 WHERE id = $3`, newCount, newVolume, items[i].BoardID)
+		_, err = tx.Exec(ctx, `UPDATE boards SET count = $2, volume_m3 = $3 WHERE organization_id = $1 AND id = $4`, orgID, newCount, newVolume, items[i].BoardID)
 		if err != nil {
 			return err
 		}
 
 		// 3. Записываем позицию чека
 		items[i].SaleID = sale.ID
-		err = tx.QueryRow(ctx, itemQuery, sale.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID)
+		err = tx.QueryRow(ctx, itemQuery, orgID, sale.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID)
 		if err != nil {
 			return err
 		}
@@ -412,7 +426,7 @@ func (r *Repository) createSaleTx(ctx context.Context, tx pgx.Tx, sale *domain.S
 
 	sale.TotalVolume = totalVolume
 	sale.TotalPrice = domain.Round2(totalPrice + sale.DeliveryPrice + sale.ExtraPrice)
-	if _, err := tx.Exec(ctx, `UPDATE sales SET total_volume = $1, total_price = $2 WHERE id = $3`, sale.TotalVolume, sale.TotalPrice, sale.ID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE sales SET total_volume = $2, total_price = $3 WHERE organization_id = $1 AND id = $4`, orgID, sale.TotalVolume, sale.TotalPrice, sale.ID); err != nil {
 		return err
 	}
 
@@ -423,16 +437,16 @@ func (r *Repository) createSaleTx(ctx context.Context, tx pgx.Tx, sale *domain.S
 // CompleteOrder в ОДНОЙ транзакции: блокирует заказ, проводит продажу по его позициям
 // и ставит статус completed. Двойной клик или параллельный запрос второй раз не спишут склад,
 // а при любой ошибке не остаётся ни продажи, ни смены статуса.
-func (r *Repository) CompleteOrder(ctx context.Context, orderID, userID int64) (*domain.Order, error) {
-	tx, err := r.db.Begin(ctx)
+func (r *Repository) CompleteOrder(ctx context.Context, orgID int64, orderID, userID int64) (*domain.Order, error) {
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
 	var o domain.Order
-	err = tx.QueryRow(ctx, `SELECT id, COALESCE(master_id,0), contractor_id, COALESCE(notes,''), delivery_price, extra_price, status, created_at, updated_at FROM orders WHERE id = $1 FOR UPDATE`, orderID).
-		Scan(&o.ID, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+	err = tx.QueryRow(ctx, `SELECT id, order_number, COALESCE(master_id,0), contractor_id, COALESCE(notes,''), delivery_price, extra_price, status, created_at, updated_at FROM orders WHERE organization_id = $1 AND id = $2 FOR UPDATE`, orgID, orderID).
+		Scan(&o.ID, &o.OrderNumber, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
@@ -443,7 +457,7 @@ func (r *Repository) CompleteOrder(ctx context.Context, orderID, userID int64) (
 		return nil, ErrOrderClosed
 	}
 
-	rows, err := tx.Query(ctx, `SELECT board_id, count, volume_m3, price FROM order_boards WHERE order_id = $1 ORDER BY id`, orderID)
+	rows, err := tx.Query(ctx, `SELECT board_id, count, volume_m3, price FROM order_boards WHERE organization_id = $1 AND order_id = $2 ORDER BY id`, orgID, orderID)
 	if err != nil {
 		return nil, err
 	}
@@ -460,14 +474,14 @@ func (r *Repository) CompleteOrder(ctx context.Context, orderID, userID int64) (
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if err = lockFirewood(ctx, tx); err != nil {
+	if err = lockFirewood(ctx, tx, orgID); err != nil {
 		return nil, err
 	}
-	fwItems, err := firewoodOrderItems(ctx, tx, orderID)
+	fwItems, err := firewoodOrderItems(ctx, tx, orgID, orderID)
 	if err != nil {
 		return nil, err
 	}
-	if err = checkFirewoodOrderStock(ctx, tx, fwItems); err != nil {
+	if err = checkFirewoodOrderStock(ctx, tx, orgID, fwItems); err != nil {
 		return nil, err
 	}
 	if len(saleItems) == 0 && len(fwItems) == 0 {
@@ -482,7 +496,7 @@ func (r *Repository) CompleteOrder(ctx context.Context, orderID, userID int64) (
 		ExtraPrice:    o.ExtraPrice,
 		CreatedBy:     userID,
 	}
-	if err := r.createSaleTx(ctx, tx, sale, saleItems); err != nil {
+	if err := r.createSaleTx(ctx, tx, orgID, sale, saleItems); err != nil {
 		return nil, err
 	}
 
@@ -491,10 +505,10 @@ func (r *Repository) CompleteOrder(ctx context.Context, orderID, userID int64) (
 		fwVolume += p.VolumeM3
 		fwPrice += domain.Round2(p.VolumeM3 * p.Price)
 	}
-	if _, err = tx.Exec(ctx, `UPDATE sales SET total_volume=total_volume+$1,total_price=total_price+$2 WHERE id=$3`, fwVolume, fwPrice, sale.ID); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE sales SET total_volume=total_volume+$2,total_price=total_price+$3 WHERE organization_id = $1 AND id=$4`, orgID, fwVolume, fwPrice, sale.ID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`, domain.OrderStatusCompleted, orderID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE orders SET status = $2, updated_at = NOW() WHERE organization_id = $1 AND id = $3`, orgID, domain.OrderStatusCompleted, orderID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -533,30 +547,33 @@ func validateOrderStock(requested map[int64]int, stocks map[int64]boardStock) er
 	return nil
 }
 
-func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items []domain.OrderItem) (*domain.Order, error) {
+func (r *Repository) CreateOrder(ctx context.Context, orgID int64, order *domain.Order, items []domain.OrderItem) (*domain.Order, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	if err := tx.QueryRow(ctx, `UPDATE organizations SET last_order_number = last_order_number + 1 WHERE id = $1 AND is_active = TRUE RETURNING last_order_number`, orgID).Scan(&order.OrderNumber); err != nil {
+		return nil, organizationError(err)
+	}
 	if len(order.FirewoodItems) > 0 {
-		if err := lockFirewood(ctx, tx); err != nil {
+		if err := lockFirewood(ctx, tx, orgID); err != nil {
 			return nil, err
 		}
 	}
 
-	orderQuery := `INSERT INTO orders (master_id, contractor_id, notes, delivery_price, extra_price, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, updated_at`
-	err = tx.QueryRow(ctx, orderQuery, order.MasterID, order.ContractorID, order.Notes, order.DeliveryPrice, order.ExtraPrice, order.Status).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
+	orderQuery := `INSERT INTO orders (organization_id, order_number, master_id, contractor_id, notes, delivery_price, extra_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at`
+	err = tx.QueryRow(ctx, orderQuery, orgID, order.OrderNumber, order.MasterID, order.ContractorID, order.Notes, order.DeliveryPrice, order.ExtraPrice, order.Status).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	itemQuery := `INSERT INTO order_boards (order_id, board_id, count, volume_m3, price) VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	itemQuery := `INSERT INTO order_boards (organization_id, order_id, board_id, count, volume_m3, price) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 	requestedByBoard := requestedOrderCounts(items)
 	boardStocks := make(map[int64]boardStock, len(requestedByBoard))
 	for boardID := range requestedByBoard {
 		var stock boardStock
-		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE id = $1`, boardID).Scan(&stock.count, &stock.volume)
+		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE organization_id = $1 AND id = $2`, orgID, boardID).Scan(&stock.count, &stock.volume)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil, ErrBoardNotFound
@@ -575,18 +592,18 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 		items[i].VolumeM3 = domain.ItemVolume(stock.count, stock.volume, items[i].Count)
 
 		items[i].OrderID = order.ID
-		err = tx.QueryRow(ctx, itemQuery, order.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID)
+		err = tx.QueryRow(ctx, itemQuery, orgID, order.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if err = checkFirewoodOrderStock(ctx, tx, order.FirewoodItems); err != nil {
+	if err = checkFirewoodOrderStock(ctx, tx, orgID, order.FirewoodItems); err != nil {
 		return nil, err
 	}
 	for i := range order.FirewoodItems {
 		p := &order.FirewoodItems[i]
 		p.Price = domain.Round2(p.Price)
-		if _, err = tx.Exec(ctx, `INSERT INTO order_firewood(order_id,kind,volume_m3,price) VALUES($1,$2,$3,$4)`, order.ID, p.Kind, p.VolumeM3, p.Price); err != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO order_firewood(organization_id, order_id,kind,volume_m3,price) VALUES($1, $2,$3,$4,$5)`, orgID, order.ID, p.Kind, p.VolumeM3, p.Price); err != nil {
 			return nil, err
 		}
 	}
@@ -597,11 +614,11 @@ func (r *Repository) CreateOrder(ctx context.Context, order *domain.Order, items
 	return order, nil
 }
 
-func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain.Order, error) {
-	query := `SELECT o.id, COALESCE(o.master_id,0), o.contractor_id, COALESCE(o.notes,''), o.delivery_price, o.extra_price, o.status, o.created_at, o.updated_at,
+func (r *Repository) GetOrders(ctx context.Context, orgID int64, limit, offset int) ([]domain.Order, error) {
+	query := `SELECT o.id, o.order_number, COALESCE(o.master_id,0), o.contractor_id, COALESCE(o.notes,''), o.delivery_price, o.extra_price, o.status, o.created_at, o.updated_at,
 		` + orderTotalExpr + `, ` + orderPaidExpr + `
-		FROM orders o ORDER BY o.id DESC LIMIT $1 OFFSET $2`
-	rows, err := r.db.Query(ctx, query, limit, offset)
+		FROM orders o WHERE o.organization_id = $1 ORDER BY o.id DESC LIMIT $2 OFFSET $3`
+	rows, err := r.db.Query(ctx, query, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -610,7 +627,7 @@ func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain
 	orders := make([]domain.Order, 0)
 	for rows.Next() {
 		var o domain.Order
-		if err := rows.Scan(&o.ID, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt, &o.TotalPrice, &o.PaidAmount); err != nil {
+		if err := rows.Scan(&o.ID, &o.OrderNumber, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt, &o.TotalPrice, &o.PaidAmount); err != nil {
 			return nil, err
 		}
 		orders = append(orders, o)
@@ -620,12 +637,12 @@ func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain
 	}
 	rows.Close()
 	for i := range orders {
-		items, err := r.GetOrderItems(ctx, orders[i].ID)
+		items, err := r.GetOrderItems(ctx, orgID, orders[i].ID)
 		if err != nil {
 			return nil, err
 		}
 		orders[i].Items = items
-		fr, err := r.db.Query(ctx, `SELECT kind,volume_m3,price FROM order_firewood WHERE order_id=$1 ORDER BY id`, orders[i].ID)
+		fr, err := r.db.Query(ctx, `SELECT kind,volume_m3,price FROM order_firewood WHERE organization_id = $1 AND order_id=$2 ORDER BY id`, orgID, orders[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -647,8 +664,8 @@ func (r *Repository) GetOrders(ctx context.Context, limit, offset int) ([]domain
 }
 
 // GetSawingOperations returns recent production operations and their input/output records.
-func (r *Repository) GetSawingOperations(ctx context.Context, limit, offset int) ([]domain.SawingOperation, error) {
-	rows, err := r.db.Query(ctx, `SELECT id, COALESCE(worker_id,0), date::text, created_at FROM sawing_operations ORDER BY date DESC, id DESC LIMIT $1 OFFSET $2`, limit, offset)
+func (r *Repository) GetSawingOperations(ctx context.Context, orgID int64, limit, offset int) ([]domain.SawingOperation, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, COALESCE(worker_id,0), date::text, created_at FROM sawing_operations WHERE organization_id = $1 ORDER BY date DESC, id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -667,7 +684,7 @@ func (r *Repository) GetSawingOperations(ctx context.Context, limit, offset int)
 	}
 	rows.Close()
 	for i := range ops {
-		logs, err := r.db.Query(ctx, `SELECT id, sawing_id, log_id, volume_m3 FROM sawed_logs WHERE sawing_id = $1 ORDER BY id`, ops[i].ID)
+		logs, err := r.db.Query(ctx, `SELECT id, sawing_id, log_id, volume_m3 FROM sawed_logs WHERE organization_id = $1 AND sawing_id = $2 ORDER BY id`, orgID, ops[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -685,7 +702,7 @@ func (r *Repository) GetSawingOperations(ctx context.Context, limit, offset int)
 			return nil, err
 		}
 		logs.Close()
-		boards, err := r.db.Query(ctx, `SELECT id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3 FROM boards WHERE sawing_id = $1 ORDER BY id`, ops[i].ID)
+		boards, err := r.db.Query(ctx, `SELECT id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3 FROM boards WHERE organization_id = $1 AND sawing_id = $2 ORDER BY id`, orgID, ops[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -709,11 +726,11 @@ func (r *Repository) GetSawingOperations(ctx context.Context, limit, offset int)
 	return ops, nil
 }
 
-func (r *Repository) GetAllBoards(ctx context.Context, filter domain.BoardFilter, limit, offset int) ([]domain.Board, error) {
-	query := `SELECT id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3 FROM boards WHERE count > 0`
+func (r *Repository) GetAllBoards(ctx context.Context, orgID int64, filter domain.BoardFilter, limit, offset int) ([]domain.Board, error) {
+	query := `SELECT id, height_mm, width_mm, length_mm, species, grade, count, volume_m3, price_per_m3 FROM boards WHERE organization_id = $1 AND count > 0`
 
-	args := []interface{}{}
-	argID := 1
+	args := []interface{}{orgID}
+	argID := 2
 
 	if filter.Species != "" {
 		query += fmt.Sprintf(" AND species = $%d", argID)
@@ -764,11 +781,11 @@ func (r *Repository) GetAllBoards(ctx context.Context, filter domain.BoardFilter
 	return boards, rows.Err()
 }
 
-func (r *Repository) GetAllLogs(ctx context.Context, filter domain.LogFilter, limit, offset int) ([]domain.LogItem, error) {
-	query := `SELECT id, arrival_id, length_mm, diameter_mm, species, remaining_count, remaining_volume_m3 FROM log_items WHERE remaining_volume_m3 > 0`
+func (r *Repository) GetAllLogs(ctx context.Context, orgID int64, filter domain.LogFilter, limit, offset int) ([]domain.LogItem, error) {
+	query := `SELECT id, arrival_id, length_mm, diameter_mm, species, remaining_count, remaining_volume_m3 FROM log_items WHERE organization_id = $1 AND remaining_volume_m3 > 0`
 
-	args := []interface{}{}
-	argID := 1
+	args := []interface{}{orgID}
+	argID := 2
 
 	if filter.Species != "" {
 		query += fmt.Sprintf(" AND species = $%d", argID)
@@ -806,51 +823,51 @@ func (r *Repository) GetAllLogs(ctx context.Context, filter domain.LogFilter, li
 	return logs, rows.Err()
 }
 
-func (r *Repository) GetStatisticsSummary(ctx context.Context, startDate, endDate string) (*domain.StatisticsSummary, error) {
+func (r *Repository) GetStatisticsSummary(ctx context.Context, orgID int64, startDate, endDate string) (*domain.StatisticsSummary, error) {
 	stats := &domain.StatisticsSummary{}
-	q1 := `SELECT COALESCE(SUM(li.volume_m3), 0) FROM log_items li JOIN log_arrivals la ON li.arrival_id = la.id WHERE la.arrival_date >= $1 AND la.arrival_date <= $2`
-	if err := r.db.QueryRow(ctx, q1, startDate, endDate).Scan(&stats.TotalLogsArrivedVolume); err != nil {
+	q1 := `SELECT COALESCE(SUM(li.volume_m3), 0) FROM log_items li JOIN log_arrivals la ON li.arrival_id = la.id AND li.organization_id = la.organization_id WHERE li.organization_id = $1 AND la.arrival_date >= $2 AND la.arrival_date <= $3`
+	if err := r.db.QueryRow(ctx, q1, orgID, startDate, endDate).Scan(&stats.TotalLogsArrivedVolume); err != nil {
 		return nil, err
 	}
 
 	// boards хранит текущий остаток. Восстанавливаем выпуск по продажам
 	// и всем корректировкам партий, напиленных в выбранном периоде.
 	q2 := `WITH operations AS (
-		SELECT id FROM sawing_operations WHERE date >= $1 AND date <= $2
+		SELECT id FROM sawing_operations WHERE organization_id = $1 AND date >= $2 AND date <= $3
 	), produced AS (
-		SELECT b.id, b.volume_m3 FROM boards b JOIN operations so ON b.sawing_id = so.id
+		SELECT b.id, b.volume_m3 FROM boards b JOIN operations so ON b.sawing_id = so.id WHERE b.organization_id = $1
 	)
-	SELECT (SELECT COALESCE(SUM(sl.volume_m3), 0) FROM sawed_logs sl JOIN operations so ON sl.sawing_id = so.id),
+	SELECT (SELECT COALESCE(SUM(sl.volume_m3), 0) FROM sawed_logs sl JOIN operations so ON sl.sawing_id = so.id WHERE sl.organization_id = $1),
 		(SELECT COALESCE(SUM(volume_m3), 0) FROM produced)
-		+ (SELECT COALESCE(SUM(sb.volume_m3), 0) FROM sale_boards sb JOIN produced b ON b.id = sb.board_id)
-		- (SELECT COALESCE(SUM(a.delta_volume), 0) FROM stock_adjustments a JOIN produced b ON b.id = a.item_id WHERE a.kind = 'board')`
-	if err := r.db.QueryRow(ctx, q2, startDate, endDate).Scan(&stats.TotalLogsSawedVolume, &stats.TotalBoardsProducedVolume); err != nil {
+		+ (SELECT COALESCE(SUM(sb.volume_m3), 0) FROM sale_boards sb JOIN produced b ON b.id = sb.board_id WHERE sb.organization_id = $1)
+		- (SELECT COALESCE(SUM(a.delta_volume), 0) FROM stock_adjustments a JOIN produced b ON b.id = a.item_id WHERE a.organization_id = $1 AND a.kind = 'board')`
+	if err := r.db.QueryRow(ctx, q2, orgID, startDate, endDate).Scan(&stats.TotalLogsSawedVolume, &stats.TotalBoardsProducedVolume); err != nil {
 		return nil, err
 	}
 
-	q3 := `SELECT COALESCE(SUM(total_price), 0) FROM sales WHERE created_at >= $1::timestamp AND created_at <= $2::timestamp + interval '23 hours 59 minutes 59 seconds'`
-	if err := r.db.QueryRow(ctx, q3, startDate, endDate).Scan(&stats.TotalSalesAmount); err != nil {
+	q3 := `SELECT COALESCE(SUM(total_price), 0) FROM sales WHERE organization_id = $1 AND created_at >= $2::timestamp AND created_at <= $3::timestamp + interval '23 hours 59 minutes 59 seconds'`
+	if err := r.db.QueryRow(ctx, q3, orgID, startDate, endDate).Scan(&stats.TotalSalesAmount); err != nil {
 		return nil, err
 	}
 
-	q4 := `SELECT COALESCE(SUM(s.total_volume), 0) FROM sales s WHERE s.created_at >= $1::timestamp AND s.created_at <= $2::timestamp + interval '23 hours 59 minutes 59 seconds'`
-	if err := r.db.QueryRow(ctx, q4, startDate, endDate).Scan(&stats.TotalSalesVolume); err != nil {
+	q4 := `SELECT COALESCE(SUM(s.total_volume), 0) FROM sales s WHERE s.organization_id = $1 AND s.created_at >= $2::timestamp AND s.created_at <= $3::timestamp + interval '23 hours 59 minutes 59 seconds'`
+	if err := r.db.QueryRow(ctx, q4, orgID, startDate, endDate).Scan(&stats.TotalSalesVolume); err != nil {
 		return nil, err
 	}
 
 	return stats, nil
 }
 
-func (r *Repository) GetOrderByID(ctx context.Context, id int64) (*domain.Order, error) {
-	query := `SELECT id, COALESCE(master_id,0), contractor_id, COALESCE(notes,''), delivery_price, extra_price, status, created_at, updated_at FROM orders WHERE id = $1`
+func (r *Repository) GetOrderByID(ctx context.Context, orgID int64, id int64) (*domain.Order, error) {
+	query := `SELECT id, order_number, COALESCE(master_id,0), contractor_id, COALESCE(notes,''), delivery_price, extra_price, status, created_at, updated_at FROM orders WHERE organization_id = $1 AND id = $2`
 	var o domain.Order
-	err := r.db.QueryRow(ctx, query, id).Scan(&o.ID, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+	err := r.db.QueryRow(ctx, query, orgID, id).Scan(&o.ID, &o.OrderNumber, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 	return &o, err
 }
 
-func (r *Repository) GetOrderItems(ctx context.Context, orderID int64) ([]domain.OrderItem, error) {
-	query := `SELECT ob.id, ob.order_id, ob.board_id, ob.count, ob.volume_m3, ob.price, COALESCE(b.species, ''), COALESCE(b.grade, ''), COALESCE(b.height_mm, 0), COALESCE(b.width_mm, 0), COALESCE(b.length_mm, 0) FROM order_boards ob LEFT JOIN boards b ON b.id = ob.board_id WHERE ob.order_id = $1 ORDER BY ob.id`
-	rows, err := r.db.Query(ctx, query, orderID)
+func (r *Repository) GetOrderItems(ctx context.Context, orgID int64, orderID int64) ([]domain.OrderItem, error) {
+	query := `SELECT ob.id, ob.order_id, ob.board_id, ob.count, ob.volume_m3, ob.price, COALESCE(b.species, ''), COALESCE(b.grade, ''), COALESCE(b.height_mm, 0), COALESCE(b.width_mm, 0), COALESCE(b.length_mm, 0) FROM order_boards ob LEFT JOIN boards b ON b.id = ob.board_id AND b.organization_id = ob.organization_id WHERE ob.organization_id = $1 AND ob.order_id = $2 ORDER BY ob.id`
+	rows, err := r.db.Query(ctx, query, orgID, orderID)
 	if err != nil {
 		return nil, err
 	}
@@ -870,11 +887,11 @@ func (r *Repository) GetOrderItems(ctx context.Context, orderID int64) ([]domain
 	return items, nil
 }
 
-func (r *Repository) UpdateOrderStatus(ctx context.Context, id int64, status domain.OrderStatus) error {
+func (r *Repository) UpdateOrderStatus(ctx context.Context, orgID int64, id int64, status domain.OrderStatus) error {
 	if status != domain.OrderStatusInProgress && status != domain.OrderStatusCanceled {
 		return ErrInvalidOrderStatus
 	}
-	tx, err := r.db.Begin(ctx)
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return err
 	}
@@ -882,7 +899,7 @@ func (r *Repository) UpdateOrderStatus(ctx context.Context, id int64, status dom
 
 	// AddPayment и CompleteOrder блокируют ту же строку заказа.
 	var current domain.OrderStatus
-	if err := tx.QueryRow(ctx, `SELECT status FROM orders WHERE id = $1 FOR UPDATE`, id).Scan(&current); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT status FROM orders WHERE organization_id = $1 AND id = $2 FOR UPDATE`, orgID, id).Scan(&current); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrOrderNotFound
 		}
@@ -893,14 +910,14 @@ func (r *Repository) UpdateOrderStatus(ctx context.Context, id int64, status dom
 	}
 	if status == domain.OrderStatusCanceled {
 		var paid float64
-		if err := tx.QueryRow(ctx, `SELECT `+orderPaidExpr+` FROM orders o WHERE o.id = $1`, id).Scan(&paid); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT `+orderPaidExpr+` FROM orders o WHERE o.organization_id = $1 AND o.id = $2`, orgID, id).Scan(&paid); err != nil {
 			return err
 		}
 		if paid > 0 {
 			return ErrOrderHasPayments
 		}
 	}
-	if _, err := tx.Exec(ctx, `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`, status, id); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE orders SET status = $2, updated_at = NOW() WHERE organization_id = $1 AND id = $3`, orgID, status, id); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -913,9 +930,11 @@ func (r *Repository) GetUserByID(ctx context.Context, id int64) (*domain.User, e
 	return &user, err
 }
 
-// ListUsers возвращает всех сотрудников (хеш пароля нужен только чтобы отличить Telegram-аккаунты).
-func (r *Repository) ListUsers(ctx context.Context) ([]domain.User, error) {
-	rows, err := r.db.Query(ctx, `SELECT id, username, password_hash, role, created_at, display_name, tg_username FROM users ORDER BY id`)
+// ListUsers возвращает сотрудников организации с их ролями.
+func (r *Repository) ListUsers(ctx context.Context, orgID int64) ([]domain.User, error) {
+	rows, err := r.db.Query(ctx, `SELECT u.id, u.username, u.password_hash, om.role, u.created_at, u.display_name, u.tg_username
+		FROM users u JOIN organization_members om ON om.user_id = u.id
+		WHERE om.organization_id = $1 ORDER BY u.id`, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -931,26 +950,46 @@ func (r *Repository) ListUsers(ctx context.Context) ([]domain.User, error) {
 	return users, rows.Err()
 }
 
-func (r *Repository) UpdateUserRole(ctx context.Context, id int64, role domain.Role, allowManager bool) (bool, error) {
-	tag, err := r.db.Exec(ctx, `UPDATE users SET role = $2::role WHERE id = $1 AND ($3 OR role <> 'manager' AND $2::role <> 'manager')`, id, role, allowManager)
+func (r *Repository) UpdateUserRole(ctx context.Context, orgID, id int64, role domain.Role, allowManager bool) (bool, error) {
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `UPDATE organization_members SET role = $3::role
+		WHERE organization_id = $1 AND user_id = $2
+		AND ($4 OR role <> 'manager' AND $3::role <> 'manager')`, orgID, id, role, allowManager)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, tx.Commit(ctx)
 }
 
-func (r *Repository) DeleteUser(ctx context.Context, id int64) error {
-	return pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		// ON DELETE SET NULL сохраняет историю. Удалённый Telegram-логин
-		// не должен автоматически зарегистрироваться при следующем входе.
-		var username string
-		if err := tx.QueryRow(ctx, `DELETE FROM users WHERE id=$1 RETURNING username`, id).Scan(&username); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, `INSERT INTO deleted_telegram_users (username)
-			SELECT $1::text WHERE $1::text ~ '^tg_[0-9]+$' ON CONFLICT DO NOTHING`, username)
+func (r *Repository) DeleteUser(ctx context.Context, orgID, id int64) error {
+	tx, err := r.beginOrgWrite(ctx, orgID)
+	if err != nil {
 		return err
-	})
+	}
+	defer tx.Rollback(ctx)
+
+	var username string
+	if err := tx.QueryRow(ctx, `SELECT username FROM users WHERE id = $1 FOR UPDATE`, id).Scan(&username); err != nil {
+		return err
+	}
+	tag, err := tx.Exec(ctx, `DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2`, orgID, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO deleted_telegram_users (organization_id, username)
+		SELECT $1, $2::text WHERE $2::text ~ '^tg_[0-9]+$' ON CONFLICT DO NOTHING`, orgID, username)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // UpdateUserPassword задаёт новый пароль. Telegram-аккаунты (хеш начинается с tg_) не трогает.

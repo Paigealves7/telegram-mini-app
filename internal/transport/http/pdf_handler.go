@@ -58,10 +58,10 @@ func contentDisposition(kind string, orderID int64) string {
 
 // servePDF отдаёт готовый файл целиком: с Content-Length, поддержкой HEAD и Range
 // (iOS и просмотрщики PDF докачивают файл частями).
-func servePDF(w http.ResponseWriter, r *http.Request, doc *service.OrderPDF, orderID int64, disposition string) {
+func servePDF(w http.ResponseWriter, r *http.Request, doc *service.OrderPDF, disposition string) {
 	h := w.Header()
 	h.Set("Content-Type", "application/pdf")
-	h.Set("Content-Disposition", contentDisposition(disposition, orderID))
+	h.Set("Content-Disposition", contentDisposition(disposition, doc.OrderNumber))
 	h.Set("Cache-Control", "private, no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
 	http.ServeContent(w, r, doc.Filename, time.Time{}, bytes.NewReader(doc.Data))
@@ -88,17 +88,21 @@ func publicBaseURL(r *http.Request) string {
 
 // GET /api/v1/orders/{id}/pdf — прямое скачивание с токеном в заголовке (для API и веб-входа).
 func (h *OrderHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, ok := parseOrderID(r)
 	if !ok {
 		http.Error(w, "некорректный ID заказа", http.StatusBadRequest)
 		return
 	}
-	doc, err := h.pdfService.BuildOrderPDF(r.Context(), id)
+	doc, err := h.pdfService.BuildOrderPDF(r.Context(), orgID, id)
 	if err != nil {
 		writePDFError(w, err)
 		return
 	}
-	servePDF(w, r, doc, id, "attachment")
+	servePDF(w, r, doc, "attachment")
 }
 
 type pdfLinkResponse struct {
@@ -110,6 +114,10 @@ type pdfLinkResponse struct {
 
 // POST /api/v1/orders/{id}/pdf/link — выдаёт короткоживущую ссылку на накладную.
 func (h *OrderHandler) PDFLink(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, ok := parseOrderID(r)
 	if !ok {
 		http.Error(w, "некорректный ID заказа", http.StatusBadRequest)
@@ -117,37 +125,37 @@ func (h *OrderHandler) PDFLink(w http.ResponseWriter, r *http.Request) {
 	}
 	// Сначала реально собираем накладную: если не получилось, ссылку не выдаём.
 	// Иначе Telegram «скачает» текст ошибки под видом файла .pdf, который потом не открыть.
-	doc, err := h.pdfService.BuildOrderPDF(r.Context(), id)
+	doc, err := h.pdfService.BuildOrderPDF(r.Context(), orgID, id)
 	if err != nil {
 		writePDFError(w, err)
 		return
 	}
 
-	token := h.pdfService.SignLink(id, doc.OrderCreatedAt, pdfLinkTTL)
-	link := fmt.Sprintf("%s/files/pdf/%s/%s", publicBaseURL(r), token, service.PDFFileNameASCII(id))
+	token := h.pdfService.SignLink(orgID, id, doc.OrderCreatedAt, pdfLinkTTL)
+	link := fmt.Sprintf("%s/files/pdf/%s/%s", publicBaseURL(r), token, service.PDFFileNameASCII(doc.OrderNumber))
 	pdfWriteJSON(w, http.StatusOK, pdfLinkResponse{
 		DownloadURL: link,
 		ViewURL:     link + "?inline=1",
-		FileName:    service.PDFFileName(id),
+		FileName:    doc.Filename,
 		ExpiresIn:   int(pdfLinkTTL.Seconds()),
 	})
 }
 
 // GET|HEAD /files/pdf/{token}/{name} — публичная ссылка; доступ даёт только действующая подпись.
 func (h *OrderHandler) ServePDF(w http.ResponseWriter, r *http.Request) {
-	id, createdAt, err := h.pdfService.VerifyLink(chi.URLParam(r, "token"))
+	orgID, id, createdAt, err := h.pdfService.VerifyLink(chi.URLParam(r, "token"))
 	if err != nil {
 		http.Error(w, "ссылка недействительна или устарела, запросите новую в приложении", http.StatusGone)
 		return
 	}
-	doc, err := h.pdfService.BuildOrderPDF(r.Context(), id)
+	doc, err := h.pdfService.BuildOrderPDF(r.Context(), orgID, id)
 	if err != nil {
 		writePDFError(w, err)
 		return
 	}
 	// После сброса номер может принадлежать другому заказу. Проверяем запись
 	// повторно, чтобы сброс между запросами сборки PDF тоже не раскрыл данные.
-	order, err := h.repo.GetOrderByID(r.Context(), id)
+	order, err := h.repo.GetOrderByID(r.Context(), orgID, id)
 	if err != nil || doc.OrderCreatedAt.UnixMicro() != createdAt || order.CreatedAt.UnixMicro() != createdAt {
 		http.Error(w, "ссылка недействительна или устарела, запросите новую в приложении", http.StatusGone)
 		return
@@ -156,11 +164,15 @@ func (h *OrderHandler) ServePDF(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("inline") == "1" {
 		disposition = "inline"
 	}
-	servePDF(w, r, doc, id, disposition)
+	servePDF(w, r, doc, disposition)
 }
 
 // POST /api/v1/orders/{id}/pdf/send — бот присылает накладную в личный чат пользователю.
 func (h *OrderHandler) PDFSend(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	if !pdfSendEnabled() {
 		http.Error(w, "отправка PDF в чат пока что недоступна из-за блокировок", http.StatusServiceUnavailable)
 		return
@@ -175,12 +187,12 @@ func (h *OrderHandler) PDFSend(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
 		return
 	}
-	doc, err := h.pdfService.BuildOrderPDF(r.Context(), id)
+	doc, err := h.pdfService.BuildOrderPDF(r.Context(), orgID, id)
 	if err != nil {
 		writePDFError(w, err)
 		return
 	}
-	caption := fmt.Sprintf("Товарная накладная №%d", id)
+	caption := fmt.Sprintf("Товарная накладная №%d", doc.OrderNumber)
 	if err := h.botService.SendDocument(r.Context(), user.UserID, doc.Filename, doc.Data, caption); err != nil {
 		if errors.Is(err, service.ErrBotCannotWrite) || errors.Is(err, service.ErrNoTelegramAccount) {
 			http.Error(w, err.Error(), http.StatusConflict)

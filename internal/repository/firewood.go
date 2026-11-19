@@ -8,23 +8,26 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func lockFirewood(ctx context.Context, tx pgx.Tx) error {
-	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(900009)`)
+func lockFirewood(ctx context.Context, tx pgx.Tx, orgID int64) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(900009, $1::int4)`, int32(orgID))
 	return err
 }
 
 // CreateFirewoodArrival записывает приход дров (общий объём в м³).
-func (r *Repository) CreateFirewoodArrival(ctx context.Context, supplierID, carrierID int64, truck string, volume float64, date string, userID int64) (*domain.FirewoodArrival, error) {
+func (r *Repository) CreateFirewoodArrival(ctx context.Context, orgID int64, supplierID, carrierID int64, truck string, volume float64, date string, userID int64) (*domain.FirewoodArrival, error) {
 	a := domain.FirewoodArrival{SupplierID: supplierID, CarrierID: carrierID, TruckNumber: truck, VolumeM3: volume}
 	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		if err := lockFirewood(ctx, tx); err != nil {
+		if err := lockOrgShare(ctx, tx, orgID); err != nil {
+			return err
+		}
+		if err := lockFirewood(ctx, tx, orgID); err != nil {
 			return err
 		}
 		return tx.QueryRow(ctx, `
-		INSERT INTO firewood_arrivals (supplier_id, carrier_id, truck_number, volume_m3, arrival_date, created_by)
-		VALUES ($1, $2, $3, $4, $5::date, $6)
+		INSERT INTO firewood_arrivals (organization_id, supplier_id, carrier_id, truck_number, volume_m3, arrival_date, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6::date, $7)
 		RETURNING id, to_char(arrival_date, 'YYYY-MM-DD'), created_at`,
-			supplierID, carrierID, truck, volume, date, userID).Scan(&a.ID, &a.ArrivalDate, &a.CreatedAt)
+			orgID, supplierID, carrierID, truck, volume, date, userID).Scan(&a.ID, &a.ArrivalDate, &a.CreatedAt)
 	})
 	if err != nil {
 		return nil, err
@@ -32,10 +35,10 @@ func (r *Repository) CreateFirewoodArrival(ctx context.Context, supplierID, carr
 	return &a, nil
 }
 
-func (r *Repository) GetFirewoodArrivals(ctx context.Context, limit, offset int) ([]domain.FirewoodArrival, error) {
+func (r *Repository) GetFirewoodArrivals(ctx context.Context, orgID int64, limit, offset int) ([]domain.FirewoodArrival, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, supplier_id, carrier_id, truck_number, volume_m3, to_char(arrival_date, 'YYYY-MM-DD'), created_at
-		FROM firewood_arrivals ORDER BY arrival_date DESC, id DESC LIMIT $1 OFFSET $2`, limit, offset)
+		FROM firewood_arrivals WHERE organization_id = $1 ORDER BY arrival_date DESC, id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -52,47 +55,51 @@ func (r *Repository) GetFirewoodArrivals(ctx context.Context, limit, offset int)
 }
 
 // GetFirewoodStock считает остатки дров. Сырьё = приходы минус списания на переработку.
-func (r *Repository) GetFirewoodStock(ctx context.Context) (*domain.FirewoodStock, error) {
-	return readFirewoodStock(ctx, r.db)
+func (r *Repository) GetFirewoodStock(ctx context.Context, orgID int64) (*domain.FirewoodStock, error) {
+	return readFirewoodStock(ctx, orgID, r.db)
 }
 
-func readFirewoodStock(ctx context.Context, db interface {
+func readFirewoodStock(ctx context.Context, orgID int64, db interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }) (*domain.FirewoodStock, error) {
 	var s domain.FirewoodStock
 	err := db.QueryRow(ctx, `WITH adjustments AS (
 		SELECT COALESCE(SUM(raw_delta_m3),0) AS raw, COALESCE(SUM(split_delta_m3),0) AS split,
-			COALESCE(SUM(round_delta_m3),0) AS round FROM firewood_stock_adjustments
+			COALESCE(SUM(round_delta_m3),0) AS round FROM firewood_stock_adjustments WHERE organization_id = $1
 	), production AS (
 		SELECT COALESCE(SUM(raw_m3),0) AS raw, COALESCE(SUM(volume_m3) FILTER (WHERE kind='split'),0) AS split,
-			COALESCE(SUM(volume_m3) FILTER (WHERE kind='round'),0) AS round FROM firewood_processing
+			COALESCE(SUM(volume_m3) FILTER (WHERE kind='round'),0) AS round FROM firewood_processing WHERE organization_id = $1
 	), shipped AS (
 		SELECT COALESCE(SUM(f.volume_m3) FILTER (WHERE f.kind='split'),0) AS split,
 			COALESCE(SUM(f.volume_m3) FILTER (WHERE f.kind='round'),0) AS round
-		FROM order_firewood f JOIN orders o ON o.id=f.order_id WHERE o.status='completed'
+		FROM order_firewood f JOIN orders o ON o.id = f.order_id AND o.organization_id = f.organization_id
+		WHERE f.organization_id = $1 AND o.status = 'completed'
 	)
-	SELECT (SELECT COALESCE(SUM(volume_m3),0) FROM firewood_arrivals)-p.raw+a.raw,
+	SELECT (SELECT COALESCE(SUM(volume_m3),0) FROM firewood_arrivals WHERE organization_id = $1)-p.raw+a.raw,
 		p.split-s.split+a.split, p.round-s.round+a.round
-	FROM production p CROSS JOIN adjustments a CROSS JOIN shipped s`).Scan(&s.RawM3, &s.SplitM3, &s.RoundM3)
+	FROM production p CROSS JOIN adjustments a CROSS JOIN shipped s`, orgID).Scan(&s.RawM3, &s.SplitM3, &s.RoundM3)
 	if err != nil {
 		return nil, err
 	}
 	return &s, nil
 }
 
-func (r *Repository) DeleteFirewoodArrival(ctx context.Context, id int64) error {
+func (r *Repository) DeleteFirewoodArrival(ctx context.Context, orgID int64, id int64) error {
 	return pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		if err := lockFirewood(ctx, tx); err != nil {
+		if err := lockOrgShare(ctx, tx, orgID); err != nil {
 			return err
 		}
-		tag, err := tx.Exec(ctx, `DELETE FROM firewood_arrivals WHERE id=$1`, id)
+		if err := lockFirewood(ctx, tx, orgID); err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `DELETE FROM firewood_arrivals WHERE organization_id = $1 AND id=$2`, orgID, id)
 		if err != nil {
 			return err
 		}
 		if tag.RowsAffected() == 0 {
 			return pgx.ErrNoRows
 		}
-		stock, err := readFirewoodStock(ctx, tx)
+		stock, err := readFirewoodStock(ctx, orgID, tx)
 		if err != nil {
 			return err
 		}
@@ -103,12 +110,15 @@ func (r *Repository) DeleteFirewoodArrival(ctx context.Context, id int64) error 
 	})
 }
 
-func (r *Repository) SetFirewoodStock(ctx context.Context, target domain.FirewoodStock, actorID int64) error {
+func (r *Repository) SetFirewoodStock(ctx context.Context, orgID int64, target domain.FirewoodStock, actorID int64) error {
 	return pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		if err := lockFirewood(ctx, tx); err != nil {
+		if err := lockOrgShare(ctx, tx, orgID); err != nil {
 			return err
 		}
-		current, err := readFirewoodStock(ctx, tx)
+		if err := lockFirewood(ctx, tx, orgID); err != nil {
+			return err
+		}
+		current, err := readFirewoodStock(ctx, orgID, tx)
 		if err != nil {
 			return err
 		}
@@ -116,8 +126,8 @@ func (r *Repository) SetFirewoodStock(ctx context.Context, target domain.Firewoo
 			return nil
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO firewood_stock_adjustments
-			(raw_delta_m3, split_delta_m3, round_delta_m3, created_by) VALUES ($1,$2,$3,$4)`,
-			target.RawM3-current.RawM3, target.SplitM3-current.SplitM3, target.RoundM3-current.RoundM3, actorID)
+			(organization_id, raw_delta_m3, split_delta_m3, round_delta_m3, created_by) VALUES ($1, $2,$3,$4,$5)`,
+			orgID, target.RawM3-current.RawM3, target.SplitM3-current.SplitM3, target.RoundM3-current.RoundM3, actorID)
 		return err
 	})
 }

@@ -24,13 +24,17 @@ var ErrPDFFonts = errors.New("шрифты для PDF не найдены на �
 
 // OrderPDF — готовый документ.
 type OrderPDF struct {
+	OrderNumber    int64
+	OrganizationID int64
 	Data           []byte
 	Filename       string
 	OrderCreatedAt time.Time
 }
 
-func PDFFileName(orderID int64) string      { return fmt.Sprintf("Накладная_%d.pdf", orderID) }
-func PDFFileNameASCII(orderID int64) string { return fmt.Sprintf("nakladnaya_%d.pdf", orderID) }
+func PDFFileName(orderNumber int64) string {
+	return fmt.Sprintf("Накладная_%d.pdf", orderNumber)
+}
+func PDFFileNameASCII(orderNumber int64) string { return fmt.Sprintf("nakladnaya_%d.pdf", orderNumber) }
 
 // PDFError — ошибка сборки накладной с названием этапа: по нему сразу видно, что именно сломалось.
 type PDFError struct {
@@ -97,7 +101,7 @@ func (s *PDFService) initFonts(dir string) {
 			continue
 		}
 		fp := &fontPair{name: base, regular: reg, bold: bold}
-		if _, err := s.renderWith(fp, sampleOrder(), sampleLines(), "Проверка", "Проверка", 0); err != nil {
+		if _, err := s.renderWith(fp, sampleOrder(), sampleLines(), "Проверка", "Проверка", 0, s.company, s.info); err != nil {
 			lastErr = fmt.Errorf("шрифт %s: %w", base, err)
 			log.Printf("PDF: шрифт %s не подошёл: %v", base, err)
 			continue
@@ -140,7 +144,7 @@ func findFontDir() string {
 }
 
 // BuildOrderPDF собирает накладную целиком в памяти. Клиент получает файл только если всё удалось.
-func (s *PDFService) BuildOrderPDF(ctx context.Context, orderID int64) (*OrderPDF, error) {
+func (s *PDFService) BuildOrderPDF(ctx context.Context, orgID, orderID int64) (*OrderPDF, error) {
 	if s.active == nil {
 		if s.fontErr != nil && !errors.Is(s.fontErr, ErrPDFFonts) {
 			return nil, &PDFError{Stage: "шрифты", Err: s.fontErr}
@@ -148,19 +152,19 @@ func (s *PDFService) BuildOrderPDF(ctx context.Context, orderID int64) (*OrderPD
 		return nil, ErrPDFFonts
 	}
 
-	order, err := s.repo.GetOrderByID(ctx, orderID)
+	order, err := s.repo.GetOrderByID(ctx, orgID, orderID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrOrderNotFound
 		}
 		return nil, &PDFError{Stage: "заказ", Err: err}
 	}
-	lines, err := s.repo.GetOrderLines(ctx, orderID)
+	lines, err := s.repo.GetOrderLines(ctx, orgID, orderID)
 	if err != nil {
 		return nil, &PDFError{Stage: "позиции заказа", Err: err}
 	}
 
-	client, err := s.repo.GetContractorName(ctx, order.ContractorID)
+	client, err := s.repo.GetContractorName(ctx, orgID, order.ContractorID)
 	if err != nil || strings.TrimSpace(client) == "" {
 		client = fmt.Sprintf("Клиент №%d", order.ContractorID)
 	}
@@ -176,15 +180,27 @@ func (s *PDFService) BuildOrderPDF(ctx context.Context, orderID int64) (*OrderPD
 		}
 	}
 
-	payments, err := s.repo.GetOrderPayments(ctx, orderID)
+	payments, err := s.repo.GetOrderPayments(ctx, orgID, orderID)
 	if err != nil {
 		return nil, &PDFError{Stage: "оплаты заказа", Err: err}
 	}
-	data, err := s.renderWith(s.active, order, lines, client, author, payments.PaidAmount)
+	org, err := s.repo.GetOrganizationByID(ctx, orgID)
+	if err != nil {
+		return nil, &PDFError{Stage: "организация", Err: err}
+	}
+	company, info := strings.TrimSpace(org.Name), strings.TrimSpace(org.CompanyInfo)
+	if company == "" {
+		company = s.company
+	}
+	if info == "" {
+		info = s.info
+	}
+	data, err := s.renderWith(s.active, order, lines, client, author, payments.PaidAmount, company, info)
 	if err != nil {
 		return nil, &PDFError{Stage: "вёрстка", Err: err}
 	}
-	return &OrderPDF{Data: data, Filename: PDFFileName(orderID), OrderCreatedAt: order.CreatedAt}, nil
+	number := documentOrderNumber(order)
+	return &OrderPDF{Data: data, Filename: PDFFileName(number), OrderCreatedAt: order.CreatedAt, OrderNumber: number, OrganizationID: orgID}, nil
 }
 
 const (
@@ -229,7 +245,14 @@ func fitText(pdf *fpdf.Fpdf, style, text string, maxW, size float64) string {
 	return string(r) + "…"
 }
 
-func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domain.OrderLine, client, author string, paid float64) (data []byte, err error) {
+func documentOrderNumber(order *domain.Order) int64 {
+	if order.OrderNumber != 0 {
+		return order.OrderNumber
+	}
+	return order.ID
+}
+
+func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domain.OrderLine, client, author string, paid float64, company, info string) (data []byte, err error) {
 	// Библиотека может паниковать на «неудобных» шрифтах: превращаем панику в обычную ошибку.
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -246,11 +269,14 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 	}
 	pdf.SetMargins(marginX, 15, marginX)
 	pdf.SetAutoPageBreak(false, 0)
-	pdf.SetTitle(fmt.Sprintf("Накладная № %d", order.ID), true)
-	pdf.SetAuthor(s.company, true)
+	pdf.SetTitle(fmt.Sprintf("Накладная № %d", documentOrderNumber(order)), true)
+	pdf.SetAuthor(company, true)
 	pdf.SetCreator("Лесопилка", true)
 
-	footerLeft := fmt.Sprintf("Накладная № %d · %s", order.ID, s.company)
+	footerLeft := fmt.Sprintf("Накладная № %d · %s", documentOrderNumber(order), company)
+	if info != "" {
+		footerLeft += " · " + strings.Join(strings.Fields(info), " ")
+	}
 	pdf.SetFooterFunc(func() {
 		pdf.SetY(-14)
 		pdf.SetDrawColor(205, 205, 205)
@@ -268,10 +294,14 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 	// ----- шапка -----
 	pdf.SetTextColor(30, 30, 30)
 	pdf.SetFont(fontName, "B", 16)
-	pdf.CellFormat(contentW, 8, fmt.Sprintf("ТОВАРНАЯ НАКЛАДНАЯ № %d", order.ID), "", 1, "C", false, 0, "")
+	pdf.CellFormat(contentW, 8, fmt.Sprintf("ТОВАРНАЯ НАКЛАДНАЯ № %d", documentOrderNumber(order)), "", 1, "C", false, 0, "")
 	date := order.CreatedAt.In(time.Local).Format("02.01.2006")
 	pdf.SetFont(fontName, "", 10)
 	pdf.CellFormat(contentW, 6, "от "+date, "", 1, "C", false, 0, "")
+	pdf.CellFormat(contentW, 5, fitText(pdf, "", company, contentW, 10), "", 1, "C", false, 0, "")
+	if info != "" {
+		pdf.CellFormat(contentW, 5, fitText(pdf, "", strings.Join(strings.Fields(info), " "), contentW, 9), "", 1, "C", false, 0, "")
+	}
 	y := pdf.GetY() + 3
 	pdf.SetDrawColor(60, 60, 60)
 	pdf.SetLineWidth(0.4)
@@ -300,13 +330,13 @@ func (s *PDFService) renderWith(fp *fontPair, order *domain.Order, lines []domai
 			pdf.CellFormat(contentW-32, 5.5, line, "", 1, "L", false, 0, "")
 		}
 	}
-	supplier := s.company
-	if s.info != "" {
-		supplier += "\n" + s.info
+	supplier := company
+	if info != "" {
+		supplier += "\n" + info
 	}
 	kv("Поставщик:", supplier)
 	kv("Покупатель:", client)
-	kv("Основание:", fmt.Sprintf("Заказ (заявка) № %d от %s", order.ID, date))
+	kv("Основание:", fmt.Sprintf("Заказ (заявка) № %d от %s", documentOrderNumber(order), date))
 	kv("Ответственный:", author)
 	kv("Примечание:", order.Notes)
 	pdf.Ln(4)

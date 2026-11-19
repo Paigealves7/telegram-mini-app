@@ -22,8 +22,12 @@ type CreateSawingRequest struct {
 }
 
 func (h *SawingHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	limit, offset := pageParams(r, 100, 500)
-	ops, err := h.repo.GetSawingOperations(r.Context(), limit, offset)
+	ops, err := h.repo.GetSawingOperations(r.Context(), orgID, limit, offset)
 	if err != nil {
 		serverError(w, r, "не удалось получить историю распилов", err)
 		return
@@ -33,6 +37,10 @@ func (h *SawingHandler) GetList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SawingHandler) CreateSawing(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	user, ok := currentUser(r)
 	if !ok {
 		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
@@ -60,7 +68,7 @@ func (h *SawingHandler) CreateSawing(w http.ResponseWriter, r *http.Request) {
 		Date:     req.Date,
 	}
 
-	result, err := h.repo.CreateSawingOperation(r.Context(), operation, req.Logs, req.Boards)
+	result, err := h.repo.CreateSawingOperation(r.Context(), orgID, operation, req.Logs, req.Boards)
 	if err != nil {
 		respondError(w, r, "не удалось сохранить распил", err)
 		return

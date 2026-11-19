@@ -20,18 +20,10 @@ type AdminHandler struct {
 	repo *repository.Repository
 }
 
-var resetConfirmationLetters = strings.NewReplacer("C", "С", "B", "Б", "P", "Р", "O", "О")
-
 func (h AdminHandler) ResetTestData(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Confirm string `json:"confirm"`
+	if orgID, ok := requireOrgID(w, r); ok {
+		OrganizationHandler{repo: h.repo}.resetOrganization(w, r, orgID)
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
-		resetConfirmationLetters.Replace(strings.ToUpper(strings.TrimSpace(req.Confirm))) != "СБРОС" {
-		http.Error(w, "для подтверждения введите СБРОС", http.StatusBadRequest)
-		return
-	}
-	adminResult(w, r, "не удалось очистить тестовые данные", h.repo.ResetTestData(r.Context()))
 }
 
 func adminID(w http.ResponseWriter, r *http.Request) (int64, bool) {
@@ -47,19 +39,23 @@ func adminResult(w http.ResponseWriter, r *http.Request, what string, err error)
 	switch {
 	case err == nil:
 		w.WriteHeader(http.StatusNoContent)
-	case errors.Is(err, pgx.ErrNoRows):
+	case errors.Is(err, pgx.ErrNoRows), errors.Is(err, repository.ErrOrganizationNotFound):
 		http.Error(w, "запись не найдена", http.StatusNotFound)
-	case errors.Is(err, repository.ErrOperationInUse), errors.Is(err, repository.ErrOrderSaleLink):
+	case errors.Is(err, repository.ErrOperationInUse), errors.Is(err, repository.ErrOrderSaleLink), errors.Is(err, repository.ErrResetNotDemo):
 		http.Error(w, err.Error(), http.StatusConflict)
 	default:
 		respondError(w, r, what, err)
 	}
 }
 
-func deleteOperation(remove func(context.Context, int64) error) http.HandlerFunc {
+func deleteOperation(remove func(context.Context, int64, int64) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		orgID, ok := requireOrgID(w, r)
+		if !ok {
+			return
+		}
 		if id, ok := adminID(w, r); ok {
-			adminResult(w, r, "не удалось удалить запись", remove(r.Context(), id))
+			adminResult(w, r, "не удалось удалить запись", remove(r.Context(), orgID, id))
 		}
 	}
 }
@@ -69,6 +65,10 @@ func validStockNumber(n, max, scale float64) bool {
 }
 
 func (h AdminHandler) UpdateBoard(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, ok := adminID(w, r)
 	if !ok {
 		return
@@ -101,10 +101,14 @@ func (h AdminHandler) UpdateBoard(w http.ResponseWriter, r *http.Request) {
 	}
 	b.Count, b.VolumeM3 = *req.Count, *req.VolumeM3
 	actor, _ := currentUser(r)
-	adminResult(w, r, "не удалось сохранить позицию склада", h.repo.UpdateBoard(r.Context(), b, actor.UserID))
+	adminResult(w, r, "не удалось сохранить позицию склада", h.repo.UpdateBoard(r.Context(), orgID, b, actor.UserID))
 }
 
 func (h AdminHandler) SetFirewoodStock(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	var req struct {
 		Raw   *float64 `json:"raw_m3"`
 		Split *float64 `json:"split_m3"`
@@ -122,5 +126,5 @@ func (h AdminHandler) SetFirewoodStock(w http.ResponseWriter, r *http.Request) {
 	}
 	actor, _ := currentUser(r)
 	stock := domain.FirewoodStock{RawM3: *req.Raw, SplitM3: *req.Split, RoundM3: *req.Round}
-	adminResult(w, r, "не удалось скорректировать остатки дров", h.repo.SetFirewoodStock(r.Context(), stock, actor.UserID))
+	adminResult(w, r, "не удалось скорректировать остатки дров", h.repo.SetFirewoodStock(r.Context(), orgID, stock, actor.UserID))
 }

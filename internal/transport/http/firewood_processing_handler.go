@@ -15,6 +15,10 @@ import (
 )
 
 func (h *FirewoodHandler) CreateProcessing(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	user, ok := currentUser(r)
 	if !ok {
 		http.Error(w, "ошибка авторизации", 401)
@@ -35,7 +39,7 @@ func (h *FirewoodHandler) CreateProcessing(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "дата: формат ГГГГ-ММ-ДД", 400)
 		return
 	}
-	if err := h.repo.CreateFirewoodProcessing(r.Context(), &p, user.UserID); err != nil {
+	if err := h.repo.CreateFirewoodProcessing(r.Context(), orgID, &p, user.UserID); err != nil {
 		respondError(w, r, "не удалось записать переработку", err)
 		return
 	}
@@ -47,8 +51,12 @@ func validFirewoodVolume(v float64) bool {
 	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0.001 && v <= 100000 && math.Abs(v*1000-math.Round(v*1000)) < 1e-7
 }
 func (h *FirewoodHandler) GetProcessing(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	limit, offset := pageParams(r, 100, 1000)
-	list, err := h.repo.FirewoodProcessing(r.Context(), limit, offset)
+	list, err := h.repo.FirewoodProcessing(r.Context(), orgID, limit, offset)
 	if err != nil {
 		serverError(w, r, "не удалось получить переработку", err)
 		return
@@ -57,12 +65,16 @@ func (h *FirewoodHandler) GetProcessing(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(list)
 }
 func (h *FirewoodHandler) DeleteProcessing(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
 		http.Error(w, "неверный ID", 400)
 		return
 	}
-	err = h.repo.DeleteFirewoodProcessing(r.Context(), id)
+	err = h.repo.DeleteFirewoodProcessing(r.Context(), orgID, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "операция не найдена", 404)
 		return
@@ -78,7 +90,11 @@ func (h *FirewoodHandler) DeleteProcessing(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(204)
 }
 func (h *FirewoodHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
-	s, err := h.repo.FirewoodSettings(r.Context())
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
+	s, err := h.repo.FirewoodSettings(r.Context(), orgID)
 	if err != nil {
 		serverError(w, r, "не удалось загрузить коэффициенты", err)
 		return
@@ -87,6 +103,10 @@ func (h *FirewoodHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(s)
 }
 func (h *FirewoodHandler) SetSettings(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	var s struct {
 		Split float64 `json:"split"`
 		Round float64 `json:"round"`
@@ -95,7 +115,7 @@ func (h *FirewoodHandler) SetSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "коэффициенты: от 0.0001 до 1, до четырёх знаков после запятой", 400)
 		return
 	}
-	if err := h.repo.UpdateFirewoodSettings(r.Context(), s.Split, s.Round); err != nil {
+	if err := h.repo.UpdateFirewoodSettings(r.Context(), orgID, s.Split, s.Round); err != nil {
 		serverError(w, r, "не удалось сохранить коэффициенты", err)
 		return
 	}

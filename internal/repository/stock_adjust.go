@@ -20,7 +20,7 @@ func lenLabel(mm int) string {
 
 // AdjustStock списывает (брак, потеря, свои нужды, другое) или добавляет (излишек) count штук позиции склада
 // и записывает операцию в журнал. Объём пересчитывается пропорционально остатку, как при продаже.
-func (r *Repository) AdjustStock(ctx context.Context, kind string, itemID int64, count int, reason, note string, userID int64) (*domain.StockAdjustment, error) {
+func (r *Repository) AdjustStock(ctx context.Context, orgID int64, kind string, itemID int64, count int, reason, note string, userID int64) (*domain.StockAdjustment, error) {
 	sign := -1
 	if reason == "surplus" {
 		sign = 1
@@ -29,7 +29,7 @@ func (r *Repository) AdjustStock(ctx context.Context, kind string, itemID int64,
 		return nil, ErrLogSurplus
 	}
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (r *Repository) AdjustStock(ctx context.Context, kind string, itemID int64,
 		var h, w, l, cnt int
 		var species, grade string
 		var vol float64
-		err := tx.QueryRow(ctx, `SELECT height_mm, width_mm, length_mm, species, grade, count, volume_m3 FROM boards WHERE id = $1 FOR UPDATE`, itemID).
+		err := tx.QueryRow(ctx, `SELECT height_mm, width_mm, length_mm, species, grade, count, volume_m3 FROM boards WHERE organization_id = $1 AND id = $2 FOR UPDATE`, orgID, itemID).
 			Scan(&h, &w, &l, &species, &grade, &cnt, &vol)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -64,7 +64,7 @@ func (r *Repository) AdjustStock(ctx context.Context, kind string, itemID int64,
 		if newCnt == 0 || newVol < 0 {
 			newVol = 0
 		}
-		if _, err := tx.Exec(ctx, `UPDATE boards SET count = $1, volume_m3 = $2 WHERE id = $3`, newCnt, newVol, itemID); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE boards SET count = $2, volume_m3 = $3 WHERE organization_id = $1 AND id = $4`, orgID, newCnt, newVol, itemID); err != nil {
 			return nil, err
 		}
 		adj.DeltaVolume = float64(sign) * dv
@@ -77,7 +77,7 @@ func (r *Repository) AdjustStock(ctx context.Context, kind string, itemID int64,
 		var l, d, arrival, rc int
 		var species string
 		var rv float64
-		err := tx.QueryRow(ctx, `SELECT length_mm, diameter_mm, species, arrival_id, remaining_count, remaining_volume_m3 FROM log_items WHERE id = $1 FOR UPDATE`, itemID).
+		err := tx.QueryRow(ctx, `SELECT length_mm, diameter_mm, species, arrival_id, remaining_count, remaining_volume_m3 FROM log_items WHERE organization_id = $1 AND id = $2 FOR UPDATE`, orgID, itemID).
 			Scan(&l, &d, &species, &arrival, &rc, &rv)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -93,7 +93,7 @@ func (r *Repository) AdjustStock(ctx context.Context, kind string, itemID int64,
 		if rc-count == 0 || newVol < 0 {
 			newVol = 0
 		}
-		if _, err := tx.Exec(ctx, `UPDATE log_items SET remaining_count = $1, remaining_volume_m3 = $2 WHERE id = $3`, rc-count, newVol, itemID); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE log_items SET remaining_count = $2, remaining_volume_m3 = $3 WHERE organization_id = $1 AND id = $4`, orgID, rc-count, newVol, itemID); err != nil {
 			return nil, err
 		}
 		adj.DeltaVolume = -dv
@@ -103,9 +103,9 @@ func (r *Repository) AdjustStock(ctx context.Context, kind string, itemID int64,
 		return nil, errors.New("неизвестный вид позиции")
 	}
 
-	err = tx.QueryRow(ctx, `INSERT INTO stock_adjustments (kind, item_id, item_label, delta_count, delta_volume, reason, note, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at`,
-		adj.Kind, adj.ItemID, adj.ItemLabel, adj.DeltaCount, adj.DeltaVolume, adj.Reason, adj.Note, userID).Scan(&adj.ID, &adj.CreatedAt)
+	err = tx.QueryRow(ctx, `INSERT INTO stock_adjustments (organization_id, kind, item_id, item_label, delta_count, delta_volume, reason, note, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at`,
+		orgID, adj.Kind, adj.ItemID, adj.ItemLabel, adj.DeltaCount, adj.DeltaVolume, adj.Reason, adj.Note, userID).Scan(&adj.ID, &adj.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -115,12 +115,12 @@ func (r *Repository) AdjustStock(ctx context.Context, kind string, itemID int64,
 	return &adj, nil
 }
 
-func (r *Repository) ListStockAdjustments(ctx context.Context, limit, offset int) ([]domain.StockAdjustment, error) {
+func (r *Repository) ListStockAdjustments(ctx context.Context, orgID int64, limit, offset int) ([]domain.StockAdjustment, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT a.id, a.kind, a.item_id, a.item_label, a.delta_count, a.delta_volume, a.reason, a.note,
 		       COALESCE(a.created_by, 0), COALESCE(NULLIF(u.display_name, ''), u.username, ''), a.created_at
 		FROM stock_adjustments a LEFT JOIN users u ON u.id = a.created_by
-		ORDER BY a.id DESC LIMIT $1 OFFSET $2`, limit, offset)
+		WHERE a.organization_id = $1 ORDER BY a.id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset)
 	if err != nil {
 		return nil, err
 	}

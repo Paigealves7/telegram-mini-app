@@ -34,6 +34,10 @@ type CreateOrderRequest struct {
 }
 
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	user, ok := currentUser(r)
 	if !ok {
 		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
@@ -71,7 +75,7 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		Status:        domain.OrderStatusNew,
 	}
 
-	result, err := h.service.CreateOrder(r.Context(), order, req.Items)
+	result, err := h.service.CreateOrder(r.Context(), orgID, order, req.Items)
 	if err != nil {
 		respondError(w, r, "не удалось создать заказ", err)
 		return
@@ -83,9 +87,13 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	limit, offset := pageParams(r, 200, 1000)
 
-	orders, err := h.repo.GetOrders(r.Context(), limit, offset)
+	orders, err := h.repo.GetOrders(r.Context(), orgID, limit, offset)
 	if err != nil {
 		serverError(w, r, "не удалось получить заказы", err)
 		return
@@ -96,6 +104,10 @@ func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
 		http.Error(w, "неверный ID заказа", http.StatusBadRequest)
@@ -108,7 +120,7 @@ func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "некорректный JSON", http.StatusBadRequest)
 		return
 	}
-	err = h.repo.UpdateOrderStatus(r.Context(), id, req.Status)
+	err = h.repo.UpdateOrderStatus(r.Context(), orgID, id, req.Status)
 	switch {
 	case err == nil:
 		w.WriteHeader(http.StatusNoContent)
@@ -125,6 +137,10 @@ func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 // НОВЫЙ МЕТОД: Завершение заказа
 func (h *OrderHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	orderIDStr := chi.URLParam(r, "id")
 	orderID, err := strconv.ParseInt(orderIDStr, 10, 64)
 	if err != nil {
@@ -138,7 +154,7 @@ func (h *OrderHandler) CompleteOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.service.CompleteOrder(r.Context(), orderID, claims.UserID)
+	err = h.service.CompleteOrder(r.Context(), orgID, orderID, claims.UserID)
 	if err != nil {
 		// Тексты ошибок сервиса уже понятны пользователю; код выбираем по типу.
 		status := http.StatusInternalServerError

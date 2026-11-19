@@ -18,8 +18,12 @@ func NewSalesHandler(service *service.SalesService, repo *repository.Repository)
 }
 
 func (h *SalesHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	limit, offset := pageParams(r, 100, 500)
-	sales, err := h.repo.GetSales(r.Context(), limit, offset)
+	sales, err := h.repo.GetSales(r.Context(), orgID, limit, offset)
 	if err != nil {
 		serverError(w, r, "не удалось получить историю продаж", err)
 		return
@@ -37,6 +41,10 @@ type CreateSaleRequest struct {
 }
 
 func (h *SalesHandler) CreateSale(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	var req CreateSaleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "некорректный JSON", http.StatusBadRequest)
@@ -63,7 +71,7 @@ func (h *SalesHandler) CreateSale(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:     claims.UserID,
 	}
 
-	result, err := h.service.CreateSale(r.Context(), sale, req.Items)
+	result, err := h.service.CreateSale(r.Context(), orgID, sale, req.Items)
 	if err != nil {
 		respondError(w, r, "не удалось провести продажу", err)
 		return

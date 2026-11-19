@@ -17,6 +17,10 @@ func NewLogHandler(repo *repository.Repository) *LogHandler {
 }
 
 func (h *LogHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	limit, offset := pageParams(r, 500, 1000)
 
 	filter := domain.LogFilter{
@@ -29,7 +33,7 @@ func (h *LogHandler) GetList(w http.ResponseWriter, r *http.Request) {
 		filter.DiameterMM = val
 	}
 
-	logs, err := h.repo.GetAllLogs(r.Context(), filter, limit, offset)
+	logs, err := h.repo.GetAllLogs(r.Context(), orgID, filter, limit, offset)
 	if err != nil {
 		serverError(w, r, "не удалось получить список сырья", err)
 		return

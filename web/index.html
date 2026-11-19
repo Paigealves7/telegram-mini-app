@@ -649,6 +649,43 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
  #jl>.card-group>.li:only-of-type{grid-column:1/-1}
 }
 
+
+/* Организации и приглашения */
+.org-title,.org-choice,.org-switch,.org-actions{display:flex;align-items:center;gap:8px;min-width:0}
+.side-brand>svg{flex:none}
+.org-title-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.org-demo{flex:none;white-space:nowrap}
+.org-list{display:grid;gap:8px;min-width:0;margin:16px 0}
+.org-choice,.org-switch{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--line2);border-radius:12px;background:var(--s1);color:var(--t1);text-align:left;transition:transform 100ms var(--ease)}
+.org-choice:active,.org-switch:active{transform:scale(.97)}
+.org-choice>span:first-child,.org-switch>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.org-choice small{display:block;color:var(--t2);margin-top:2px}
+.org-choice svg,.org-switch svg{flex:none;width:16px;height:16px}
+.org-gate{max-width:460px}
+.org-gate .org-list{max-height:min(45dvh,360px);overflow:auto;overscroll-behavior:contain}
+.org-check{margin:12px 0}
+.org-admin-card{display:grid;gap:12px;min-width:0;margin:12px 0;padding:14px;border:1px solid var(--line);border-radius:var(--r-card);background:var(--s1);overflow-wrap:anywhere}
+.org-admin-card p{margin:3px 0}
+.org-actions{flex-wrap:wrap}
+.org-actions .btn{width:auto;min-height:44px;max-width:100%;white-space:normal}
+.org-code{display:block;margin:14px 0;font-size:clamp(20px,6vw,32px);font-weight:700;letter-spacing:.07em;white-space:nowrap}
+.org-editor textarea{width:100%;min-height:92px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--s1);color:inherit;resize:vertical}
+.org-editor .org-checkline{display:flex;align-items:center;gap:8px;margin:12px 0;min-width:0;overflow-wrap:anywhere}
+.org-checkline input{width:18px;height:18px;flex:none}
+body.noauth[data-view="orgs"] #sheet.on{display:block}
+body.noauth[data-view="orgs"] #view{display:block}
+.side-org-switch{display:none}
+.home-org-switch{display:flex;width:44px;min-width:44px;padding:0;justify-content:center}
+.home-org-switch>span,.home-org-switch>svg:last-child{display:none}
+#hact .home-org-switch{flex:none}
+@media(max-width:399px){#title .org-title{gap:4px}#title .org-demo{font-size:9px;padding:3px 4px}body[data-view="home"] #hact .home-reports{display:none}}
+#title .org-title{max-width:100%}
+#title:has(.org-title){min-width:0}
+html.lite .org-choice,html.lite .org-switch{transition:none}
+html.lite .org-choice:active,html.lite .org-switch:active{transform:none}
+@media(prefers-reduced-motion:reduce){.org-choice:active,.org-switch:active{transform:none}}
+@media(min-width:768px){.side-org-switch{display:flex;margin:0 0 12px}.home-org-switch{display:none}.side-brand{margin-bottom:12px}}
+
 </style>
 </head>
 <body class="noauth">
@@ -764,12 +801,21 @@ function perfProbe() {
 }
 
 /* ---------- состояние и утилиты ---------- */
-const S = {role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month', cq: ''};
-const canSuper = () => S.isSuperAdmin && S.accountRole !== 'pending' && !S.previewRole;
+let orgEpoch = 0;
+const staleRequest = new Error('Запрос отменён при смене организации');
+const S = {orgId: +localStorage.getItem('org_id') || 0, orgs: [], org: null, role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month', cq: ''};
+const canSuper = () => S.isSuperAdmin && !S.previewRole;
 let CFG = {pdf_send: true}; // настройки с сервера (/config)
-const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}};
-let MEM = {}; try { MEM = JSON.parse(localStorage.getItem('mem') || '{}'); } catch (e) {}
-const mem = (k, v) => { MEM[k] = v; try { localStorage.setItem('mem', JSON.stringify(MEM)); } catch (e) {} };
+const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}, staff: [], invites: [], organizations: []};
+function formMemory() {
+  try { return JSON.parse(localStorage.getItem('mem_org_' + S.orgId) || '{}') || {}; }
+  catch { return {}; }
+}
+let MEM = formMemory();
+const mem = (k, v) => {
+  MEM[k] = v;
+  try { localStorage.setItem('mem_org_' + S.orgId, JSON.stringify(MEM)); } catch {}
+};
 const hap = t => { try { tg.HapticFeedback.impactOccurred(t || 'light'); } catch (e) {} };
 const notify = t => { try { tg.HapticFeedback.notificationOccurred(t); } catch (e) {} };
 const token = () => localStorage.getItem('jwt_token');
@@ -780,53 +826,119 @@ const sk = n => '<div class="sk"></div>'.repeat(n);
 let tt;
 function toast(m, k = 'ok') { const t = $('#toast'); t.className = k + ' on'; t.innerHTML = ic(k === 'ok' ? 'check' : 'warn') + '<span>' + esc(m) + '</span>'; clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2900); }
 
+function reportError(e) {
+  if (e !== staleRequest) toast(e.message, 'err');
+}
+function run(task) {
+  Promise.resolve(task).catch(reportError);
+}
+
 async function api(path, opts = {}) {
-  const headers = {'Content-Type': 'application/json', ...(opts.headers || {})};
+  const reqEpoch = orgEpoch;
   const session = token();
+  const headers = {'Content-Type': 'application/json', ...(opts.headers || {})};
   if (session) headers.Authorization = 'Bearer ' + session;
+  if (S.orgId > 0) headers['X-Organization-ID'] = String(S.orgId);
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
   let r, text;
   try {
-    r = await fetch('/api/v1' + path, {...opts, headers, signal: controller.signal});
+    r = await fetch('/api/v1' + path, {...opts, cache: 'no-store', headers, signal: controller.signal});
     text = await r.text();
   } catch (e) {
+    if (reqEpoch !== orgEpoch || session !== token()) throw staleRequest;
     if (e.name === 'AbortError') throw new Error('Сервер долго не отвечает. Проверьте соединение и повторите попытку.');
     throw new Error('Не удалось связаться с сервером. Проверьте подключение и повторите попытку.');
   } finally { clearTimeout(timer); }
+  if (reqEpoch !== orgEpoch || session !== token()) throw staleRequest;
   let data = null;
-  if (text) { try { data = JSON.parse(text); } catch (e) { data = null; } }
+  if (text) { try { data = JSON.parse(text); } catch {} }
   if (!r.ok) {
-    const supplied = data && (data.message || data.error || data.detail);
-    const plainMessage = !data && text.trim() ? text.trim() : null;
-    if (r.status === 403 && plainMessage === 'доступ ожидает подтверждения руководителем' &&
-        session && session === token() && S.cur !== 'pending') {
-      S.accountRole = 'pending';
-      vPending();
+    const message = (data && (data.message || data.error || data.detail)) || (!data && text.trim()) || '';
+    const chooseOrg = r.status === 409 && message === 'выберите организацию';
+    const deniedOrg = r.status === 403 && ['доступ ожидает приглашения в организацию', 'нет доступа к выбранной организации'].includes(message);
+    if (session && path !== '/config' && (chooseOrg || deniedOrg)) {
+      resetOrgState(0);
+      orgGate('orgloading', '<section class="login" aria-busy="true">' + sk(3) + '</section>');
+      await loadConfig({forceChoice: true});
+      throw staleRequest;
     }
-    if (r.status === 401 || r.status === 403) throw new Error(supplied || plainMessage || 'Нет доступа. Возможно, нужно войти снова.');
-    if (r.status >= 500) throw new Error(supplied || plainMessage || 'На сервере произошла ошибка. Попробуйте позже.');
-    throw new Error(supplied || plainMessage || (r.status === 400 ? 'Проверьте введённые данные.' : `Не удалось выполнить запрос (${r.status}).`));
+    if (r.status === 401 || r.status === 403) throw new Error(message || 'Нет доступа. Возможно, нужно войти снова.');
+    if (r.status >= 500) throw new Error(message || 'На сервере произошла ошибка. Попробуйте позже.');
+    throw new Error(message || (r.status === 400 ? 'Проверьте введённые данные.' : `Не удалось выполнить запрос (${r.status}).`));
   }
   if (text && data === null) throw new Error('Сервер вернул некорректный ответ. Попробуйте позже.');
   return data;
 }
-const safe = async u => { try { return (await api(u)) || []; } catch (e) { toast(e.message, 'err'); return null; } };
-async function loadConfig() {
-  const session = token();
+
+const safe = async u => {
+  try { return (await api(u)) || []; }
+  catch (e) { if (e === staleRequest) throw e; reportError(e); return null; }
+};
+
+function resetOrgState(id) {
+  orgEpoch++;
+  if (ASK) settle(false);
+  closeSheet();
+  clearTimeout(DEB);
+  statsRequest++;
+  Object.assign(D, {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}, staff: [], invites: [], organizations: []});
+  journalLinks.clear();
+  Object.assign(S, {orgId: +id || 0, org: null, previewRole: '', tab: 'home', stack: [], jt: '', jq: '', wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', donefilter: 'all', cq: '', staffq: '', range: 'month'});
+  FK = null;
+  formParams = {};
+  localStorage.setItem('org_id', S.orgId || '');
+  MEM = formMemory();
+}
+
+async function selectOrg(id) {
+  resetOrgState(id);
+  orgGate('orgloading', '<section class="login" aria-busy="true">' + sk(3) + '</section>');
+  await loadConfig({open: 'home'});
+}
+
+async function loadConfig({open, forceChoice = false, stayAdmin = false} = {}) {
   try {
     const c = await api('/config');
-    if (!c || token() !== session) return false;
+    if (!c) throw new Error('Не удалось загрузить настройки');
+    const id = forceChoice || c.organization?.is_active === false ? 0 : +c.organization_id || 0;
+    const current = S.cur;
+    const previousRole = S.accountRole;
+    if (id !== S.orgId) resetOrgState(id);
     CFG = {...CFG, ...c};
-    if (!Object.hasOwn(ROLE, c.role) || typeof c.is_super_admin !== 'boolean' ||
-        (S.accountRole === c.role && S.isSuperAdmin === c.is_super_admin)) return true;
-    S.accountRole = c.role; S.isSuperAdmin = c.is_super_admin;
+    S.orgs = c.organizations || [];
+    S.org = id ? c.organization || null : null;
+    S.orgId = id;
+    localStorage.setItem('org_id', id || '');
+    S.accountRole = c.role; S.isSuperAdmin = c.is_super_admin === true;
     if (!S.isSuperAdmin) S.previewRole = '';
-    if (c.role === 'pending') { vPending(); return true; }
-    S.role = S.previewRole || (S.isSuperAdmin ? 'manager' : S.accountRole);
-    document.body.classList.remove('noauth');
-    buildTabs(); go(S.cur === 'profile' ? 'profile' : 'home');
+    S.role = S.previewRole || S.accountRole;
+    if (!id) {
+      if (S.isSuperAdmin && (stayAdmin || !S.orgs.length)) await vOrgs();
+      else if (S.orgs.length) vOrgSelect();
+      else vPending();
+    } else {
+      document.body.classList.remove('noauth');
+      buildTabs();
+      if (stayAdmin) {
+        S.cur = 'orgs';
+        document.body.dataset.view = 'orgs';
+        document.body.classList.add('sub');
+        $('#title').textContent = TT.orgs;
+        setAct('orgs');
+        await vOrgs();
+      }
+      else if (open || previousRole !== S.accountRole || ['login', 'pending', 'orgselect', 'orgloading'].includes(current)) {
+        go(open || (current === 'profile' ? 'profile' : 'home'));
+      }
+    }
     return true;
-  } catch (e) { return false; }
+  } catch (e) {
+    if (e === staleRequest) return false;
+    if (forceChoice || S.cur === 'orgloading') {
+      orgGate('orgloading', `<section class="login"><h1>Не удалось загрузить лесопилки</h1><p class="sub">${esc(e.message)}</p><button class="btn" data-a="checkaccess">Повторить</button>${logoutButton()}</section>`);
+    } else reportError(e);
+    return false;
+  }
 }
 async function loadStock() { const [b, l, f] = await Promise.all([safe('/boards'), safe('/logs'), safe('/firewood/stock')]); if (b) D.boards = b; if (l) D.logs = l; if (f) D.fw = f; return !!b && !!l && !!f; }
 async function ensureCon() { if (Object.keys(D.con).length) return true; const list = await safe('/contractors'); if (!list) return false; D.cl = list; list.forEach(c => D.con[c.id] = c.name); return true; }
@@ -880,7 +992,7 @@ function settle(v) {
 }
 /* ---------- навигация ---------- */
 const TABS = ['home', 'stock', 'orders', 'journal', 'stats'];
-const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники', cons: 'Контрагенты', adjlog: 'Корректировки склада'};
+const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники', cons: 'Контрагенты', adjlog: 'Корректировки склада', orgs: 'Организации (Лесопилки)'};
 const canOrd = () => S.role === 'manager' || S.role === 'master';
 const jSegs = () => [canOrd() && ['arrivals', 'Приходы'], S.role !== 'master' && ['production', 'Распилы'], canOrd() && ['sales', 'Продажи']].filter(Boolean);
 
@@ -889,7 +1001,7 @@ function buildTabs() {
   if (canOrd()) t.push(['orders', 'order', 'Заказы']);
   t.push(['journal', 'journal', 'Журнал']);
   if(S.role==='manager') t.push(['stats','chart','Отчёты']);
-  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+'<span>Лесопилка<small>Рабочее пространство</small></span></div>' + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile"><span class="side-avatar">${esc((S.name || '?')[0].toUpperCase())}</span><span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span>${ic('chev')}</button></div>`;
+  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+`<span class="org-title">${orgTitle()}</span></div>` + orgSwitchButton('Сменить лесопилку', 'side-org-switch') + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile"><span class="side-avatar">${esc((S.name || '?')[0].toUpperCase())}</span><span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span>${ic('chev')}</button></div>`;
   theme();
 }
 const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-label="Создать: ${l}" title="Создать: ${l}">${ic('plus')}<span>${l}</span></button>`;
@@ -897,6 +1009,7 @@ function setAct(v) {
   const actions = v === 'staff' ? hbtn('user','Сотрудник') : v === 'cons' ? '<button class="hbtn" data-a="cedit" data-v="new">'+ic('plus')+'<span>Контрагент</span></button>' : v === 'orders' ? hbtn('order', 'Новый заказ')
     : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
   $('#hact').innerHTML = (v === 'home' ?
+    orgSwitchButton('Сменить лесопилку', 'home-org-switch') +
     (S.role === 'manager' ? '<button class="hbtn home-reports" data-a="go" data-v="stats" aria-label="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
     '<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль" title="Профиль">' + esc((S.name || '?')[0].toUpperCase()) + '</button>' : '') + actions;
   theme();
@@ -908,7 +1021,7 @@ function go(v, p) {
     document.body.classList.add('dock-form'); document.body.dataset.activeForm=v;
     sheet(`<h3>${esc(FORMS[v].t)}</h3><div id="formbody"></div>`);
     $('#sb').append($('.act'));
-    vForm(v,p); return;
+    run(vForm(v,p)); return;
   }
   closeSheet();
   if (TABS.includes(v)) { S.tab = v; S.stack = []; } else S.stack.push(S.cur);
@@ -920,16 +1033,17 @@ function show(v, p) {
   closeSheet();
   S.cur = v;
   document.body.dataset.view = v;
-  const f = FORMS[v], sub = !!f || v === 'stats' || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog';
+  const f = FORMS[v], sub = !!f || v === 'stats' || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog' || v === 'orgs';
   document.body.classList.toggle('form', !!f);
   document.body.classList.toggle('sub', sub);
-  $('#title').textContent = f ? f.t : v === 'home' ? 'Лесопилка' : TT[v] || 'Лесопилка';
+  if (v === 'home') $('#title').innerHTML = `<span class="org-title">${orgTitle()}</span>`;
+  else $('#title').textContent = f ? f.t : TT[v] || orgName();
   setAct(v);
   const profileButton=$('.side-profile'); if(profileButton){profileButton.classList.toggle('on',v==='profile');v==='profile'?profileButton.setAttribute('aria-current','page'):profileButton.removeAttribute('aria-current');}
   $$('.tab').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
   try { sub ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {}
   scrollTo(0, 0); $('#workspace').scrollTop=0; $('#view').scrollTop=0;
-  if (f) vForm(v, p); else ({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff, cons: vCons, adjlog: vAdjLog}[v] || (() => {}))();
+  if (f) run(vForm(v, p)); else run(({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff, cons: vCons, adjlog: vAdjLog, orgs: vOrgs}[v] || (() => {}))());
 }
 tg.BackButton.onClick(back);
 $('#hb').innerHTML = ic('back');
@@ -968,9 +1082,11 @@ const sdate = s => { const d = s ? new Date(s) : null; return d && !isNaN(d) ? d
 const oPaid = o => +o.paid_amount || 0;
 const oDue = o => Math.max(osum(o) - oPaid(o), 0);
 const payTxt = o => { const t = osum(o); if (t <= 0 || o.status === 'canceled') return ''; return oPaid(o) >= t - .005 ? 'оплачен' : oPaid(o) > 0 ? 'долг ' + fmt(oDue(o), 0) + ' ₽' : 'не оплачен'; };
+const onum = o => o?.order_number || o?.order_id || o?.id;
+const orderNumberFor = id => onum(D.orders.find(o => o.id == id) || D.debts.find(o => o.order_id == id)) || id;
 const orderContents = o => [...(o.items || []).map(p => { const b = p.height_mm ? p : D.boards.find(x=>x.id==p.board_id) || p; return `${b.height_mm ? boardTitle(b) + ' · ' + lenM(b.length_mm) : 'Доски · позиция №' + p.board_id} — ${fmt(p.count,0)} шт${p.volume_m3 != null ? ' · '+fmt(p.volume_m3,3)+' м³' : ''}`; }), ...(o.firewood_items || []).map(p=>`${FW_NAMES[p.kind] || 'Дрова'} — ${fmt(p.volume_m3,3)} м³`)];
-const oRow = o => { const t = osum(o), paid=oPaid(o), contents=orderContents(o); if(o.status==='completed' && oDue(o)<=.005) return `<button class="order-card order-compact" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(o.id)} · ${esc(sdate(o.created_at))}</b><small>${esc(D.con[o.contractor_id]||'Клиент №'+o.contractor_id)}</small></span><span class="compact-total"><b>${fmt(t,0)} ₽</b><small>✓ Оплачен</small></span><span class="compact-content">${esc(contents.join('; '))}</span></button>`; return `<article class="order-card">
-<button class="order-head" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(o.id)}</b><small>${esc(D.con[o.contractor_id] || 'Клиент №'+o.contractor_id)}</small></span>${stl(o.status)}</button>
+const oRow = o => { const t = osum(o), paid=oPaid(o), contents=orderContents(o); if(o.status==='completed' && oDue(o)<=.005) return `<button class="order-card order-compact" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(onum(o))} · ${esc(sdate(o.created_at))}</b><small>${esc(D.con[o.contractor_id]||'Клиент №'+o.contractor_id)}</small></span><span class="compact-total"><b>${fmt(t,0)} ₽</b><small>✓ Оплачен</small></span><span class="compact-content">${esc(contents.join('; '))}</span></button>`; return `<article class="order-card">
+<button class="order-head" data-a="order" data-v="${esc(o.id)}"><span><b>Заказ №${esc(onum(o))}</b><small>${esc(D.con[o.contractor_id] || 'Клиент №'+o.contractor_id)}</small></span>${stl(o.status)}</button>
 ${contents.length ? `<div class="order-content">${contents.map(x=>`<span>${esc(x)}</span>`).join('')}</div>` : ''}
 <div class="payment-summary"><span>Оплачено <b>${fmt(paid,0)} ₽</b></span><span>${o.status==='canceled' ? 'Отменён' : 'Долг '+fmt(oDue(o),0)+' ₽'}</span></div>
 <div class="bar"><i style="--w:${t>0 ? Math.min(100,paid/t*100) : 0}%"></i></div>
@@ -1001,7 +1117,7 @@ const sQ = (a, b) => `/statistics?start_date=${encodeURIComponent(a)}&end_date=$
 
 const quickActions = () => [canOrd() && ['arrival','Приход леса','arrival'], canOrd() && ['fwarr','Дрова','box'], S.role !== 'master' && ['sawing','Распил','sawing'], canOrd() && ['order','Заказ','order'], !canOrd() && ['fwproc','Переработка дров','box']].filter(Boolean);
 const quickBar = () => quickActions().map(([k,l,i]) => `<button class="quick-btn" data-a="new" data-v="${k}">${ic(i)}<span>${l}</span></button>`).join('');
-const homeOrderRow = o => `<button class="home-order" data-a="order" data-v="${esc(o.id)}"><span>Заказ №${esc(o.id)} · ${esc(D.con[o.contractor_id] || "Клиент №"+o.contractor_id)}</span><b>${fmt(osum(o),0)} ₽</b>${stl(o.status)}</button>`;
+const homeOrderRow = o => `<button class="home-order" data-a="order" data-v="${esc(o.id)}"><span>Заказ №${esc(onum(o))} · ${esc(D.con[o.contractor_id] || "Клиент №"+o.contractor_id)}</span><b>${fmt(osum(o),0)} ₽</b>${stl(o.status)}</button>`;
 async function vHome() {
   const v = $('#view');
   v.innerHTML = `<div class="quickbar">${quickBar()}</div><div id="hd">${sk(4)}</div>`;
@@ -1021,11 +1137,11 @@ async function vHome() {
     ${canOrd() ? `<section class="workspace-card"><div class="sh"><h2>Заказы в работе <span class="tag">${open.length}</span></h2><button class="lnk" data-a="go" data-v="orders">Все →</button></div>${orders ? (open.length ? open.slice(0,3).map(homeOrderRow).join('') : '<p class="mut">Все заказы выполнены</p>') : '<p class="mut">Заказы временно недоступны</p>'}</section>` : ''}
     <section id="rcn" class="workspace-card">${sk(3)}</section></div></div>`;
   v.prepend($('.metrics'));
-  homeExtra(open);
+  run(homeExtra(open));
 }
 /* «Сегодня», изменение за 7 дней, последние действия: считаем из журналов, которые уже отдаёт API */
 async function homeExtra(open) {
-  const q = u => api(u).then(r => r || []).catch(() => null);
+  const q = u => safe(u);
   const [arr, saw, sal] = await Promise.all([canOrd() ? q('/arrivals?limit=100') : null, S.role !== 'master' ? q('/sawing?limit=100') : null, canOrd() ? q('/sales?limit=100') : null]);
   if (S.cur !== 'home' || !$('#tdy')) return;
   const td = ymd(new Date()), w = new Date(); w.setDate(w.getDate() - 6); const w0 = ymd(w);
@@ -1178,7 +1294,7 @@ function orderList() {
   if(S.of==='debt'){ $('#donefilters').innerHTML='';debtList();return; }
   $('#donefilters').innerHTML=S.of==='done'?`<div class="chips">${[['all','Все завершённые'],['due','С долгом'],['paid','Оплаченные']].map(([k,l])=>`<button class="chip ${(S.donefilter||'all')===k?'on':''}" data-a="donefilter" data-v="${k}">${l}</button>`).join('')}</div>`:'';
   const q=S.oq.toLowerCase();
-  const l=D.orders.filter(o=>(S.of==='all'||(S.of==='open')===isOpen(o))&&(!q||`${o.id} ${D.con[o.contractor_id]||''}`.toLowerCase().includes(q))&&(S.of!=='done'||!S.donefilter||S.donefilter==='all'||(S.donefilter==='due'?o.status==='completed'&&oDue(o)>.005:o.status==='completed'&&oDue(o)<=.005))).sort((a,b)=>(new Date(b.created_at)-new Date(a.created_at))||b.id-a.id);
+  const l=D.orders.filter(o=>(S.of==='all'||(S.of==='open')===isOpen(o))&&(!q||`${onum(o)} ${D.con[o.contractor_id]||''}`.toLowerCase().includes(q))&&(S.of!=='done'||!S.donefilter||S.donefilter==='all'||(S.donefilter==='due'?o.status==='completed'&&oDue(o)>.005:o.status==='completed'&&oDue(o)<=.005))).sort((a,b)=>(new Date(b.created_at)-new Date(a.created_at))||b.id-a.id);
   $('#osum').innerHTML=tots([['Заказов',l.length],['Активных',l.filter(isOpen).length],['Сумма, ₽',fmtR(tot(l,osum))]]);
   const section=(title,rows)=>rows.length?grp(title,fmtR(tot(rows,osum))+' ₽',rows.map(oRow).join('')):'';
   const months=rows=>{const g=new Map();rows.forEach(o=>{const key=dayKey(o.created_at).slice(0,7);if(!g.has(key))g.set(key,[]);g.get(key).push(o);});return [...g].map(([k,a])=>section(k?new Date(k+'-01T00:00:00').toLocaleDateString('ru-RU',{month:'long',year:'numeric'}):'Без даты',a)).join('');};
@@ -1189,12 +1305,12 @@ function orderList() {
 async function doComplete(id, btn) {
   btn.disabled = true; btn.classList.add('busy');
   try { await api(`/orders/${id}/complete`, {method: 'PUT'}); notify('success'); toast('Заказ завершён, продажа проведена'); }
-  catch (e) { notify('error'); toast(e.message, 'err'); }
+  catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
   show(S.cur);
 }
 function pdfSheet(id) {
   const row = (a, e, t, d) => `<button class="srow glass rip" data-a="${a}" data-v="${esc(id)}"><span class="e">${ic(e)}</span><span><b>${t}</b><small>${d}</small></span>${ic('chev')}</button>`;
-  sheet(`<h3>Накладная №${esc(id)}</h3><p class="mut" style="margin-bottom:24px">Как получить файл?</p>
+  sheet(`<h3>Накладная №${esc(orderNumberFor(id))}</h3><p class="mut" style="margin-bottom:24px">Как получить файл?</p>
     ${inTg ? (CFG.pdf_send
       ? row('pdfsend', 'send', 'Отправить в чат', 'Бот пришлёт PDF сообщением: его можно открыть, переслать и сохранить')
       : `<div class="srow glass off"><span class="e">${ic('send')}</span><span><b>Отправить в чат</b><small>Отправка PDF в чат пока что недоступна из-за блокировок</small></span></div>`) : ''}
@@ -1219,7 +1335,7 @@ async function pdfDo(kind, id, btn) {
     } else {
       open(l.view_url);
     }
-  } catch (e) { notify('error'); toast(e.message, 'err'); }
+  } catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
   btn.disabled = false;
 }
 
@@ -1288,6 +1404,9 @@ async function loadStats() {
 function vProfile() {
   const j = jwt() || {};
   $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><div><h2>${esc(S.name)}</h2><p class="profile-meta"><span class="role-badge">${esc(ROLE[S.role] || S.role)}</span> ${S.isSuperAdmin ? '<span class="role-badge">Супер-Админ</span>' : ''} · ID ${esc(j.user_id || '—')}</p></div></div>
+    ${orgSwitchButton()}
+    <button class="btn ghost org-check" data-a="orgpending">Войти по коду приглашения</button>
+    ${S.isSuperAdmin ? `<button class="profile-link profile-group" data-a="go" data-v="orgs"><span class="profile-icon">${ic('box')}</span><b>Организации (Лесопилки)</b>${ic('chev')}</button>` : ''}
     <h2 class="profile-heading">Настройки приложения</h2>
     <div class="profile-group settings-group">
       <div class="profile-setting"><div><b>Оформление</b><p class="mut sm">${document.documentElement.dataset.t === 'dark' ? 'Тёмная тема' : 'Светлая тема'}</p></div><button class="sw" role="switch" aria-checked="${document.documentElement.dataset.t === 'dark'}" aria-label="Тёмная тема" data-a="theme"></button></div>
@@ -1298,7 +1417,7 @@ function vProfile() {
       ${S.previewRole ? '<button class="lnk" data-a="previewrole" data-v="">Вернуться в режим супер-админа</button>' : ''}
     </div>` : ''}
     ${S.role === 'manager' ? `<h2 class="profile-heading">Управление</h2><div class="profile-group">${[['staff','user','Сотрудники'],['cons','box','Контрагенты'],['adjlog','box','Корректировки склада'],['stats','chart','Отчёты']].map(([v,i,t])=>`<button class="profile-link" data-a="go" data-v="${v}"><span class="profile-icon">${ic(i)}</span><b>${t}</b>${ic('chev')}</button>`).join('')}</div>` : ''}
-    ${canSuper() ? '<button class="btn ghost admin-delete profile-logout" data-a="resetdata">Очистить тестовые данные (Сброс склада и заказов)</button>' : ''}
+    ${canSuper() && S.org?.is_demo ? '<button class="btn ghost admin-delete profile-logout" data-a="resetdata">Очистить тестовые данные</button>' : ''}
     ${inTg ? '' : '<button class="btn ghost profile-logout" data-a="logout">Выйти</button>'}`;
 }
 /* ---------- корректировки склада (только руководитель) ---------- */
@@ -1339,10 +1458,12 @@ const staffName = u => staffBaseName(u)+(u.id==uid()?' (вы)':'');
 const staffSub = u => u.kind==='telegram' ? (u.tg_username && staffBaseName(u)!=='@'+u.tg_username?'@'+u.tg_username:'Telegram') : 'Вход по паролю';
 async function vStaff() {
   const v=$('#view');v.innerHTML=sk(4);
-  const list=await safe('/users');if(S.cur!=='staff')return;
+  const [list, invites] = await Promise.all([safe('/users'), S.role === 'manager' ? safe('/invites') : []]);
+  if(S.cur!=='staff')return;
   if(!list){v.innerHTML=fail('Не удалось загрузить сотрудников','staff');return;}
   D.staff=list;
-  v.innerHTML=`<div class="filterbar"><div class="srch">${ic('search')}<input id="staffq" placeholder="Поиск по имени, логину, роли" aria-label="Поиск сотрудников" value="${esc(S.staffq||'')}"></div></div><div id="stafflist"></div>`;
+  D.invites=invites || [];
+  v.innerHTML=`<div class="filterbar"><div class="srch">${ic('search')}<input id="staffq" placeholder="Поиск по имени, логину, роли" aria-label="Поиск сотрудников" value="${esc(S.staffq||'')}"></div></div><div id="stafflist"></div>${S.role === 'manager' ? staffInvites(invites) : ''}`;
   staffList();
 }
 function staffList(){
@@ -1351,17 +1472,168 @@ function staffList(){
     .sort((a,b)=>Number(b.role==='pending')-Number(a.role==='pending'));
   $('#stafflist').innerHTML=grp('Сотрудники',list.length,list.map(u=>`<button class="staff-card" data-a="staff" data-v="${esc(u.id)}"><span class="staff-avatar">${esc(Array.from(staffBaseName(u).replace(/^@/,''))[0]?.toUpperCase()||'?')}</span><span class="staff-main"><b>${esc(staffName(u))}</b><small>${esc(staffSub(u))}</small></span><span class="staff-end"><span class="staff-role ${Object.hasOwn(ROLE,u.role)?u.role:'worker'}">${esc(u.role === 'pending' ? 'Ожидает доступа' : canSuper() && u.is_super_admin ? 'Супер-Админ' : ROLE[u.role]||u.role)}</span><small>${esc(sdate(u.created_at))}</small></span></button>`).join('')||none('Сотрудники не найдены'));
 }
-function vPending() {
+const orgName = () => S.org?.name || 'Лесопилка';
+const orgTitle = () => `<span class="org-title-name" title="${esc(orgName())}">${esc(orgName())}</span>${orgDemoBadge(S.org)}`;
+const orgDemoBadge = org => org?.is_demo ? '<span class="role-badge org-demo">ДЕМО</span>' : '';
+const canSwitchOrg = () => S.orgs.length > 1 || S.isSuperAdmin;
+const orgSwitchButton = (label = 'Сменить лесопилку', cls = '') =>
+  canSwitchOrg() ? `<button class="org-switch ${cls}" data-a="orgswitch" aria-label="${esc(label)}" title="${esc(label)}">${ic('box')}<span>${esc(label)}</span>${ic('chev')}</button>` : '';
+const logoutButton = () => inTg ? '' : '<button class="btn ghost" data-a="logout">Выйти</button>';
+
+function orgGate(view, body) {
+  if (ASK) settle(false);
   closeSheet();
-  S.cur = 'pending'; S.role = 'pending'; S.previewRole = '';
+  S.cur = view;
+  document.body.dataset.view = view;
+  document.body.classList.remove('form', 'sub');
   document.body.classList.add('noauth');
   $('#tabs').replaceChildren();
-  try { tg.BackButton.hide(); } catch (e) {}
-  $('#view').innerHTML = `<section class="login"><div class="logo">${ic('lock')}</div>
-    <h1>Доступ ожидает подтверждения</h1>
-    <p class="sub">Ваша учётная запись зарегистрирована (ID: ${esc(jwt()?.user_id || '—')}). Попросите руководителя подтвердить ваш доступ в разделе «Сотрудники».</p>
-    <button class="btn" data-a="checkaccess">Проверить доступ</button></section>`;
+  $('#view').innerHTML = body;
+  try { tg.BackButton.hide(); } catch {}
 }
+
+function orgChoices() {
+  return S.orgs.filter(org => org.is_active).map(org => `
+    <button class="org-choice" data-a="orgpick" data-v="${esc(org.id)}">
+      <span><b>${esc(org.name)}</b><small>${esc(ROLE[org.role] || org.role || '')}</small></span>
+      ${orgDemoBadge(org)}${org.id === S.orgId ? ic('check') : ic('chev')}
+    </button>`).join('') || '<p class="mut">Активных лесопилок пока нет</p>';
+}
+
+function vOrgSelect() {
+  orgGate('orgselect', `<section class="login org-gate"><div class="logo">${ic('box')}</div>
+    <h1>Выберите лесопилку</h1>
+    <div class="org-list">${orgChoices()}</div>
+    <button class="btn ghost" data-a="orgpending">У меня есть код приглашения</button>
+    ${S.isSuperAdmin ? '<button class="btn ghost" data-a="orgadmin">Организации (Лесопилки)</button>' : ''}
+    ${logoutButton()}</section>`);
+}
+
+function vPending() {
+  orgGate('pending', `<section class="login org-gate"><div class="logo">${ic('lock')}</div>
+    <h1>Вход по приглашению</h1>
+    <p class="sub">Введите код, который выдал руководитель лесопилки.</p>
+    <form id="invite-accept">
+      <div class="fld"><label for="invite-code">Код приглашения</label>
+        <input id="invite-code" name="code" type="text" required maxlength="32" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn" type="submit">Войти по коду</button>
+    </form>
+    ${S.org ? '<button class="btn ghost" data-a="orgback">Вернуться в лесопилку</button>' : S.orgs.length ? '<button class="btn ghost" data-a="orgselect">К выбору лесопилки</button>' : ''}
+    <button class="lnk org-check" data-a="checkaccess">Проверить доступ</button>
+    ${logoutButton()}</section>`);
+}
+
+function startInviteCode() {
+  const param = String(tg.initDataUnsafe?.start_param || '').trim();
+  const code = param.replace(/^inv_/i, '');
+  return /^[A-HJ-NP-Z2-9]{10}$/i.test(code) ? code.toUpperCase() : '';
+}
+
+async function acceptOrgInvite(raw) {
+  const code = raw.trim().replace(/^inv_/i, '').toUpperCase();
+  const res = await api('/invites/accept', {method: 'POST', body: JSON.stringify({code})});
+  await selectOrg(res.organization_id);
+  if (S.orgId === res.organization_id && S.org) toast('Доступ к лесопилке получен');
+}
+
+function staffInvites(invites) {
+  const active = (invites || []).filter(i => !i.revoked_at && i.used_count < i.max_uses && Date.parse(i.expires_at) > Date.now());
+  return `<section class="workspace-card">
+    <div class="sh"><h2>Приглашения</h2></div>
+    <button class="btn ghost" data-a="invitecreate">Пригласить по коду</button>
+    <div class="org-list">${invites === null ? '<p class="mut">Не удалось загрузить приглашения</p>' : active.length ? active.map(i => `
+      <article class="org-admin-card"><b>${esc(ROLE[i.role])}</b>
+        <p class="mut">Использовано ${esc(i.used_count)} из ${esc(i.max_uses)} · до ${esc(sdate(i.expires_at))}</p>
+        <div class="org-actions"><button class="btn ghost" data-a="inviterevoke" data-v="${esc(i.id)}">Отозвать</button></div>
+      </article>`).join('') : '<p class="mut">Активных приглашений нет</p>'}</div>
+  </section>`;
+}
+
+function inviteSheet() {
+  if (S.role !== 'manager') return;
+  sheet(`<h3>Пригласить по коду</h3><form id="invite-create" class="org-editor">
+    <div class="fld"><label for="invite-role">Роль</label><select id="invite-role" name="role">
+      ${(canSuper() ? ['master', 'worker', 'manager'] : ['master', 'worker']).map(r => `<option value="${r}">${ROLE[r]}</option>`).join('')}
+    </select></div>
+    <div class="fld"><label for="invite-uses">Количество использований</label><input id="invite-uses" name="max_uses" type="number" min="1" max="2147483647" value="1" required></div>
+    <div class="fld"><label for="invite-days">Срок действия, дней</label><input id="invite-days" name="expires_in_days" type="number" min="1" max="365" value="7" required></div>
+    <button class="btn" type="submit">Создать приглашение</button>
+  </form>`);
+}
+
+function inviteCodeSheet(invite) {
+  const username = String(CFG.bot_username || '').replace(/^@/, '');
+  const link = /^[A-Za-z0-9_]+$/.test(username) ? `https://t.me/${username}?startapp=inv_${encodeURIComponent(invite.code)}` : '';
+  sheet(`<h3>Код приглашения</h3>
+    <p class="mut">${esc(ROLE[invite.role] || invite.role)} · действует до ${esc(sdate(invite.expires_at))}</p>
+    <output class="org-code" id="issued-code">${esc(invite.code)}</output>
+    <button class="btn" data-a="invitecopy">Скопировать код</button>
+    <p class="mut sm org-check">Отправьте код сотруднику. Его можно ввести на экране входа по приглашению.</p>
+    ${link ? `<button class="btn ghost" data-a="invitecopy" data-v="${esc(link)}">Скопировать ссылку Telegram</button>` : ''}`);
+}
+
+async function copyInvite(text) {
+  const value = text || $('#issued-code')?.textContent;
+  if (!value) return;
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(value); toast('Скопировано'); return; }
+    catch {}
+  }
+  const field = document.createElement('textarea');
+  field.value = value;
+  $('#sb').append(field);
+  field.select();
+  let copied;
+  try { copied = document.execCommand('copy'); }
+  finally { field.remove(); }
+  toast(copied ? 'Скопировано' : 'Выделите и скопируйте код вручную', copied ? 'ok' : 'err');
+}
+
+async function vOrgs() {
+  if (!S.isSuperAdmin) return;
+  if (!S.org && (S.cur !== 'orgs' || !document.body.classList.contains('noauth'))) orgGate('orgs', '');
+  const v = $('#view');
+  v.innerHTML = sk(3);
+  const list = await safe('/admin/organizations');
+  if (S.cur !== 'orgs') return;
+  if (!list) {
+    v.innerHTML = '<button class="btn ghost" data-a="orgadmin">Повторить загрузку</button>';
+    return;
+  }
+  D.organizations = list;
+  v.innerHTML = `<section class="${S.org ? 'workspace-card' : 'login org-gate'}">
+    <h2>${list.length ? 'Организации (Лесопилки)' : 'Создайте первую лесопилку'}</h2>
+    <button class="btn org-check" data-a="orgedit">Создать организацию</button>
+    ${list.map(o => `<article class="org-admin-card">
+      <b>${esc(o.name)}</b>
+      <p class="mut">${o.is_active ? 'Активна' : 'Скрыта'} · ${o.is_demo ? 'Демо' : 'Рабочая'}</p>
+      <div class="org-actions">
+        ${o.is_active && o.id !== S.orgId ? `<button class="btn ghost" data-a="orgpick" data-v="${esc(o.id)}">Переключиться</button>` : ''}
+        <button class="btn ghost" data-a="orgedit" data-v="${esc(o.id)}">Редактировать</button>
+        ${o.is_active ? `<button class="btn ghost" data-a="orgmanagerinvite" data-v="${esc(o.id)}">Выдать код руководителю</button>` : ''}
+      </div>
+    </article>`).join('')}
+    ${!S.org && S.orgs.length ? '<button class="btn ghost" data-a="orgselect">К выбору лесопилки</button>' : ''}
+    ${!S.org ? logoutButton() : ''}
+  </section>`;
+}
+
+function orgEditor(id) {
+  if (!S.isSuperAdmin) return;
+  const org = id ? D.organizations.find(o => o.id === +id) : null;
+  if (id && !org) return;
+  sheet(`<h3>${org ? 'Редактировать организацию' : 'Создать организацию'}</h3>
+    <form id="org-editor" class="org-editor" data-org-id="${esc(org?.id || '')}">
+      <div class="fld"><label for="org-name">Название</label><input id="org-name" name="name" value="${esc(org?.name || '')}" required></div>
+      <div class="fld"><label for="org-info">Реквизиты для PDF</label><textarea id="org-info" name="company_info">${esc(org?.company_info || '')}</textarea></div>
+      <label class="org-checkline"><input type="checkbox" name="is_demo" ${org?.is_demo ? 'checked' : ''}>Демонстрационная организация</label>
+      ${org ? `<label class="org-checkline"><input type="checkbox" name="is_active" ${org.is_active ? 'checked' : ''}>Активна</label>`
+        : '<label class="org-checkline"><input type="checkbox" name="create_manager_invite" checked>Создать одноразовый код для руководителя</label>'}
+      <button class="btn" type="submit">${org ? 'Сохранить' : 'Создать'}</button>
+    </form>`);
+}
+
 function vLogin(msg) {
   document.body.classList.add('noauth'); S.cur = 'login';
   $('#view').innerHTML = `<section class="login"><div class="logo">${ic('mark')}</div><h1>Лесопилка</h1><p class="sub">Учёт производства</p>
@@ -1376,28 +1648,43 @@ function vAuthErr(msg) {
 }
 async function login() {
   const b = $('#lb'), u = $('#lu').value.trim();
+  if (b.disabled) return;
   b.disabled = true; b.classList.add('busy');
   try {
     const d = await api('/auth/login', {method: 'POST', body: JSON.stringify({username: u, password: $('#lp').value})});
-    if (d?.token) { localStorage.setItem('uname', u); finish(d.token, u); }
-  } catch (e) { notify('error'); toast(e.message, 'err'); }
+    if (d?.token) { localStorage.setItem('uname', u); await finish(d.token, u); }
+  } catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
   b.disabled = false; b.classList.remove('busy');
 }
-function finish(tkn, name) {
+async function finish(tkn, name) {
+  const priorUser = jwt()?.user_id;
   localStorage.setItem('jwt_token', tkn);
   const account = jwt() || {};
-  S.accountRole = account.role || 'worker'; S.isSuperAdmin = account.is_super_admin === true; S.previewRole = '';
-  S.role = S.isSuperAdmin ? 'manager' : S.accountRole; S.name = name || localStorage.getItem('uname') || 'Сотрудник';
-  if (S.accountRole === 'pending') { vPending(); loadConfig(); return; }
-  document.body.classList.remove('noauth'); buildTabs(); loadConfig(); go('home'); perfProbe();
+  resetOrgState(priorUser && priorUser !== account.user_id ? 0 : S.orgId);
+  S.orgs = [];
+  S.accountRole = account.role || 'pending';
+  S.isSuperAdmin = account.is_super_admin === true;
+  S.name = name || localStorage.getItem('uname') || 'Сотрудник';
+  orgGate('orgloading', '<section class="login" aria-busy="true">' + sk(3) + '</section>');
+  const code = startInviteCode();
+  if (code) {
+    const key = 'invite_attempt_' + account.user_id + '_' + code;
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      try { await acceptOrgInvite(code); perfProbe(); return; }
+      catch (e) { if (e === staleRequest) return; reportError(e); }
+    }
+  }
+  await loadConfig({open: 'home'});
+  perfProbe();
 }
 async function tgAuth() {
   document.body.classList.add('noauth'); $('#view').innerHTML = sk(2);
   try {
     const d = await api('/auth/telegram', {method: 'POST', body: JSON.stringify({init_data: tg.initData})});
     if (!d?.token) throw new Error('Токен не получен');
-    finish(d.token, tg.initDataUnsafe?.user?.first_name || 'User');
-  } catch (e) { vAuthErr(e.message); }
+    await finish(d.token, tg.initDataUnsafe?.user?.first_name || 'User');
+  } catch (e) { if (e === staleRequest) return; vAuthErr(e.message); }
 }
 
 /* ---------- формы ---------- */
@@ -1594,7 +1881,7 @@ FORMS.fwsettings = {
 async function fwHistory(offset=0){
  try { const rows=await api('/firewood/processing?limit=50&offset='+offset);
  sheet('<h2>Переработка дров</h2>'+rows.map(p=>`<div class="dl"><div><b>${esc(FW_NAMES[p.kind])}: ${fmt(p.volume_m3,3)} м³</b><p>${esc(p.date)} · ${esc(p.performer)}</p><p>Сырьё: ${fmt(p.raw_m3,4)} м³ · коэффициент ${p.coefficient}</p><p>${esc(p.comment)}</p></div>${S.role==='manager'?`<button class="lnk" data-a="fwdelete" data-v="${p.id}">Удалить</button>`:''}</div>`).join('')+`${offset?`<button class="btn ghost" data-a="fwhistory" data-v="${Math.max(0,offset-50)}">Назад</button>`:''}${rows.length===50?`<button class="btn ghost" data-a="fwhistory" data-v="${offset+50}">Далее</button>`:''}`);
- }catch(e){toast(e.message,'err')}
+ }catch(e){ if (e === staleRequest) return;toast(e.message,'err')}
 }
 let FK = null, formParams = {}, rowSerial = 0;
 const fe = (k, scope = document) => $(`input[data-k="${k}"],select[data-k="${k}"]`, scope);
@@ -1703,7 +1990,7 @@ async function vForm(kind, p = {}) {
       if(!active())return;
       if(kind==='fwsettings'){fe('split').value=settings.split;fe('round').value=settings.round;}
       else {FORMS.fwproc.pv=v=>`<div class="pvr"><span>Списание сырья</span><b>${fmt(v.vol*settings[v.kind],4)} м³</b></div><p class="hint">Коэффициент: ${settings[v.kind]}. При сохранении применяется актуальный коэффициент из настроек.</p>`;if(!$('#pv'))target.insertAdjacentHTML('beforeend','<section class="pv" id="pv"></section>');}
-    }catch(e){toast(e.message,'err');$('#ok').disabled=true;return;}
+    }catch(e){ if (e === staleRequest) return;toast(e.message,'err');$('#ok').disabled=true;return;}
   }
   if (kind === 'sawing') syncLog();
   calcForm();
@@ -1721,7 +2008,7 @@ async function submitForm() {
     if (firstBoard) mem('price', firstBoard.price);
     if (kind === 'arrival') mem('species', v.rows[0].species);
     notify('success'); toast(F.done); F.after === 'back' ? back() : go(F.after);
-  } catch (er) { notify('error'); toast(er.message, 'err'); }
+  } catch (er) { if (er === staleRequest) return; notify('error'); toast(er.message, 'err'); }
   b.disabled = false; b.classList.remove('busy');
 }
 
@@ -1755,51 +2042,75 @@ const FW_STOCK_EDITOR = [
 ];
 const ACT = {
  fwhistory:v=>fwHistory(+v||0),
- fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){toast(e.message,'err')}},
+ fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){ if (e === staleRequest) return;toast(e.message,'err')}},
   theme: toggleTheme,
   previewrole: role => {
     if (!S.isSuperAdmin || (role && !STAFF_ROLES.includes(role))) return;
-    S.previewRole = role; S.role = role || 'manager'; S.tab = 'home'; S.stack = [];
+    S.previewRole = role; S.role = role || S.accountRole; S.tab = 'home'; S.stack = [];
     buildTabs(); show('profile');
+  },
+  orgswitch: () => sheet(`<h3>Выберите лесопилку</h3><div class="org-list">${orgChoices()}</div>
+    <button class="btn ghost" data-a="orgpending">У меня есть код приглашения</button>`),
+  orgpick: id => selectOrg(id),
+  orgpending: vPending,
+  orgback: () => loadConfig({open: 'home'}),
+  orgselect: vOrgSelect,
+  orgadmin: () => S.org ? go('orgs') : vOrgs(),
+  orgedit: orgEditor,
+  invitecreate: inviteSheet,
+  invitecopy: copyInvite,
+  orgmanagerinvite: async (id, button) => {
+    if (!S.isSuperAdmin) return;
+    button.disabled = true;
+    try {
+      const invite = await api(`/admin/organizations/${id}/invites`, {method: 'POST', body: JSON.stringify({role: 'manager', max_uses: 1, expires_in_days: 7})});
+      inviteCodeSheet(invite);
+    } finally { button.disabled = false; }
+  },
+  inviterevoke: async id => {
+    if (!await ask('user', 'Отозвать приглашение?', 'По этому коду больше нельзя будет войти.', 'Отозвать')) return;
+    await api(`/invites/${id}`, {method: 'DELETE'});
+    toast('Приглашение отозвано');
+    if (S.cur === 'staff') await vStaff();
   },
   checkaccess: async (_, button) => {
     button.disabled = true;
-    if (inTg) await tgAuth();
-    else if (!await loadConfig()) {
-      if ((jwt()?.exp || 0) * 1000 <= Date.now()) vLogin();
-      else toast('Не удалось проверить доступ. Повторите попытку.', 'err');
-    } else if (S.cur === 'pending') toast('Доступ ещё ожидает подтверждения');
-    button.disabled = false;
+    try {
+      if ((jwt()?.exp || 0) * 1000 <= Date.now()) {
+        if (inTg) await tgAuth();
+        else vLogin();
+      } else await loadConfig({open: 'home'});
+    } finally { button.disabled = false; }
   },
   resetdata: () => {
-    if (!canSuper()) return;
+    if (!canSuper() || !S.org?.is_demo) return;
     sheet(`<h3>Очистить тестовые данные</h3>
-      <p class="mut">Все заказы, оплаты, продажи, приходы, распилы и корректировки будут удалены. Остатки обнулятся, нумерация заказов начнётся с №1.</p>
+      <p class="mut">Очистить тестовые данные в демо-организации «${esc(S.org.name)}»?</p>
+      <p class="mut">Операции будут удалены, остатки обнулятся, нумерация заказов начнётся с №1.</p>
       <div class="fld"><label for="reset-word">Для подтверждения введите СБРОС</label><input id="reset-word" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false"></div>
-      <button class="btn ghost admin-delete" data-a="resetdataok">Очистить данные</button>`);
+      <button class="btn ghost admin-delete" data-a="resetdataok" data-v="${esc(S.org.id)}">Очистить данные</button>`);
   },
-  resetdataok: async (_, button) => {
-    if (!canSuper()) return;
+  resetdataok: async (id, button) => {
+    if (!canSuper() || !S.org?.is_demo || S.org.id !== +id) return;
     const input = $('#sheet.on #sb input#reset-word');
     if (!input) return;
     const confirm = input.value.trim().toUpperCase().replace(/C/g,'С').replace(/B/g,'Б').replace(/P/g,'Р').replace(/O/g,'О');
     if (confirm !== 'СБРОС') { input.focus(); toast('Для подтверждения введите СБРОС', 'err'); return; }
     button.disabled = true;
     try {
-      await api('/admin/reset-test-data', {method:'POST', body:JSON.stringify({confirm})});
-      if (button.isConnected) go('home');
-      notify('success'); toast('Тестовые данные очищены');
-    } catch (e) { notify('error'); toast(e.message, 'err'); }
-    finally { button.disabled = false; }
+      await api(`/admin/organizations/${id}/reset-test-data`, {method:'POST', body:JSON.stringify({confirm})});
+      await selectOrg(id);
+      if (S.org?.id === +id) { notify('success'); toast('Тестовые данные очищены'); }
+    } finally { button.disabled = false; }
   },
   homekpi: v => { if(['boards','logs','firewood'].includes(v)){S.wt=v;S.wq='';S.wsp='';go('stock');}else{if(v==='orders'){S.of='open';S.oq='';}go(v);} },
   go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK, formParams),
-  logout: () => { localStorage.removeItem('jwt_token'); S.stack = []; buildTabs(); vLogin(); $('#tabs').innerHTML = ''; },
+  logout: () => { localStorage.removeItem('jwt_token'); resetOrgState(0); S.orgs = []; S.isSuperAdmin = false; orgGate('login', ''); vLogin(); },
   new: v => { closeSheet(); go(v); },
   order: v => {
     const o = D.orders.find(x => x.id == v); if (!o) return;
     const positions = (o.items?.length || 0) + (o.firewood_items?.length || 0);
-    sheet(`<h3>Заказ №${esc(o.id)}</h3>
+    sheet(`<h3>Заказ №${esc(onum(o))}</h3>
       <div class="dl"><span class="mut">Клиент</span><b>${esc(D.con[o.contractor_id] || 'Клиент №' + o.contractor_id)}</b></div>
       <div class="dl"><span class="mut">Статус</span>${stl(o.status, 1)}</div><div class="order-content">${orderContents({...o,firewood_items:[]}).map(x=>`<span>${esc(x)}</span>`).join('')}</div>
 ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}</span><b>${fmt(p.volume_m3,3)} м³ × ${fmt(p.price,2)} ₽</b></div>`).join('')}
@@ -1820,12 +2131,13 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
     const [kind, id] = key.split(':'), action = ADMIN_DELETE[kind], view = S.cur;
     if (!canSuper() || !action || (kind === 'staff' && id == uid())) return;
     const [path, description] = action;
-    if (!await ask('ok', kind === 'staff' ? 'Удалить сотрудника?' : 'Удалить запись №' + id + '?', description, 'Удалить')) return;
+    if (!await ask('ok', kind === 'staff' ? 'Удалить сотрудника?' : (kind === 'order' ? 'Удалить заказ №' + orderNumberFor(id) : 'Удалить запись №' + id) + '?', description, 'Удалить')) return;
     try {
       await api(`${path}/${id}`, {method:'DELETE'});
       notify('success'); toast(kind === 'staff' ? 'Сотрудник удалён' : 'Запись удалена');
       if (S.cur === view && !$('#sheet').classList.contains('on')) show(view);
     } catch (e) {
+      if (e === staleRequest) return;
       if (S.cur === view && !$('#sheet').classList.contains('on')) {
         if (kind === 'order' || kind === 'staff') ACT[kind](id);
         else ACT.opdetail(key);
@@ -1836,13 +2148,14 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
   ostatus: async (v, el) => {
     const [id, status] = v.split(':'), cancel = status === 'canceled';
     const fromDetail = !!el.closest('#sheet'), view = S.cur;
-    if (cancel && !await ask('order', `Отменить заказ №${id}?`, 'Отменённый заказ будет закрыт.', 'Отменить заказ')) return;
+    if (cancel && !await ask('order', `Отменить заказ №${orderNumberFor(id)}?`, 'Отменённый заказ будет закрыт.', 'Отменить заказ')) return;
     el.disabled = true;
     try {
       await api(`/orders/${id}/status`, {method:'PUT', body:JSON.stringify({status})});
       notify('success'); toast(cancel ? 'Заказ отменён' : 'Заказ взят в работу');
       if (S.cur === view) show(view);
     } catch (e) {
+      if (e === staleRequest) return;
       if (cancel && fromDetail && S.cur === view && !$('#sheet').classList.contains('on')) ACT.order(id);
       notify('error'); toast(e.message, 'err');
     } finally { el.disabled = false; }
@@ -1850,14 +2163,14 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
   debtc: v => {
     const a = D.debts.filter(d => d.contractor_id == v);
     sheet(`<h3>${esc(D.con[v] || 'Клиент №' + v)}</h3><p class="mut">Долг: ${fmt(tot(a, x => x.due), 2)} ₽</p>
-      ${a.map(d => li(`Заказ №${esc(d.order_id)}`, esc(sdate(d.created_at)), `${fmt(d.due, 0)} ₽`, `из ${fmt(d.total, 0)} ₽`, {a: 'pay', d: d.order_id})).join('')}`);
+      ${a.map(d => li(`Заказ №${esc(onum(d))}`, esc(sdate(d.created_at)), `${fmt(d.due, 0)} ₽`, `из ${fmt(d.total, 0)} ₽`, {a: 'pay', d: d.order_id})).join('')}`);
   },
   pay: async v => {
-    let d; try { d = await api(`/orders/${v}/payments`); } catch (e) { toast(e.message, 'err'); return; }
+    let d; try { d = await api(`/orders/${v}/payments`); } catch (e) { if (e === staleRequest) return; toast(e.message, 'err'); return; }
     await ensureCon();
     const due = Math.max(Math.round((d.total_price - d.paid_amount) * 100) / 100, 0), mgr = S.role === 'manager';
     const hist = (d.payments || []).map(p => li(esc(fmt(p.amount, 2) + ' ₽'), esc(p.note || ''), '', esc(new Date(p.created_at).toLocaleDateString('ru-RU', {day: 'numeric', month: 'short', year: 'numeric'})), mgr ? {a: 'payx', d: p.id + ':' + v} : {})).join('');
-    sheet(`<h3>Оплата · заказ №${esc(v)}</h3><p class="mut">${esc(D.con[d.contractor_id] || 'Клиент №' + d.contractor_id)}</p>
+    sheet(`<h3>Оплата · заказ №${esc(onum(d) || v)}</h3><p class="mut">${esc(D.con[d.contractor_id] || 'Клиент №' + d.contractor_id)}</p>
       <div class="dl"><span class="mut">Сумма заказа</span><b>${fmt(d.total_price, 2)} ₽</b></div>
       <div class="dl"><span class="mut">Оплачено</span><b>${fmt(d.paid_amount, 2)} ₽</b></div>
       <div class="dl"><span class="mut">Остаток</span><b>${fmt(due, 2)} ₽</b></div>
@@ -1873,14 +2186,14 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
     try {
       await api(`/orders/${v}/payments`, {method: 'POST', body: JSON.stringify({amount: a, note: $('#pn').value.trim()})});
       notify('success'); closeSheet(); toast('Оплата записана'); if (S.cur === 'orders') vOrders(true);
-    } catch (e) { notify('error'); toast(e.message, 'err'); el.disabled = false; }
+    } catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); el.disabled = false; }
   },
   payx: v => {
     const [pid, oid] = v.split(':');
     ask('ok', 'Удалить оплату', 'Оплата будет убрана из истории, а долг по заказу вырастет.', 'Удалить').then(async ok => {
       if (!ok) return;
       try { await api(`/payments/${pid}`, {method: 'DELETE'}); notify('success'); toast('Оплата удалена'); if (S.cur === 'orders') vOrders(true); ACT.pay(oid); }
-      catch (e) { notify('error'); toast(e.message, 'err'); }
+      catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
     });
   },
   cedit: v => {
@@ -1904,7 +2217,7 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
     try {
       await api(id ? `/contractors/${id}` : '/contractors', {method: id ? 'PUT' : 'POST', body: JSON.stringify({name, ...f, is_active: old ? old.is_active : true})});
       notify('success'); closeSheet(); toast(id ? 'Сохранено' : 'Контрагент добавлен'); vCons();
-    } catch (e) { notify('error'); toast(e.message, 'err'); el.disabled = false; }
+    } catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); el.disabled = false; }
   },
   cact: async (v, el) => {
     const c = D.cl.find(x => x.id == v); if (!c) return;
@@ -1912,22 +2225,22 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
     try {
       await api(`/contractors/${v}`, {method: 'PUT', body: JSON.stringify({name: c.name, is_supplier: c.is_supplier, is_carrier: c.is_carrier, is_client: c.is_client, is_active: !c.is_active})});
       notify('success'); closeSheet(); toast(c.is_active ? 'Скрыт из списков' : 'Возвращён в списки'); vCons();
-    } catch (e) { notify('error'); toast(e.message, 'err'); el.disabled = false; }
+    } catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); el.disabled = false; }
   },
   cdel: v => {
     const c = D.cl.find(x => x.id == v); if (!c) return;
     ask('user', 'Удалить контрагента', c.name, 'Удалить').then(async ok => {
       if (!ok) return;
       try { await api(`/contractors/${v}`, {method: 'DELETE'}); notify('success'); toast('Контрагент удалён'); vCons(); }
-      catch (e) { notify('error'); toast(e.message, 'err'); }
+      catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
     });
   },
   staff: v => {
     const u = (D.staff || []).find(x => x.id == v); if (!u) return;
     const self = u.id == uid(), protectedAccount = u.is_super_admin && !canSuper();
-    const roles = self || protectedAccount ? [] : canSuper() ? Object.keys(ROLE) : u.role === 'manager' ? [] : ['master','worker','pending'];
+    const roles = self || protectedAccount ? [] : canSuper() ? STAFF_ROLES : u.role === 'manager' ? [] : ['master','worker'];
     const btns = roles.filter(r => r !== u.role).map(r => `<button class="btn" data-a="srole" data-v="${u.id}:${r}">${r === 'pending' ? 'Заблокировать доступ' : 'Назначить: ' + esc(ROLE[r])}</button>`).join('') +
-      (u.kind === 'password' && !protectedAccount ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '') +
+      (u.kind === 'password' && canSuper() ? `<button class="btn ghost" data-a="spw" data-v="${u.id}">Сменить пароль</button>` : '') +
       (self ? '' : deleteButton('staff', u.id, 'Удалить сотрудника'));
     sheet(`<h3>${esc(staffName(u))}</h3>
       <div class="dl"><span class="mut">Вход</span><b>${u.kind === 'telegram' ? 'Через Telegram' : 'Логин и пароль'}</b></div>
@@ -1943,7 +2256,7 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
       await api(`/users/${id}/role`, {method: 'PUT', body: JSON.stringify({role})});
       if (S.cur === 'staff') { closeSheet(); vStaff(); }
       notify('success'); toast('Роль изменена');
-    } catch (e) { notify('error'); toast(e.message, 'err'); }
+    } catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
     finally { button.disabled = false; }
   },
   spw: v => {
@@ -1957,7 +2270,7 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
     if (n < 8 || n > 72) { notify('error'); toast('Пароль: от 8 до 72 символов', 'err'); return; }
     el.disabled = true;
     try { await api(`/users/${v}/password`, {method: 'PUT', body: JSON.stringify({password: p})}); notify('success'); closeSheet(); toast('Пароль изменён'); }
-    catch (e) { notify('error'); toast(e.message, 'err'); el.disabled = false; }
+    catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); el.disabled = false; }
   },
   jt: v => { S.jt = v; vJournal(); },
   wt: v => { S.wt = v; S.wsp = ''; vStock(false); },
@@ -2014,11 +2327,11 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
       try {
         await api('/stock/adjust', {method: 'POST', body: JSON.stringify({kind: t === 'boards' ? 'board' : 'log', item_id: +id, count: n, reason: r, note})});
         notify('success'); toast('Остаток исправлен'); if (S.cur === 'stock') vStock(true);
-      } catch (e) { notify('error'); toast(e.message, 'err'); }
+      } catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
     });
   },
   mk: v => { const [f, k, id] = v.split(':'); closeSheet(); go(f, {[k]: id}); },
-  done: (v, el) => ask('ok', 'Завершить заказ №' + v, 'Товары будут списаны со склада и проведены как продажа.', 'Завершить').then(ok => ok && doComplete(v, el)),
+  done: (v, el) => ask('ok', 'Завершить заказ №' + orderNumberFor(v), 'Товары будут списаны со склада и проведены как продажа.', 'Завершить').then(ok => ok && doComplete(v, el)),
   pdf: v => pdfSheet(v), pdfsend: (v, el) => pdfDo('send', v, el), pdfdl: (v, el) => pdfDo('dl', v, el), pdfview: (v, el) => pdfDo('view', v, el),
   addrow: type => { const row = addFormRow(type); row?.querySelector('input,select')?.focus(); calcForm(); },
   removerow: (_, el) => { el.closest('[data-form-row]').remove(); $('#form-rows + .form-row-tools button')?.focus(); calcForm(); },
@@ -2040,10 +2353,43 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return;
-  const f = ACT[el.dataset.a]; if (f) { hap(); f(el.dataset.v, el); }
+  const f = ACT[el.dataset.a]; if (f) { hap(); run(f(el.dataset.v, el)); }
 });
 document.addEventListener('submit', async e => {
   const form = e.target;
+  if (['invite-accept', 'invite-create', 'org-editor'].includes(form.id)) {
+    e.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    if (!button || button.disabled) return;
+    const fields = new FormData(form);
+    button.disabled = true;
+    try {
+      if (form.id === 'invite-accept') {
+        await acceptOrgInvite(String(fields.get('code') || ''));
+      } else if (form.id === 'invite-create') {
+        if (S.role !== 'manager') return;
+        const payload = {role: fields.get('role'), max_uses: +fields.get('max_uses'), expires_in_days: +fields.get('expires_in_days')};
+        const invite = await api('/invites', {method: 'POST', body: JSON.stringify(payload)});
+        if (S.cur === 'staff') run(vStaff());
+        inviteCodeSheet(invite);
+      } else {
+        if (!S.isSuperAdmin) return;
+        const id = +form.dataset.orgId;
+        const payload = {name: fields.get('name'), company_info: fields.get('company_info'), is_demo: fields.has('is_demo')};
+        if (id) payload.is_active = fields.has('is_active');
+        else payload.create_manager_invite = fields.has('create_manager_invite');
+        const result = await api(id ? `/admin/organizations/${id}` : '/admin/organizations', {method: id ? 'PUT' : 'POST', body: JSON.stringify(payload)});
+        closeSheet();
+        if (id && id === S.orgId && !payload.is_active) resetOrgState(0);
+        await loadConfig({stayAdmin: true});
+        if (S.cur !== 'orgs') return;
+        if (result.manager_invite?.code) inviteCodeSheet(result.manager_invite);
+        toast(result.manager_invite_error || (id ? 'Организация обновлена' : 'Организация создана'), result.manager_invite_error ? 'err' : 'ok');
+      }
+    } catch (error) { reportError(error); }
+    finally { button.disabled = false; }
+    return;
+  }
   if (form.id !== 'stockedit') return;
   e.preventDefault();
   if (!canSuper()) return;
@@ -2062,7 +2408,7 @@ document.addEventListener('submit', async e => {
     await api(kind === 'board' ? '/boards/' + id : '/firewood/stock', {method:'PUT', body:JSON.stringify(patch)});
     notify('success'); toast('Остатки обновлены');
     if (form.isConnected && S.cur === 'stock') show('stock');
-  } catch (err) { toast(err.message, 'err'); }
+  } catch (err) { if (err === staleRequest) return; toast(err.message, 'err'); }
   finally { button.disabled = false; }
 });
 document.addEventListener('input', e => {
@@ -2082,8 +2428,8 @@ document.addEventListener('change', e => {
 document.addEventListener('keydown', e => { if(e.key==='Escape' && $('#sheet').classList.contains('on')) { settle(false); return; } if (e.key === 'Enter' && e.target.id === 'lp') login(); });
 
 /* ---------- старт ---------- */
-if (inTg) tgAuth();
-else { const j = jwt(); if (j && j.exp * 1000 > Date.now()) finish(token()); else vLogin(); }
+if (inTg) run(tgAuth());
+else { const j = jwt(); if (j && j.exp * 1000 > Date.now()) run(finish(token())); else vLogin(); }
 </script>
 </body>
 </html>

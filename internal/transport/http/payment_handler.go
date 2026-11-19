@@ -33,11 +33,15 @@ func idParam(w http.ResponseWriter, r *http.Request) (int64, bool) {
 }
 
 func (h *PaymentHandler) List(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, ok := idParam(w, r)
 	if !ok {
 		return
 	}
-	res, err := h.repo.GetOrderPayments(r.Context(), id)
+	res, err := h.repo.GetOrderPayments(r.Context(), orgID, id)
 	if errors.Is(err, repository.ErrOrderNotFound) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -51,6 +55,10 @@ func (h *PaymentHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PaymentHandler) Add(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	user, ok := currentUser(r)
 	if !ok {
 		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
@@ -79,7 +87,7 @@ func (h *PaymentHandler) Add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p, err := h.repo.AddPayment(r.Context(), id, req.Amount, note, user.UserID)
+	p, err := h.repo.AddPayment(r.Context(), orgID, id, req.Amount, note, user.UserID)
 	switch {
 	case errors.Is(err, repository.ErrOrderNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -99,11 +107,15 @@ func (h *PaymentHandler) Add(w http.ResponseWriter, r *http.Request) {
 
 // Delete: убрать ошибочную оплату (только менеджер, см. router.go).
 func (h *PaymentHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	id, ok := idParam(w, r)
 	if !ok {
 		return
 	}
-	deleted, err := h.repo.DeletePayment(r.Context(), id)
+	deleted, err := h.repo.DeletePayment(r.Context(), orgID, id)
 	if err != nil {
 		serverError(w, r, "не удалось удалить оплату", err)
 		return
@@ -119,7 +131,11 @@ func (h *PaymentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PaymentHandler) Debts(w http.ResponseWriter, r *http.Request) {
-	debts, err := h.repo.GetDebts(r.Context())
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
+	debts, err := h.repo.GetDebts(r.Context(), orgID)
 	if err != nil {
 		serverError(w, r, "не удалось получить долги", err)
 		return

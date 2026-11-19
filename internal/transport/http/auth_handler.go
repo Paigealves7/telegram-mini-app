@@ -3,7 +3,6 @@ package http
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -24,9 +23,11 @@ const (
 )
 
 type Claims struct {
-	UserID       int64  `json:"user_id"`
-	Role         string `json:"role"`
-	IsSuperAdmin bool   `json:"is_super_admin"`
+	OrganizationID   int64  `json:"organization_id,omitempty"`
+	OrganizationName string `json:"-"`
+	UserID           int64  `json:"user_id"`
+	Role             string `json:"role"`
+	IsSuperAdmin     bool   `json:"is_super_admin"`
 	jwt.RegisteredClaims
 }
 
@@ -92,9 +93,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "неизвестная роль", http.StatusBadRequest)
 		return
 	}
-	actor, _ := currentUser(r)
+	actor, ok := currentUser(r)
+	if !ok || actor.OrganizationID <= 0 {
+		http.Error(w, "выберите организацию", http.StatusConflict)
+		return
+	}
 	if (req.Role == domain.RoleManager || (domain.User{Username: req.Username}).IsSuperAdmin()) &&
-		(actor == nil || !actor.IsSuperAdmin) {
+		!actor.IsSuperAdmin {
 		http.Error(w, "действие доступно только супер-админу", http.StatusForbidden)
 		return
 	}
@@ -105,17 +110,30 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.repo.CreateUser(r.Context(), req.Username, string(hashedPassword), req.Role)
+	ctx := r.Context()
+	user, err := h.repo.CreateUser(ctx, req.Username, string(hashedPassword), req.Role)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
+			serverError(w, r, "не удалось создать пользователя", err)
+			return
+		}
+		user, err = h.repo.GetUserByUsername(ctx, req.Username)
+		if err != nil || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
 			http.Error(w, "пользователь с таким логином уже существует", http.StatusConflict)
 			return
 		}
-		log.Printf("REGISTER: не удалось создать пользователя %q: %v", req.Username, err)
-		http.Error(w, "не удалось создать пользователя", http.StatusInternalServerError)
+	}
+	if err := h.repo.AddOrganizationMember(ctx, actor.OrganizationID, user.ID, req.Role); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			http.Error(w, "пользователь уже состоит в организации", http.StatusConflict)
+			return
+		}
+		serverError(w, r, "не удалось добавить пользователя в организацию", err)
 		return
 	}
+	user.Role = req.Role
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

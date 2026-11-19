@@ -16,6 +16,10 @@ func NewStatsHandler(repo *repository.Repository) *StatsHandler {
 
 // GET /api/v1/statistics?start_date=2026-09-01&end_date=2026-09-30
 func (h *StatsHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	startDate := r.URL.Query().Get("start_date")
 	endDate := r.URL.Query().Get("end_date")
 
@@ -34,7 +38,7 @@ func (h *StatsHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stats, err := h.repo.GetStatisticsSummary(r.Context(), startDate, endDate)
+	stats, err := h.repo.GetStatisticsSummary(r.Context(), orgID, startDate, endDate)
 	if err != nil {
 		serverError(w, r, "не удалось получить статистику", err)
 		return

@@ -14,10 +14,10 @@ import (
 // Сумма заказа = сумма позиций (цена за м³ × объём, по копейкам) + доставка + допы. Совпадает с продажей и накладной.
 // Запросы используют алиас таблицы заказов o.
 const (
-	orderTotalExpr = `(COALESCE((SELECT SUM(ROUND(ob.price * ob.volume_m3, 2)) FROM order_boards ob WHERE ob.order_id = o.id), 0)
-		+ COALESCE((SELECT SUM(ROUND(f.price*f.volume_m3,2)) FROM order_firewood f WHERE f.order_id=o.id),0)
+	orderTotalExpr = `(COALESCE((SELECT SUM(ROUND(ob.price * ob.volume_m3, 2)) FROM order_boards ob WHERE ob.order_id = o.id AND ob.organization_id = o.organization_id), 0)
+		+ COALESCE((SELECT SUM(ROUND(f.price*f.volume_m3,2)) FROM order_firewood f WHERE f.order_id = o.id AND f.organization_id = o.organization_id),0)
  + COALESCE(o.delivery_price, 0) + COALESCE(o.extra_price, 0))`
-	orderPaidExpr = `COALESCE((SELECT SUM(p.amount) FROM order_payments p WHERE p.order_id = o.id), 0)`
+	orderPaidExpr = `COALESCE((SELECT SUM(p.amount) FROM order_payments p WHERE p.order_id = o.id AND p.organization_id = o.organization_id), 0)`
 )
 
 var (
@@ -30,15 +30,15 @@ func money(v float64) string {
 }
 
 // AddPayment записывает оплату. Переплатить заказ нельзя: так ловятся опечатки в сумме.
-func (r *Repository) AddPayment(ctx context.Context, orderID int64, amount float64, note string, userID int64) (*domain.Payment, error) {
-	tx, err := r.db.Begin(ctx)
+func (r *Repository) AddPayment(ctx context.Context, orgID int64, orderID int64, amount float64, note string, userID int64) (*domain.Payment, error) {
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
 	var status domain.OrderStatus
-	if err := tx.QueryRow(ctx, `SELECT status FROM orders WHERE id = $1 FOR UPDATE`, orderID).Scan(&status); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT status FROM orders WHERE organization_id = $1 AND id = $2 FOR UPDATE`, orgID, orderID).Scan(&status); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
 		}
@@ -49,7 +49,7 @@ func (r *Repository) AddPayment(ctx context.Context, orderID int64, amount float
 	}
 
 	var total, paid float64
-	if err := tx.QueryRow(ctx, `SELECT `+orderTotalExpr+`, `+orderPaidExpr+` FROM orders o WHERE o.id = $1`, orderID).Scan(&total, &paid); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT `+orderTotalExpr+`, `+orderPaidExpr+` FROM orders o WHERE o.organization_id = $1 AND o.id = $2`, orgID, orderID).Scan(&total, &paid); err != nil {
 		return nil, err
 	}
 	amount = domain.Round2(amount)
@@ -62,8 +62,8 @@ func (r *Repository) AddPayment(ctx context.Context, orderID int64, amount float
 	}
 
 	p := domain.Payment{OrderID: orderID, Amount: amount, Note: note, CreatedBy: userID}
-	err = tx.QueryRow(ctx, `INSERT INTO order_payments (order_id, amount, note, created_by) VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
-		orderID, amount, note, userID).Scan(&p.ID, &p.CreatedAt)
+	err = tx.QueryRow(ctx, `INSERT INTO order_payments (organization_id, order_id, amount, note, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
+		orgID, orderID, amount, note, userID).Scan(&p.ID, &p.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -74,17 +74,17 @@ func (r *Repository) AddPayment(ctx context.Context, orderID int64, amount float
 }
 
 // GetOrderPayments возвращает итоги по заказу и историю оплат.
-func (r *Repository) GetOrderPayments(ctx context.Context, orderID int64) (*domain.OrderPayments, error) {
+func (r *Repository) GetOrderPayments(ctx context.Context, orgID int64, orderID int64) (*domain.OrderPayments, error) {
 	res := domain.OrderPayments{OrderID: orderID, Payments: []domain.Payment{}}
-	err := r.db.QueryRow(ctx, `SELECT o.contractor_id, o.status, `+orderTotalExpr+`, `+orderPaidExpr+` FROM orders o WHERE o.id = $1`, orderID).
-		Scan(&res.ContractorID, &res.Status, &res.TotalPrice, &res.PaidAmount)
+	err := r.db.QueryRow(ctx, `SELECT o.order_number, o.contractor_id, o.status, `+orderTotalExpr+`, `+orderPaidExpr+` FROM orders o WHERE o.organization_id = $1 AND o.id = $2`, orgID, orderID).
+		Scan(&res.OrderNumber, &res.ContractorID, &res.Status, &res.TotalPrice, &res.PaidAmount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
 		}
 		return nil, err
 	}
-	rows, err := r.db.Query(ctx, `SELECT id, order_id, amount, note, COALESCE(created_by, 0), created_at FROM order_payments WHERE order_id = $1 ORDER BY id`, orderID)
+	rows, err := r.db.Query(ctx, `SELECT id, order_id, amount, note, COALESCE(created_by, 0), created_at FROM order_payments WHERE organization_id = $1 AND order_id = $2 ORDER BY id`, orgID, orderID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,21 +100,26 @@ func (r *Repository) GetOrderPayments(ctx context.Context, orderID int64) (*doma
 }
 
 // DeletePayment удаляет ошибочную оплату. Возвращает false, если её нет.
-func (r *Repository) DeletePayment(ctx context.Context, id int64) (bool, error) {
-	tag, err := r.db.Exec(ctx, `DELETE FROM order_payments WHERE id = $1`, id)
+func (r *Repository) DeletePayment(ctx context.Context, orgID int64, id int64) (bool, error) {
+	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `DELETE FROM order_payments WHERE organization_id = $1 AND id = $2`, orgID, id)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, tx.Commit(ctx)
 }
 
 // GetDebts возвращает завершённые заказы с неоплаченным остатком.
-func (r *Repository) GetDebts(ctx context.Context) ([]domain.DebtOrder, error) {
+func (r *Repository) GetDebts(ctx context.Context, orgID int64) ([]domain.DebtOrder, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, contractor_id, created_at, total, paid FROM (
-			SELECT o.id, o.contractor_id, o.created_at, `+orderTotalExpr+` AS total, `+orderPaidExpr+` AS paid
-			FROM orders o WHERE o.status = 'completed'
-		) t WHERE total - paid > 0.005 ORDER BY contractor_id, id`)
+		SELECT id, order_number, contractor_id, created_at, total, paid FROM (
+			SELECT o.id, o.order_number, o.contractor_id, o.created_at, `+orderTotalExpr+` AS total, `+orderPaidExpr+` AS paid
+			FROM orders o WHERE o.organization_id = $1 AND o.status = 'completed'
+		) t WHERE total - paid > 0.005 ORDER BY contractor_id, id`, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +127,7 @@ func (r *Repository) GetDebts(ctx context.Context) ([]domain.DebtOrder, error) {
 	out := make([]domain.DebtOrder, 0)
 	for rows.Next() {
 		var d domain.DebtOrder
-		if err := rows.Scan(&d.OrderID, &d.ContractorID, &d.CreatedAt, &d.Total, &d.Paid); err != nil {
+		if err := rows.Scan(&d.OrderID, &d.OrderNumber, &d.ContractorID, &d.CreatedAt, &d.Total, &d.Paid); err != nil {
 			return nil, err
 		}
 		d.Due = domain.Round2(d.Total - d.Paid)

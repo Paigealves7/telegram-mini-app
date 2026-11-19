@@ -22,6 +22,10 @@ func NewStockHandler(repo *repository.Repository) *StockHandler {
 var adjustReasons = map[string]bool{"defect": true, "loss": true, "own_use": true, "surplus": true, "other": true}
 
 func (h *StockHandler) Adjust(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	user, ok := currentUser(r)
 	if !ok {
 		http.Error(w, "ошибка авторизации", http.StatusUnauthorized)
@@ -65,7 +69,7 @@ func (h *StockHandler) Adjust(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adj, err := h.repo.AdjustStock(r.Context(), req.Kind, req.ItemID, req.Count, req.Reason, note, user.UserID)
+	adj, err := h.repo.AdjustStock(r.Context(), orgID, req.Kind, req.ItemID, req.Count, req.Reason, note, user.UserID)
 	switch {
 	case errors.Is(err, repository.ErrBoardNotFound), errors.Is(err, repository.ErrLogNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -84,8 +88,12 @@ func (h *StockHandler) Adjust(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *StockHandler) List(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := requireOrgID(w, r)
+	if !ok {
+		return
+	}
 	limit, offset := pageParams(r, 200, 1000)
-	list, err := h.repo.ListStockAdjustments(r.Context(), limit, offset)
+	list, err := h.repo.ListStockAdjustments(r.Context(), orgID, limit, offset)
 	if err != nil {
 		serverError(w, r, "не удалось получить журнал корректировок", err)
 		return
