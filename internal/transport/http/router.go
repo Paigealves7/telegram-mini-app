@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 	"telegram-mini-app/internal/service"
@@ -19,6 +21,7 @@ import (
 )
 
 func NewRouter(db *pgxpool.Pool) http.Handler {
+	startedAt := time.Now()
 	// 1. Читаем секреты ОДИН раз при старте
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -31,10 +34,11 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	}
 
 	// Диагностика: какому боту принадлежит токен. Сравни с ботом, через который открываешь Mini App.
-	if username, err := telegram.BotUsername(context.Background(), botToken); err != nil {
+	botUsername, err := telegram.BotUsername(context.Background(), botToken)
+	if err != nil {
 		log.Printf("ВНИМАНИЕ: токен бота не прошёл проверку getMe: %v", err)
 	} else {
-		log.Printf("Telegram: токен принадлежит боту @%s (длина токена: %d)", username, len(botToken))
+		log.Printf("Telegram: токен принадлежит боту @%s (длина токена: %d)", botUsername, len(botToken))
 	}
 
 	r := chi.NewRouter()
@@ -105,6 +109,14 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	}
 	webDir := filepath.Join(workDir, "web")
 	fileServer := http.FileServer(http.Dir(webDir))
+	serveAdmin := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeFile(w, r, filepath.Join(webDir, "admin.html"))
+	}
+	r.Get("/admin", serveAdmin)
+	r.Head("/admin", serveAdmin)
+	r.Get("/admin/", serveAdmin)
+	r.Head("/admin/", serveAdmin)
 
 	// Проверки состояния для Docker, nginx и мониторинга (без авторизации, ответ «ok»).
 	healthHandler := NewHealthHandler(repo)
@@ -153,10 +165,13 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			organizations := OrganizationHandler{repo: repo}
 			r.Post("/invites/accept", inviteLimiter.Middleware(organizations.AcceptInvite))
 			adminOrganizations := r.With(RequireSuperAdmin)
+			adminOrganizations.Get("/admin/overview", platformOverview(repo, db, startedAt, botUsername))
 			adminOrganizations.Get("/admin/organizations", organizations.List)
 			adminOrganizations.Post("/admin/organizations", organizations.Create)
 			adminOrganizations.Put("/admin/organizations/{id}", organizations.Update)
+			adminOrganizations.Get("/admin/organizations/{id}/invites", organizations.ListAdminInvites)
 			adminOrganizations.Post("/admin/organizations/{id}/invites", organizations.CreateAdminInvite)
+			adminOrganizations.Delete("/admin/organizations/{id}/invites/{inviteID}", organizations.RevokeAdminInvite)
 			adminOrganizations.Post("/admin/organizations/{id}/reset-test-data", organizations.Reset)
 			r = r.With(ResolveOrganization(repo), RequireRoles(domain.RoleManager, domain.RoleMaster, domain.RoleWorker))
 

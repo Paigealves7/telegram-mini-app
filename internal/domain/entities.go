@@ -35,6 +35,29 @@ type Organization struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
+type OrganizationStats struct {
+	Organization
+	MembersCount    int        `json:"members_count"`
+	OrdersCount     int        `json:"orders_count"`
+	BoardsVolumeM3  float64    `json:"boards_volume_m3"`
+	LogsVolumeM3    float64    `json:"logs_volume_m3"`
+	FirewoodRawM3   float64    `json:"firewood_raw_m3"`
+	FirewoodReadyM3 float64    `json:"firewood_ready_m3"`
+	LastActivityAt  *time.Time `json:"last_activity_at"`
+}
+
+type PlatformOverview struct {
+	DBSizeBytes         int64               `json:"db_size_bytes"`
+	DBLatencyMs         float64             `json:"db_latency_ms"`
+	UptimeSeconds       int64               `json:"uptime_seconds"`
+	TotalOrganizations  int                 `json:"total_organizations"`
+	ActiveOrganizations int                 `json:"active_organizations"`
+	DemoOrganizations   int                 `json:"demo_organizations"`
+	TotalUsers          int                 `json:"total_users"`
+	TotalOrders         int                 `json:"total_orders"`
+	Organizations       []OrganizationStats `json:"organizations"`
+}
+
 type UserOrganization struct {
 	OrganizationID int64  `json:"organization_id"`
 	Name           string `json:"name"`

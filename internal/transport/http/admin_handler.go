@@ -27,7 +27,11 @@ func (h AdminHandler) ResetTestData(w http.ResponseWriter, r *http.Request) {
 }
 
 func adminID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	return recordID(w, r, "id")
+}
+
+func recordID(w http.ResponseWriter, r *http.Request, param string) (int64, bool) {
+	id, err := strconv.ParseInt(chi.URLParam(r, param), 10, 64)
 	if err != nil || id <= 0 {
 		http.Error(w, "некорректный номер записи", http.StatusBadRequest)
 		return 0, false

@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141619">
+<title>Панель управления платформой · Лесопилка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#141619;--surface:#1e2125;--panel:#262a2f;--line:#3a4047;--text:#f4f5f6;--muted:#aeb6bf;--accent:#b8ef90;--accent-ink:#172613;--good:#b8ef90;--warn:#ffd58b;--danger:#ffaaa4;--shadow:0 20px 55px #0005;--ease:cubic-bezier(.22,1,.36,1)}
+:root[data-theme=light]{color-scheme:light;--bg:#eef1ef;--surface:#fbfcfa;--panel:#e7ede7;--line:#cbd4cb;--text:#1a251e;--muted:#4d5d53;--accent:#285f34;--accent-ink:#fff;--good:#285f34;--warn:#775000;--danger:#a22521;--shadow:0 20px 55px #263e2920}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 Onest,system-ui,sans-serif;overflow-wrap:anywhere}
+button,input,select,textarea{font:inherit;color:inherit}
+button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
+button,a{touch-action:manipulation}
+button{cursor:pointer}
+button:disabled{cursor:default;opacity:.55}
+button:active:not(:disabled),.button:active{transform:scale(.97)}
+button,.button{transition:transform 100ms var(--ease)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+a{color:var(--good)}
+h1,h2,h3,p{margin:0}
+h1{font-size:clamp(26px,4vw,42px);line-height:1.12;letter-spacing:-.045em}
+h2{font-size:20px;letter-spacing:-.025em}
+h3{font-size:16px}
+small,.muted{color:var(--muted)}
+.unit{white-space:nowrap}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.between{justify-content:space-between}
+.stack{display:grid;gap:16px}
+.row>*,.stack>*,.metrics>*,.org-grid>*{min-width:0}
+.card{padding:clamp(14px,2vw,24px);border:1px solid var(--line);border-radius:22px;background:var(--surface)}
+.pill{display:inline-flex;padding:4px 9px;border-radius:999px;background:var(--panel);font-size:12px;font-weight:700;color:var(--muted)}
+.good{color:var(--good)}
+.warn{color:var(--warn)}
+.error,.danger{color:var(--danger)}
+.error:empty,.status:empty{display:none}
+.button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);text-decoration:none;font-weight:600;text-align:center}
+.primary{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
+.button.danger{color:var(--danger)}
+.icon{min-width:44px;padding:8px;font-size:22px;line-height:1}
+.brand{display:flex;gap:10px;align-items:center;font-weight:800;letter-spacing:-.025em}
+.mark{display:grid;place-items:center;width:34px;height:34px;flex:none;background:var(--accent);border-radius:10px;color:var(--accent-ink)}
+.mark svg{width:22px;height:22px}
+.logo-text small{display:block;font-size:12px;font-weight:500;letter-spacing:0}
+.shell{min-height:100dvh}
+.sidebar{position:fixed;inset:auto 0 0;z-index:2;padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));background:var(--surface);background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(20px);border-top:1px solid var(--line)}
+.sidebar .brand{display:none}
+nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+nav button{display:grid;justify-items:center;align-content:center;gap:3px;min-height:52px;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--muted);font-size:12px;font-weight:600;padding:4px}
+nav button[aria-current=page]{border-color:var(--line);background:var(--panel);color:var(--good)}
+nav svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+main{max-width:1300px;margin-inline:auto;padding:calc(22px + max(env(safe-area-inset-top),var(--tg-top,0px))) max(12px,env(safe-area-inset-right)) calc(86px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.top .button{flex:none}
+.metrics,.org-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.org-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
+.metric{display:grid;align-content:start;gap:5px;background:var(--panel);padding:12px;border-radius:14px}
+.metric small{font-size:12px}
+.metric b{font-size:clamp(15px,2.3vw,24px);line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.035em}
+.metric>span{font-size:12px;color:var(--muted)}
+.activity{display:grid;margin-top:10px}
+.activity button{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:52px;border:0;border-top:1px solid var(--line);padding:10px 0;background:transparent;text-align:left}
+.activity time{color:var(--muted);text-align:right;font-size:12px}
+.org{display:grid;align-content:start;gap:12px;color:var(--text);text-align:left}
+.org:hover{border-color:var(--muted)}
+.org .metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.org .metric{padding:7px}
+.org .metric b{font-size:15px}
+.company{white-space:pre-wrap;line-height:1.4}
+.org .company{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.filters .button{min-height:40px;padding-inline:10px;font-size:13px}
+.filters .button[aria-pressed=true]{color:var(--accent-ink);background:var(--accent);border-color:transparent}
+label{display:grid;gap:6px;font-weight:600}
+input:not([type=checkbox]),textarea,select{width:100%;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:12px;padding:9px 12px;background:var(--panel)}
+textarea{resize:vertical}
+::placeholder{color:var(--muted)}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px}
+.toggle input{appearance:none;width:42px;height:25px;border:1px solid var(--line);border-radius:99px;background:var(--panel);display:grid;align-items:center;padding:3px;margin:0;flex:none;cursor:pointer}
+.toggle input::before{content:"";width:17px;height:17px;border-radius:50%;background:var(--muted);transition:transform 170ms var(--ease)}
+.toggle input:checked{background:var(--accent);border-color:var(--accent)}
+.toggle input:checked::before{transform:translateX(16px);background:var(--accent-ink)}
+.gate{display:grid;align-content:center;min-height:100dvh;width:min(100%,440px);margin:auto;padding:20px}
+.gate h1{font-size:28px}
+dialog{position:fixed;inset:auto 0 0;width:100%;max-width:100%;max-height:min(86dvh,calc(100dvh - 50px - var(--tg-top,0px)));margin:0;padding:0;border:1px solid var(--line);border-radius:24px 24px 0 0;background:var(--surface);color:var(--text);box-shadow:var(--shadow);overscroll-behavior:contain}
+dialog[open]{animation:enter 220ms var(--ease)}
+dialog::backdrop{background:#0d1012aa;backdrop-filter:blur(4px)}
+body:has(dialog[open]){overflow:hidden}
+.dialog-head{position:sticky;top:0;z-index:1;flex-wrap:nowrap;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.dialog-head button{flex:none}
+.dialog-content{padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.dialog-content .card{background:var(--bg)}
+.invite{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-top:1px solid var(--line);padding:8px 0}
+.code{font:700 19px ui-monospace,monospace;letter-spacing:.06em;user-select:all}
+.notice{position:fixed;z-index:4;bottom:calc(74px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);padding:10px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);max-width:calc(100% - 24px)}
+dialog .notice{position:sticky;left:auto;transform:none;bottom:0;max-width:none;margin:0 16px 12px}
+@keyframes enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@media(min-width:680px){main{padding-inline:24px}.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}dialog{inset:0;margin:auto;width:min(660px,calc(100% - 40px));border-radius:24px}}
+@media(min-width:960px){.shell{padding-left:230px}.sidebar{inset:0 auto 0 0;width:230px;padding:28px 16px;border-top:0;border-right:1px solid var(--line)}.sidebar .brand{display:flex;padding:0 8px;margin-bottom:36px}nav{grid-template-columns:1fr}nav button{display:flex;justify-content:flex-start;align-items:center;min-height:46px;gap:10px;padding:0 12px;font-size:14px}main{padding:36px 32px}.notice{bottom:24px}}
+@media(prefers-reduced-motion:reduce){*,*::before{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="card stack" id="gate-content"><h1>Панель управления платформой</h1><p role="status">Подключение…</p></div>
+</div>
+<div class="shell" id="shell" hidden>
+  <aside class="sidebar">
+    <div class="brand"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17l4-7 4 7H4Zm8 0 4-7 4 7h-8ZM8 9l4-6 4 6"/></svg></span><span class="logo-text">Лесопилка<small>Управление платформой</small></span></div>
+    <nav aria-label="Разделы панели">
+      <button type="button" data-tab="pulse" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h5l3-7 4 14 3-7h5"/></svg>Пульс</button>
+      <button type="button" data-tab="orgs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V9l6 3V9l6 3V4h4l2 16H3Zm4-4h1m4 0h1m4 0h1"/></svg>Лесопилки</button>
+      <button type="button" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="var(--surface)"/><circle cx="15" cy="17" r="2" fill="var(--surface)"/></svg>Настройки</button>
+    </nav>
+  </aside>
+  <main>
+    <header class="top"><h1 id="page-title">Пульс</h1><button class="button primary" id="create" type="button" hidden>+ Новая лесопилка</button></header>
+    <p class="error status" id="load-error" role="alert"></p>
+    <p class="muted status" id="loading" role="status"></p>
+    <section class="stack" id="pulse" aria-labelledby="page-title"></section>
+    <section class="stack" id="orgs" aria-labelledby="page-title" hidden>
+      <label>Поиск по названию<input type="search" id="search" placeholder="Название лесопилки"></label>
+      <div class="filters" id="filters" role="group" aria-label="Фильтр лесопилок">
+        <button class="button" type="button" data-filter="all" aria-pressed="true">Все</button>
+        <button class="button" type="button" data-filter="work" aria-pressed="false">Рабочие</button>
+        <button class="button" type="button" data-filter="demo" aria-pressed="false">Демо</button>
+        <button class="button" type="button" data-filter="frozen" aria-pressed="false">Замороженные</button>
+      </div>
+      <div class="org-grid" id="org-list"></div>
+    </section>
+    <section class="stack" id="settings" aria-labelledby="page-title" hidden>
+      <div class="card stack">
+        <label class="toggle"><span>Тёмная тема</span><input type="checkbox" role="switch" id="theme-switch"></label>
+        <div class="row"><button type="button" class="button" id="refresh">Обновить данные</button><a class="button" href="/">Основное приложение</a><button type="button" class="button danger" id="logout">Выйти</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+<dialog id="sheet" aria-labelledby="sheet-title">
+  <header class="dialog-head row between"><h2 id="sheet-title"></h2><button class="button icon" id="close" type="button" aria-label="Закрыть">×</button></header>
+  <div class="dialog-content stack" id="sheet-content"></div>
+  <div class="notice" id="sheet-notice" role="status" hidden></div>
+</dialog>
+<div class="notice" id="notice" role="status" hidden></div>
+<script>
+'use strict';
+const $ = selector => document.querySelector(selector);
+const tg = window.Telegram?.WebApp;
+const roles = {manager:'Руководитель',master:'Мастер',worker:'Сотрудник'};
+const tabs = {pulse:'Пульс',orgs:'Лесопилки',settings:'Настройки'};
+const el = {gate:$('#gate'), shell:$('#shell'), sheet:$('#sheet'), sheetContent:$('#sheet-content')};
+const state = {filter:'all', overview:null, authenticated:false, botUsername:'', refresh:null, sheetVersion:0};
+const number = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2});
+const date = new Intl.DateTimeFormat('ru-RU',{dateStyle:'short',timeStyle:'short'});
+const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+})[character]);
+const format = value => number.format(value ?? 0);
+const amount = value => `<span class="unit">${format(value)}&nbsp;м³</span>`;
+const when = value => value ? date.format(new Date(value)) : 'Операций пока нет';
+const orgPath = id => `/admin/organizations/${encodeURIComponent(id)}`;
+let noticeTimeout;
+
+function applyTheme() {
+  const selection = localStorage.getItem('theme');
+  const theme = ['dark','light'].includes(selection) ? selection : (tg?.colorScheme || 'dark');
+  document.documentElement.dataset.theme = theme;
+  $('#theme-switch').checked = theme === 'dark';
+  const color = theme === 'dark' ? '#141619' : '#eef1ef';
+  $('meta[name="theme-color"]').content = color;
+  try { tg?.setHeaderColor(color); } catch {}
+  try { tg?.setBackgroundColor(color); } catch {}
+}
+function safeArea() {
+  const top = (tg?.safeAreaInset?.top || 0) + (tg?.contentSafeAreaInset?.top || 0);
+  document.documentElement.style.setProperty('--tg-top',`${top}px`);
+}
+function notice(message) {
+  clearTimeout(noticeTimeout);
+  $('#notice').hidden = $('#sheet-notice').hidden = true;
+  const target = el.sheet.open ? $('#sheet-notice') : $('#notice');
+  target.textContent = message;
+  target.hidden = false;
+  noticeTimeout = setTimeout(() => { target.hidden = true; },3500);
+}
+
+class RequestError extends Error {
+  constructor(status,message) {
+    super(message);
+    this.status = status;
+  }
+}
+async function api(path,{method='GET',body,signal}={}) {
+  const headers = {Accept:'application/json'};
+  const token = localStorage.getItem('jwt_token');
+  const isLogin = path.startsWith('/auth/');
+  if (token && !isLogin) headers.Authorization = `Bearer ${token}`;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  let response;
+  try {
+    response = await fetch('/api/v1'+path,{
+      method, headers, signal, cache:'no-store', body:body === undefined ? undefined : JSON.stringify(body)
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    throw new RequestError(0,'Нет связи с сервером');
+  }
+  if (!response.ok) {
+    const text = await response.text();
+    const message = response.status < 500 && !text.trimStart().startsWith('<') ? text.trim() : '';
+    if (response.status === 401 && !isLogin && state.authenticated && localStorage.getItem('jwt_token') === token) {
+      signOut('Сессия завершилась. Войдите снова.');
+    }
+    if (response.status === 403 && path.startsWith('/admin/') && state.authenticated && localStorage.getItem('jwt_token') === token) {
+      showDenied();
+    }
+    throw new RequestError(response.status,message || 'Не удалось выполнить запрос');
+  }
+  return response.status === 204 ? null : response.json();
+}
+function gate(content) {
+  state.authenticated = false;
+  state.refresh?.abort();
+  el.shell.hidden = true;
+  el.gate.hidden = false;
+  el.sheet.close();
+  $('#gate-content').innerHTML = content;
+}
+function showDenied() {
+  gate('<h1>Доступ только для администратора платформы</h1><div class="row"><a class="button" href="/">Основное приложение</a><button class="button" type="button" id="other-login">Войти другим аккаунтом</button></div>');
+  $('#other-login').onclick = () => signOut();
+}
+function showLogin(message='') {
+  gate(`<h1>Панель управления платформой</h1>
+    <form class="stack" id="login">
+      <label>Логин<input name="username" autocomplete="username" required></label>
+      <label>Пароль<input type="password" name="password" autocomplete="current-password" required></label>
+      <p class="error" role="alert">${esc(message)}</p>
+      <button class="button primary" type="submit">Войти</button>
+      <a href="/">Основное приложение</a>
+    </form>`);
+  bindForm($('#login'),async values => {
+    const username = values.get('username').trim();
+    const session = await api('/auth/login',{method:'POST',body:{username,password:values.get('password')}});
+    localStorage.setItem('jwt_token',session.token);
+    localStorage.setItem('uname',username);
+    await authorize();
+  });
+}
+function signOut(message) {
+  localStorage.removeItem('jwt_token');
+  state.overview = null;
+  state.botUsername = '';
+  showLogin(message);
+}
+async function authorize() {
+  const config = await api('/config');
+  if (!config.is_super_admin) {
+    showDenied();
+    return;
+  }
+  state.authenticated = true;
+  el.gate.hidden = true;
+  el.shell.hidden = false;
+  showTab('pulse');
+  await refresh();
+}
+async function start() {
+  try {
+    if (tg?.initData) {
+      const session = await api('/auth/telegram',{method:'POST',body:{init_data:tg.initData}});
+      localStorage.setItem('jwt_token',session.token);
+    }
+    if (localStorage.getItem('jwt_token')) {
+      await authorize();
+    } else {
+      showLogin();
+    }
+  } catch (error) {
+    if (error.status === 401 && !tg?.initData) localStorage.removeItem('jwt_token');
+    showLogin(error.message);
+  }
+}
+
+function showTab(tab) {
+  $('#page-title').textContent = tabs[tab];
+  for (const button of document.querySelectorAll('[data-tab]')) {
+    const selected = button.dataset.tab === tab;
+    if (selected) button.setAttribute('aria-current','page');
+    else button.removeAttribute('aria-current');
+    document.getElementById(button.dataset.tab).hidden = !selected;
+  }
+  $('#create').hidden = tab !== 'orgs';
+  window.scrollTo(0,0);
+}
+function metric(label,value,detail='') {
+  return `<div class="metric"><small>${label}</small><b>${value}</b>${detail ? `<span>${detail}</span>` : ''}</div>`;
+}
+function uptime(seconds) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor(seconds / 3600) % 24;
+  const minutes = Math.floor(seconds / 60) % 60;
+  return seconds < 60 ? `${seconds} с` : [days && `${days} д`,hours && `${hours} ч`,`${minutes} мин`].filter(Boolean).join(' ');
+}
+async function probe(path,signal) {
+  try {
+    return (await fetch(path,{signal,cache:'no-store'})).ok;
+  } catch {
+    return false;
+  }
+}
+async function refresh() {
+  state.refresh?.abort();
+  const controller = new AbortController();
+  const {signal} = controller;
+  state.refresh = controller;
+  $('#loading').textContent = 'Обновляем данные…';
+  $('#load-error').textContent = '';
+  try {
+    const overview = await api('/admin/overview',{signal});
+    if (signal.aborted) return;
+    state.overview = overview;
+    state.botUsername = String(overview.bot_username || '');
+    renderPulse();
+    renderOrgs();
+  } catch (error) {
+    if (signal.aborted) return;
+    const [serverOnline, dbOnline] = await Promise.all([probe('/healthz',signal),probe('/readyz',signal)]);
+    if (signal.aborted) return;
+    $('#load-error').textContent = state.overview ? `Не удалось обновить данные. Показана последняя сводка. ${error.message}` : error.message;
+    renderPulse({serverOnline,dbOnline});
+  } finally {
+    if (state.refresh === controller) $('#loading').textContent = '';
+  }
+}
+function renderPulse(health) {
+  const data = state.overview;
+  const orgs = data?.organizations || [];
+  const activeDemo = orgs.filter(org => org.is_active && org.is_demo).length;
+  const sum = key => orgs.reduce((total,org) => total + (Number(org[key]) || 0),0);
+  const stateLabel = online => `<span class="${online ? 'good' : 'warn'}">${online ? 'Онлайн' : 'Недоступен'}</span>`;
+  const sorted = [...orgs].sort((first,second) => (Date.parse(second.last_activity_at) || 0) - (Date.parse(first.last_activity_at) || 0));
+  const pool = data?.db_pool;
+  $('#pulse').innerHTML = `<section class="card stack">
+    <div class="row between"><h2>Состояние сервиса</h2><button class="button" type="button" data-refresh>Обновить</button></div>
+    <div class="metrics">
+      ${metric('Сервер',stateLabel(health?.serverOnline ?? true),data ? `Аптайм · ${uptime(data.uptime_seconds || 0)}` : '')}
+      ${metric('База данных',stateLabel(health?.dbOnline ?? true))}
+      ${metric('Задержка БД',data && !health ? `<span class="unit">${format(data.db_latency_ms)}&nbsp;мс</span>` : '—')}
+      ${metric('Размер БД',data ? `<span class="unit">${format(data.db_size_bytes / 1000000)}&nbsp;МБ</span>` : '—')}
+    </div>
+    ${pool && !health ? `<small>Соединения БД · ${format(pool.acquired_connections)} занято · ${format(pool.idle_connections)} свободно · лимит ${format(pool.max_connections)}</small>` : ''}
+  </section>
+  ${data ? `<section class="card stack"><h2>Платформа</h2><div class="metrics">
+    ${metric('Активных лесопилок',format(data.active_organizations),`Демо · ${format(activeDemo)} · Всего · ${format(data.total_organizations)}`)}
+    ${metric('Всего сотрудников',format(data.total_users))}
+    ${metric('Всего заказов',format(data.total_orders))}
+    ${metric('Общий склад досок и дров',amount(sum('boards_volume_m3')+sum('firewood_raw_m3')+sum('firewood_ready_m3')),
+      `Доски · ${amount(sum('boards_volume_m3'))} · Дрова · ${amount(sum('firewood_raw_m3')+sum('firewood_ready_m3'))}`)}
+  </div></section>
+  <section class="card"><h2>Активность лесопилок</h2><div class="activity">
+    ${sorted.map(org => `<button type="button" data-org="${esc(org.id)}"><b>${esc(org.name)}</b><time>${when(org.last_activity_at)}</time></button>`).join('') || '<p class="muted">Лесопилок пока нет</p>'}
+  </div></section>` : ''}`;
+}
+function renderOrgs() {
+  const query = $('#search').value.trim().toLocaleLowerCase('ru');
+  const orgs = (state.overview?.organizations || []).filter(org => {
+    const matches = {all:true,work:org.is_active && !org.is_demo,demo:org.is_demo,frozen:!org.is_active};
+    return matches[state.filter] && org.name.toLocaleLowerCase('ru').includes(query);
+  });
+  $('#org-list').innerHTML = orgs.map(org => `<button class="card org" type="button" data-org="${esc(org.id)}">
+    <div class="row between"><h2>${esc(org.name)}</h2><small>ID ${esc(org.id)}</small></div>
+    ${badges(org)}
+    <p class="muted company">${esc(org.company_info || 'Реквизиты PDF не заполнены')}</p>
+    <div class="metrics">
+      ${metric('Сотрудников',format(org.members_count))}
+      ${metric('Заказов',format(org.orders_count))}
+      ${metric('Доски',amount(org.boards_volume_m3))}
+      ${metric('Брёвна',amount(org.logs_volume_m3))}
+      ${metric('Сырьё для дров',amount(org.firewood_raw_m3))}
+      ${metric('Готовые дрова',amount(org.firewood_ready_m3))}
+    </div>
+    <small>Последняя операция · ${when(org.last_activity_at)}</small>
+  </button>`).join('') || (state.overview ? '<p class="muted">Лесопилки не найдены</p>' : '');
+}
+function badges(org) {
+  return `<div class="row"><span class="pill ${org.is_demo ? 'warn' : ''}">${org.is_demo ? 'Демо' : 'Рабочая'}</span><span class="pill ${org.is_active ? 'good' : 'warn'}">${org.is_active ? 'Активна' : 'Заморожена'}</span></div>`;
+}
+
+function openSheet(title,content) {
+  const version = ++state.sheetVersion;
+  $('#sheet-title').textContent = title;
+  $('#sheet-notice').hidden = true;
+  el.sheetContent.innerHTML = content;
+  if (!el.sheet.open) el.sheet.showModal();
+  el.sheet.scrollTop = 0;
+  return () => el.sheet.open && state.sheetVersion === version;
+}
+function bindForm(form,submit) {
+  form.addEventListener('submit',async event => {
+    event.preventDefault();
+    const button = form.querySelector('[type=submit]');
+    if (button.disabled) return;
+    const alert = form.querySelector('[role=alert]');
+    alert.textContent = '';
+    button.disabled = true;
+    try {
+      await submit(new FormData(form));
+    } catch (error) {
+      alert.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+function orgFields(org={}) {
+  return `<label>Название<input name="name" value="${esc(org.name)}" required></label>
+    <label>Реквизиты для PDF<textarea name="company_info" rows="3">${esc(org.company_info)}</textarea></label>
+    <label class="toggle"><span>Демонстрационная</span><input type="checkbox" role="switch" name="is_demo" ${org.is_demo ? 'checked' : ''}></label>
+    ${org.id ? `<label class="toggle"><span>Доступ активен</span><input type="checkbox" role="switch" name="is_active" ${org.is_active ? 'checked' : ''}></label>` : ''}
+    <p class="error" role="alert"></p>`;
+}
+function orgValues(values) {
+  return {name:values.get('name').trim(),company_info:values.get('company_info').trim(),is_demo:values.has('is_demo')};
+}
+function roleOptions() {
+  return Object.entries(roles).map(([key,label]) => `<option value="${key}">${label}</option>`).join('');
+}
+function inviteResult(invite) {
+  if (!invite?.code) return '';
+  const bot = state.botUsername.replace(/^@/,'');
+  const url = /^[a-z\d_]+$/i.test(bot) ? `https://t.me/${bot}?startapp=inv_${encodeURIComponent(invite.code)}` : '';
+  return `<section class="card stack"><h3>Приглашение · ${roles[invite.role] || 'Код доступа'}</h3>
+    <p class="code">${esc(invite.code)}</p><small>Действует до ${when(invite.expires_at)}</small>
+    <div class="row"><button class="button" type="button" data-copy="${esc(invite.code)}">Копировать код</button>
+    ${url ? `<a class="button" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Открыть ссылку</a><button class="button" type="button" data-copy="${esc(url)}">Копировать ссылку</button>` : ''}</div>
+  </section>`;
+}
+function createOrg() {
+  const current = openSheet('Новая лесопилка',`<form id="new-org" class="stack">${orgFields()}<button class="button primary" type="submit">Создать и выдать код руководителя</button></form>`);
+  bindForm($('#new-org'),async values => {
+    const created = await api('/admin/organizations',{method:'POST',body:{...orgValues(values),create_manager_invite:true}});
+    if (current()) manageOrg(created.organization,created.manager_invite,created.manager_invite_error);
+    void refresh();
+  });
+}
+function manageOrg(org,newInvite,warning='') {
+  const path = orgPath(org.id);
+  const current = openSheet(org.name,`
+    <div class="row"><small>ID ${esc(org.id)}</small>${badges(org)}</div>
+    <div class="stack" id="invite-result">${warning ? `<p class="warn" role="status">${esc(warning)}</p>` : ''}${inviteResult(newInvite)}</div>
+    <form class="card stack" id="open-stock">
+      <h3>Открыть склад лесопилки</h3>
+      <label>Роль просмотра<select name="role"><option value="">Текущая роль</option>${roleOptions()}</select></label>
+      <button class="button primary" type="submit">Открыть склад лесопилки</button>
+    </form>
+    <section class="card stack">
+      <h3>Приглашения</h3>
+      <div id="invites" aria-live="polite"></div>
+      <form class="stack" id="new-invite">
+        <label>Роль для приглашения<select name="role">${roleOptions()}</select></label>
+        <p class="error" role="alert"></p>
+      <button class="button" type="submit" ${org.is_active ? '' : 'disabled'}>+ Выдать код</button>
+      ${org.is_active ? '' : '<small>Для выдачи кода разморозьте лесопилку.</small>'}
+      </form>
+    </section>
+    <form class="card stack" id="edit-org"><h3>Редактировать реквизиты и статус</h3>
+      ${orgFields(org)}<button class="button" type="submit">Сохранить</button>
+    </form>
+    ${org.is_demo ? `<form class="card stack" id="reset-org">
+      <h3>Сброс тестовых данных</h3><p class="muted">Операции, заказы и складские остатки этой лесопилки будут удалены.</p>
+      <label>Для подтверждения введите СБРОС<input name="confirm" autocomplete="off" autocapitalize="characters" spellcheck="false" required></label>
+      <p class="error" role="alert"></p><button class="button danger" type="submit">Сбросить тестовые данные</button>
+    </form>` : ''}`);
+
+  const inviteList = $('#invites');
+  const result = $('#invite-result');
+  let inviteRequest = 0;
+  async function loadInvites() {
+    const version = ++inviteRequest;
+    inviteList.innerHTML = '<p class="muted">Загрузка приглашений…</p>';
+    try {
+      const invites = await api(path+'/invites');
+      if (!current() || version !== inviteRequest) return;
+      const active = (invites || []).filter(invite => !invite.revoked_at && Date.parse(invite.expires_at)>Date.now() && invite.used_count<invite.max_uses);
+      inviteList.innerHTML = active.map(invite => `<div class="invite">
+        <div><b>${roles[invite.role] || 'Приглашение'} · №${esc(invite.id)}</b><br><small>До ${when(invite.expires_at)} · использовано ${format(invite.used_count)} из ${format(invite.max_uses)}</small></div>
+        <button class="button danger" type="button" data-revoke="${esc(invite.id)}">Отозвать</button>
+      </div>`).join('') || '<p class="muted">Активных приглашений нет</p>';
+    } catch (error) {
+      if (current() && version === inviteRequest) inviteList.innerHTML = `<p class="error">${esc(error.message)}</p><button class="button" type="button" data-retry>Повторить</button>`;
+    }
+  }
+  inviteList.addEventListener('click',async event => {
+    const button = event.target.closest('button');
+    if (!button || button.disabled) return;
+    if (button.hasAttribute('data-retry')) {
+      await loadInvites();
+      return;
+    }
+    button.disabled = true;
+    try {
+      await api(path+'/invites/'+encodeURIComponent(button.dataset.revoke),{method:'DELETE'});
+      if (current()) {
+        if (String(newInvite?.id) === button.dataset.revoke) {
+          newInvite = null;
+          result.replaceChildren();
+        }
+        notice('Приглашение отозвано');
+        await loadInvites();
+      }
+    } catch (error) {
+      if (current()) notice(error.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+  $('#open-stock').onsubmit = event => {
+    event.preventDefault();
+    const role = new FormData(event.currentTarget).get('role');
+    localStorage.setItem('org_id',String(org.id));
+    location.assign(Object.hasOwn(roles,role) ? `/?preview_role=${role}` : '/');
+  };
+  bindForm($('#new-invite'),async values => {
+    const invite = await api(path+'/invites',{method:'POST',body:{role:values.get('role')}});
+    if (current()) {
+      newInvite = invite;
+      warning = '';
+      result.innerHTML = inviteResult(invite);
+      result.scrollIntoView({block:'nearest'});
+      await loadInvites();
+    }
+  });
+  bindForm($('#edit-org'),async values => {
+    const updated = await api(path,{method:'PUT',body:{...orgValues(values),is_active:values.has('is_active')}});
+    if (current()) {
+      if (org.is_demo !== updated.is_demo || org.is_active !== updated.is_active) manageOrg(updated,newInvite,warning);
+      else {
+        $('#sheet-title').textContent = updated.name;
+        el.sheetContent.firstElementChild.innerHTML = `<small>ID ${esc(updated.id)}</small>${badges(updated)}`;
+      }
+      notice('Лесопилка обновлена');
+    }
+    void refresh();
+  });
+  const resetForm = $('#reset-org');
+  if (resetForm) bindForm(resetForm,async values => {
+    const confirm = values.get('confirm').trim().toUpperCase();
+    if (confirm !== 'СБРОС') throw new Error('Введите СБРОС для подтверждения');
+    await api(path+'/reset-test-data',{method:'POST',body:{confirm}});
+    if (current()) {
+      resetForm.reset();
+      notice('Тестовые данные сброшены');
+    }
+    void refresh();
+  });
+  void loadInvites();
+}
+
+async function copy(value) {
+  try { await navigator.clipboard.writeText(value); }
+  catch {
+    const field = document.createElement('textarea');
+    field.value = value;
+    field.readOnly = true;
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    (el.sheet.open ? el.sheet : document.body).append(field);
+    const focused = document.activeElement;
+    field.select();
+    try {
+      if (!document.execCommand('copy')) throw new Error('Копирование недоступно');
+    } finally {
+      field.remove();
+      focused?.focus();
+    }
+  }
+}
+document.addEventListener('click',async event => {
+  const button = event.target.closest('button');
+  if (!button) return;
+  if (button.dataset.tab) showTab(button.dataset.tab);
+  if (button.hasAttribute('data-refresh')) void refresh();
+  if (button.dataset.org) {
+    const org = state.overview?.organizations?.find(item => String(item.id) === button.dataset.org);
+    if (org) manageOrg(org);
+  }
+  if (button.dataset.copy) {
+    try {
+      await copy(button.dataset.copy);
+      notice('Скопировано');
+    } catch {
+      notice('Не удалось скопировать. Выделите код или откройте ссылку.');
+    }
+  }
+});
+$('#filters').addEventListener('click',event => {
+  const button = event.target.closest('[data-filter]');
+  if (!button) return;
+  state.filter = button.dataset.filter;
+  for (const filter of document.querySelectorAll('[data-filter]')) filter.setAttribute('aria-pressed',String(filter === button));
+  renderOrgs();
+});
+$('#search').addEventListener('input',renderOrgs);
+$('#create').onclick = createOrg;
+$('#refresh').onclick = () => refresh();
+$('#close').onclick = () => el.sheet.close();
+$('#logout').onclick = () => signOut();
+$('#theme-switch').onchange = event => {
+  localStorage.setItem('theme',event.target.checked ? 'dark' : 'light');
+  applyTheme();
+};
+window.addEventListener('storage',event => {
+  if (event.key === 'theme') applyTheme();
+  if (event.key === 'jwt_token' && state.authenticated) {
+    if (!event.newValue) showLogin('Сессия завершилась. Войдите снова.');
+    else location.reload();
+  }
+});
+applyTheme();
+safeArea();
+tg?.onEvent?.('themeChanged',applyTheme);
+tg?.onEvent?.('safeAreaChanged',safeArea);
+tg?.onEvent?.('contentSafeAreaChanged',safeArea);
+tg?.ready?.();
+tg?.expand?.();
+void start();
+</script>
+</body>
+</html>

@@ -96,6 +96,82 @@ func (r *Repository) ListOrganizations(ctx context.Context) ([]domain.Organizati
 	return pgx.CollectRows(rows, pgx.RowToStructByName[domain.Organization])
 }
 
+func (r *Repository) GetPlatformOverview(ctx context.Context) (*domain.PlatformOverview, error) {
+	overview := &domain.PlatformOverview{Organizations: []domain.OrganizationStats{}}
+	started := time.Now()
+	if err := r.db.Ping(ctx); err != nil {
+		return nil, err
+	}
+	overview.DBLatencyMs = float64(time.Since(started)) / float64(time.Millisecond)
+
+	if err := r.db.QueryRow(ctx, `SELECT pg_database_size(current_database()), (SELECT COUNT(*) FROM users)`).
+		Scan(&overview.DBSizeBytes, &overview.TotalUsers); err != nil {
+		return nil, err
+	}
+
+	rows, err := r.db.Query(ctx, `WITH members AS (
+		SELECT organization_id, COUNT(*) AS count FROM organization_members GROUP BY organization_id
+	), order_stats AS (
+		SELECT organization_id, COUNT(*) AS count, MAX(created_at) AS last_activity
+		FROM orders GROUP BY organization_id
+	), board_stock AS (
+		SELECT organization_id, SUM(volume_m3) AS volume
+		FROM boards WHERE count > 0 GROUP BY organization_id
+	), log_stock AS (
+		SELECT organization_id, SUM(remaining_volume_m3) AS volume
+		FROM log_items WHERE remaining_volume_m3 > 0 GROUP BY organization_id
+	), log_activity AS (
+		SELECT organization_id, MAX(created_at) AS last_activity FROM log_arrivals GROUP BY organization_id
+	), sawing_activity AS (
+		SELECT organization_id, MAX(created_at) AS last_activity FROM sawing_operations GROUP BY organization_id
+	), sale_activity AS (
+		SELECT organization_id, MAX(created_at) AS last_activity FROM sales GROUP BY organization_id
+	)
+	SELECT o.id, o.name, o.company_info, o.is_demo, o.is_active, o.last_order_number, o.created_at,
+		COALESCE(members.count, 0), COALESCE(order_stats.count, 0),
+		COALESCE(board_stock.volume, 0), COALESCE(log_stock.volume, 0),
+		firewood.raw, firewood.split + firewood.round,
+		GREATEST(order_stats.last_activity, log_activity.last_activity, sawing_activity.last_activity,
+			sale_activity.last_activity, firewood.last_arrival_at)
+	FROM organizations o
+	LEFT JOIN members ON members.organization_id = o.id
+	LEFT JOIN order_stats ON order_stats.organization_id = o.id
+	LEFT JOIN board_stock ON board_stock.organization_id = o.id
+	LEFT JOIN log_stock ON log_stock.organization_id = o.id
+	LEFT JOIN log_activity ON log_activity.organization_id = o.id
+	LEFT JOIN sawing_activity ON sawing_activity.organization_id = o.id
+	LEFT JOIN sale_activity ON sale_activity.organization_id = o.id
+	CROSS JOIN LATERAL (`+firewoodStockQuery+`) firewood
+	ORDER BY o.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var stats domain.OrganizationStats
+		err := rows.Scan(&stats.ID, &stats.Name, &stats.CompanyInfo, &stats.IsDemo, &stats.IsActive,
+			&stats.LastOrderNumber, &stats.CreatedAt, &stats.MembersCount, &stats.OrdersCount,
+			&stats.BoardsVolumeM3, &stats.LogsVolumeM3, &stats.FirewoodRawM3, &stats.FirewoodReadyM3, &stats.LastActivityAt)
+		if err != nil {
+			return nil, err
+		}
+		overview.Organizations = append(overview.Organizations, stats)
+		overview.TotalOrders += stats.OrdersCount
+		if stats.IsActive {
+			overview.ActiveOrganizations++
+		}
+		if stats.IsDemo {
+			overview.DemoOrganizations++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	overview.TotalOrganizations = len(overview.Organizations)
+	return overview, nil
+}
+
 func (r *Repository) ListUserOrganizations(ctx context.Context, userID int64) ([]domain.UserOrganization, error) {
 	rows, err := r.db.Query(ctx, `SELECT o.id AS organization_id, o.name, o.company_info, o.is_demo, o.is_active, m.role
 		FROM organization_members m JOIN organizations o ON o.id = m.organization_id
@@ -163,6 +239,9 @@ func (r *Repository) ListOrganizationInvites(ctx context.Context, orgID int64) (
 	return pgx.CollectRows(rows, pgx.RowToStructByNameLax[domain.OrganizationInvite])
 }
 
+const revokeInviteSQL = `UPDATE organization_invites SET revoked_at = NOW()
+	WHERE id = $1 AND organization_id = $2 AND revoked_at IS NULL`
+
 func (r *Repository) RevokeInvite(ctx context.Context, orgID, inviteID int64) (bool, error) {
 	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
@@ -170,12 +249,17 @@ func (r *Repository) RevokeInvite(ctx context.Context, orgID, inviteID int64) (b
 	}
 	defer tx.Rollback(ctx)
 
-	tag, err := tx.Exec(ctx, `UPDATE organization_invites SET revoked_at = NOW()
-		WHERE id = $1 AND organization_id = $2 AND revoked_at IS NULL`, inviteID, orgID)
+	tag, err := tx.Exec(ctx, revokeInviteSQL, inviteID, orgID)
 	if err != nil {
 		return false, err
 	}
 	return tag.RowsAffected() > 0, tx.Commit(ctx)
+}
+
+func (r *Repository) RevokeAdminInvite(ctx context.Context, orgID, inviteID int64) (bool, error) {
+	// Одно обновление по паре (лесопилка, приглашение) работает и для замороженной лесопилки.
+	tag, err := r.db.Exec(ctx, revokeInviteSQL, inviteID, orgID)
+	return tag.RowsAffected() > 0, err
 }
 
 func (r *Repository) AcceptInvite(ctx context.Context, codeHash string, userID int64) (*domain.UserOrganization, error) {

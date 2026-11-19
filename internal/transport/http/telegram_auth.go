@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -26,16 +27,18 @@ const (
 )
 
 type TelegramAuthHandler struct {
-	repo      *repository.Repository
-	botToken  string
-	jwtSecret []byte
+	repo          *repository.Repository
+	botToken      string
+	adminBotToken string
+	jwtSecret     []byte
 }
 
 func NewTelegramAuthHandler(repo *repository.Repository, botToken, jwtSecret string) *TelegramAuthHandler {
 	return &TelegramAuthHandler{
-		repo:      repo,
-		botToken:  botToken,
-		jwtSecret: []byte(jwtSecret),
+		repo:          repo,
+		botToken:      botToken,
+		adminBotToken: strings.Trim(strings.TrimSpace(os.Getenv("ADMIN_BOT_TOKEN")), "\"'"),
+		jwtSecret:     []byte(jwtSecret),
 	}
 }
 
@@ -54,7 +57,11 @@ func (h *TelegramAuthHandler) LoginViaTelegram(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	data, err := telegram.ValidateInitData(req.InitData, h.botToken, initDataMaxAge, time.Now())
+	now := time.Now()
+	data, err := telegram.ValidateInitData(req.InitData, h.botToken, initDataMaxAge, now)
+	if errors.Is(err, telegram.ErrInvalidSignature) && h.adminBotToken != "" {
+		data, err = telegram.ValidateInitData(req.InitData, h.adminBotToken, initDataMaxAge, now)
+	}
 	if err != nil {
 		log.Printf("TG AUTH: вход отклонён: %v (remote=%s)", err, r.RemoteAddr)
 		if errors.Is(err, telegram.ErrEmptyToken) {

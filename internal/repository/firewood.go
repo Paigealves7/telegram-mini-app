@@ -63,26 +63,34 @@ func readFirewoodStock(ctx context.Context, orgID int64, db interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }) (*domain.FirewoodStock, error) {
 	var s domain.FirewoodStock
-	err := db.QueryRow(ctx, `WITH adjustments AS (
-		SELECT COALESCE(SUM(raw_delta_m3),0) AS raw, COALESCE(SUM(split_delta_m3),0) AS split,
-			COALESCE(SUM(round_delta_m3),0) AS round FROM firewood_stock_adjustments WHERE organization_id = $1
-	), production AS (
-		SELECT COALESCE(SUM(raw_m3),0) AS raw, COALESCE(SUM(volume_m3) FILTER (WHERE kind='split'),0) AS split,
-			COALESCE(SUM(volume_m3) FILTER (WHERE kind='round'),0) AS round FROM firewood_processing WHERE organization_id = $1
-	), shipped AS (
-		SELECT COALESCE(SUM(f.volume_m3) FILTER (WHERE f.kind='split'),0) AS split,
-			COALESCE(SUM(f.volume_m3) FILTER (WHERE f.kind='round'),0) AS round
-		FROM order_firewood f JOIN orders o ON o.id = f.order_id AND o.organization_id = f.organization_id
-		WHERE f.organization_id = $1 AND o.status = 'completed'
-	)
-	SELECT (SELECT COALESCE(SUM(volume_m3),0) FROM firewood_arrivals WHERE organization_id = $1)-p.raw+a.raw,
-		p.split-s.split+a.split, p.round-s.round+a.round
-	FROM production p CROSS JOIN adjustments a CROSS JOIN shipped s`, orgID).Scan(&s.RawM3, &s.SplitM3, &s.RoundM3)
+	err := db.QueryRow(ctx, `SELECT stock.raw, stock.split, stock.round
+	FROM (SELECT $1::bigint AS id) o CROSS JOIN LATERAL (`+firewoodStockQuery+`) stock`, orgID).
+		Scan(&s.RawM3, &s.SplitM3, &s.RoundM3)
 	if err != nil {
 		return nil, err
 	}
 	return &s, nil
 }
+
+// Общий расчёт остатков для склада и обзора платформы. o.id — ID лесопилки.
+const firewoodStockQuery = `WITH adjustments AS (
+		SELECT COALESCE(SUM(raw_delta_m3),0) AS raw, COALESCE(SUM(split_delta_m3),0) AS split,
+			COALESCE(SUM(round_delta_m3),0) AS round FROM firewood_stock_adjustments WHERE organization_id = o.id
+	), production AS (
+		SELECT COALESCE(SUM(raw_m3),0) AS raw, COALESCE(SUM(volume_m3) FILTER (WHERE kind='split'),0) AS split,
+			COALESCE(SUM(volume_m3) FILTER (WHERE kind='round'),0) AS round FROM firewood_processing WHERE organization_id = o.id
+	), shipped AS (
+		SELECT COALESCE(SUM(f.volume_m3) FILTER (WHERE f.kind='split'),0) AS split,
+			COALESCE(SUM(f.volume_m3) FILTER (WHERE f.kind='round'),0) AS round
+		FROM order_firewood f JOIN orders ord ON ord.id = f.order_id AND ord.organization_id = f.organization_id
+		WHERE f.organization_id = o.id AND ord.status = 'completed'
+	), arrivals AS (
+		SELECT COALESCE(SUM(volume_m3),0) AS volume, MAX(created_at) AS last_arrival_at
+		FROM firewood_arrivals WHERE organization_id = o.id
+	)
+	SELECT arrivals.volume-p.raw+a.raw AS raw, p.split-s.split+a.split AS split,
+		p.round-s.round+a.round AS round, arrivals.last_arrival_at
+	FROM production p CROSS JOIN adjustments a CROSS JOIN shipped s CROSS JOIN arrivals`
 
 func (r *Repository) DeleteFirewoodArrival(ctx context.Context, orgID int64, id int64) error {
 	return pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {

@@ -384,9 +384,6 @@ body[data-view="home"] #view{display:block}
 .order-actions .primary{background:var(--wood);color:var(--ink)}
 .order-cancel,.btn.order-cancel,.form-error{color:var(--err)}
 .btn.admin-delete{color:var(--err);border-color:var(--err)}
-.role-preview{padding:12px 16px}
-.role-preview .seg{flex-wrap:wrap;border-radius:16px;margin:8px 0 0}
-.role-preview .seg button{flex:1 1 auto}
 .form-rows{display:grid;gap:12px;margin-bottom:12px}
 .form-row{border:1px solid var(--line);border-radius:var(--r-fld);padding:12px;min-width:0}
 .form-row-head,.form-row-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
@@ -523,7 +520,7 @@ body[data-view="home"] #hact .avatar{display:flex;width:38px;min-width:38px;heig
 .profile-setting+ .profile-setting,.profile-link+ .profile-link{border-top:1px solid var(--line)}
 .profile-setting b,.profile-link b{font-size:14px;font-weight:500}.profile-setting p{font-size:11px}
 .profile-link{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:0;border:0;background:transparent;text-align:left}
-.profile-link b{flex:1}.profile-link>svg{width:18px;height:18px;color:var(--t3)}
+.profile-link b{flex:1;min-width:0;overflow-wrap:anywhere}.profile-link[href]{color:inherit;text-decoration:none}.profile-link>svg{flex:none;width:18px;height:18px;color:var(--t3)}
 .profile-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--s2)}
 .profile-icon svg{width:18px;height:18px}
 .profile-logout{min-height:44px;margin-top:0}
@@ -651,16 +648,16 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
 
 
 /* Организации и приглашения */
-.org-title,.org-choice,.org-switch,.org-actions{display:flex;align-items:center;gap:8px;min-width:0}
+.org-title,.org-choice,.org-actions{display:flex;align-items:center;gap:8px;min-width:0}
 .side-brand>svg{flex:none}
 .org-title-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .org-demo{flex:none;white-space:nowrap}
 .org-list{display:grid;gap:8px;min-width:0;margin:16px 0}
-.org-choice,.org-switch{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--line2);border-radius:12px;background:var(--s1);color:var(--t1);text-align:left;transition:transform 100ms var(--ease)}
-.org-choice:active,.org-switch:active{transform:scale(.97)}
-.org-choice>span:first-child,.org-switch>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.org-choice{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--line2);border-radius:12px;background:var(--s1);color:var(--t1);text-align:left;transition:transform 100ms var(--ease)}
+.org-choice:active{transform:scale(.97)}
+.org-choice>span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
 .org-choice small{display:block;color:var(--t2);margin-top:2px}
-.org-choice svg,.org-switch svg{flex:none;width:16px;height:16px}
+.org-choice svg{flex:none;width:16px;height:16px}
 .org-gate{max-width:460px}
 .org-gate .org-list{max-height:min(45dvh,360px);overflow:auto;overscroll-behavior:contain}
 .org-check{margin:12px 0}
@@ -669,22 +666,20 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
 .org-actions{flex-wrap:wrap}
 .org-actions .btn{width:auto;min-height:44px;max-width:100%;white-space:normal}
 .org-code{display:block;margin:14px 0;font-size:clamp(20px,6vw,32px);font-weight:700;letter-spacing:.07em;white-space:nowrap}
-.org-editor textarea{width:100%;min-height:92px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--s1);color:inherit;resize:vertical}
-.org-editor .org-checkline{display:flex;align-items:center;gap:8px;margin:12px 0;min-width:0;overflow-wrap:anywhere}
-.org-checkline input{width:18px;height:18px;flex:none}
-body.noauth[data-view="orgs"] #sheet.on{display:block}
-body.noauth[data-view="orgs"] #view{display:block}
-.side-org-switch{display:none}
-.home-org-switch{display:flex;width:44px;min-width:44px;padding:0;justify-content:center}
-.home-org-switch>span,.home-org-switch>svg:last-child{display:none}
-#hact .home-org-switch{flex:none}
-@media(max-width:399px){#title .org-title{gap:4px}#title .org-demo{font-size:9px;padding:3px 4px}body[data-view="home"] #hact .home-reports{display:none}}
-#title .org-title{max-width:100%}
-#title:has(.org-title){min-width:0}
-html.lite .org-choice,html.lite .org-switch{transition:none}
-html.lite .org-choice:active,html.lite .org-switch:active{transform:none}
-@media(prefers-reduced-motion:reduce){.org-choice:active,.org-switch:active{transform:none}}
-@media(min-width:768px){.side-org-switch{display:flex;margin:0 0 12px}.home-org-switch{display:none}.side-brand{margin-bottom:12px}}
+#title .org-title{max-width:100%;min-height:44px}
+#title button.org-title{padding:0;border:0;background:transparent;color:inherit;font:inherit;letter-spacing:inherit;text-align:left;transition:transform 100ms var(--ease)}
+#title button.org-title:active{transform:scale(.97)}
+.org-chevron{flex:none;font-size:14px;color:var(--t2)}
+body[data-view="home"] #hact{flex-wrap:nowrap}
+@media(max-width:399px){
+  #title .org-title{gap:4px}
+  body[data-view="home"] #hact .home-reports{gap:4px;padding:0 8px}
+  body[data-view="home"] #hact .home-reports span{font-size:12px}
+  body[data-view="home"] #hact .home-reports svg{width:16px;height:16px}
+}
+html.lite .org-choice,html.lite #title button.org-title{transition:none}
+html.lite .org-choice:active,html.lite #title button.org-title:active{transform:none}
+@media(prefers-reduced-motion:reduce){.org-choice:active,#title button.org-title:active{transform:none}}
 
 </style>
 </head>
@@ -701,7 +696,7 @@ html.lite .org-choice:active,html.lite .org-switch:active{transform:none}
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-const tg = window.Telegram.WebApp, inTg = !!tg.initData;
+const tg = window.Telegram?.WebApp, inTg = !!tg?.initData;
 document.documentElement.classList.toggle('in-telegram', inTg);
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -750,7 +745,7 @@ const ICP = {
 };
 const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICP[n] || ''}</svg>`;
 
-tg.ready(); tg.expand();
+tg?.ready(); tg?.expand();
 /* Тема пользователя имеет приоритет над оформлением Telegram. */
 let chosenTheme = null;
 try { chosenTheme = localStorage.getItem('theme'); } catch (e) {}
@@ -775,7 +770,7 @@ function toggleTheme() {
   theme();
   const label = document.querySelector('.profile-setting .mut'); if(label) label.textContent = document.documentElement.dataset.t === 'dark' ? 'Тёмная тема' : 'Светлая тема';
 }
-theme(); tg.onEvent('themeChanged', theme);
+theme(); tg?.onEvent('themeChanged', theme);
 try { tg.MainButton.hide(); } catch (e) {}
 
 
@@ -804,9 +799,18 @@ function perfProbe() {
 let orgEpoch = 0;
 const staleRequest = new Error('Запрос отменён при смене организации');
 const S = {orgId: +localStorage.getItem('org_id') || 0, orgs: [], org: null, role: 'worker', name: '', tab: 'home', cur: 'login', stack: [], wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', range: 'month', cq: ''};
+const previewURL = new URL(location.href);
+const requestedRole = previewURL.searchParams.get('preview_role');
+let rolePreview = STAFF_ROLES.includes(requestedRole) ? {role: requestedRole, orgId: S.orgId} : null;
+function clearRolePreview() {
+  rolePreview = null;
+  if (!previewURL.searchParams.has('preview_role')) return;
+  previewURL.searchParams.delete('preview_role');
+  history.replaceState(history.state, '', previewURL);
+}
 const canSuper = () => S.isSuperAdmin && !S.previewRole;
 let CFG = {pdf_send: true}; // настройки с сервера (/config)
-const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}, staff: [], invites: [], organizations: []};
+const D = {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}, staff: [], invites: []};
 function formMemory() {
   try { return JSON.parse(localStorage.getItem('mem_org_' + S.orgId) || '{}') || {}; }
   catch { return {}; }
@@ -881,7 +885,7 @@ function resetOrgState(id) {
   closeSheet();
   clearTimeout(DEB);
   statsRequest++;
-  Object.assign(D, {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}, staff: [], invites: [], organizations: []});
+  Object.assign(D, {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}, staff: [], invites: []});
   journalLinks.clear();
   Object.assign(S, {orgId: +id || 0, org: null, previewRole: '', tab: 'home', stack: [], jt: '', jq: '', wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', donefilter: 'all', cq: '', staffq: '', range: 'month'});
   FK = null;
@@ -891,43 +895,40 @@ function resetOrgState(id) {
 }
 
 async function selectOrg(id) {
+  if (+id !== S.orgId) clearRolePreview();
   resetOrgState(id);
   orgGate('orgloading', '<section class="login" aria-busy="true">' + sk(3) + '</section>');
   await loadConfig({open: 'home'});
 }
 
-async function loadConfig({open, forceChoice = false, stayAdmin = false} = {}) {
+async function loadConfig({open, forceChoice = false} = {}) {
   try {
     const c = await api('/config');
     if (!c) throw new Error('Не удалось загрузить настройки');
-    const id = forceChoice || c.organization?.is_active === false ? 0 : +c.organization_id || 0;
+    const superAdmin = c.is_super_admin === true;
+    const selected = c.organization?.is_active === false && !superAdmin ? 0 : +c.organization_id || 0;
+    const unavailablePreview = superAdmin && !!rolePreview?.orgId && selected !== rolePreview.orgId;
+    const id = forceChoice || unavailablePreview ? 0 : selected;
     const current = S.cur;
-    const previousRole = S.accountRole;
+    const previousRole = S.role;
     if (id !== S.orgId) resetOrgState(id);
+    if (!superAdmin || unavailablePreview || forceChoice) clearRolePreview();
     CFG = {...CFG, ...c};
-    S.orgs = c.organizations || [];
+    S.orgs = (c.organizations || []).filter(org => org.is_active);
     S.org = id ? c.organization || null : null;
     S.orgId = id;
     localStorage.setItem('org_id', id || '');
-    S.accountRole = c.role; S.isSuperAdmin = c.is_super_admin === true;
-    if (!S.isSuperAdmin) S.previewRole = '';
-    S.role = S.previewRole || S.accountRole;
+    S.isSuperAdmin = superAdmin;
+    S.previewRole = id && rolePreview ? rolePreview.role : '';
+    S.role = S.previewRole || c.role;
     if (!id) {
-      if (S.isSuperAdmin && (stayAdmin || !S.orgs.length)) await vOrgs();
-      else if (S.orgs.length) vOrgSelect();
+      if (S.orgs.length) vOrgSelect(unavailablePreview ? 'Выбранная лесопилка недоступна.' : '');
+      else if (superAdmin) vNoOrganizations();
       else vPending();
     } else {
       document.body.classList.remove('noauth');
       buildTabs();
-      if (stayAdmin) {
-        S.cur = 'orgs';
-        document.body.dataset.view = 'orgs';
-        document.body.classList.add('sub');
-        $('#title').textContent = TT.orgs;
-        setAct('orgs');
-        await vOrgs();
-      }
-      else if (open || previousRole !== S.accountRole || ['login', 'pending', 'orgselect', 'orgloading'].includes(current)) {
+      if (open || previousRole !== S.role || ['login', 'pending', 'orgselect', 'orgloading'].includes(current)) {
         go(open || (current === 'profile' ? 'profile' : 'home'));
       }
     }
@@ -992,7 +993,7 @@ function settle(v) {
 }
 /* ---------- навигация ---------- */
 const TABS = ['home', 'stock', 'orders', 'journal', 'stats'];
-const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники', cons: 'Контрагенты', adjlog: 'Корректировки склада', orgs: 'Организации (Лесопилки)'};
+const TT = {stock: 'Склад', orders: 'Заказы', journal: 'Журнал', stats: 'Отчёты', profile: 'Профиль', staff: 'Сотрудники', cons: 'Контрагенты', adjlog: 'Корректировки склада'};
 const canOrd = () => S.role === 'manager' || S.role === 'master';
 const jSegs = () => [canOrd() && ['arrivals', 'Приходы'], S.role !== 'master' && ['production', 'Распилы'], canOrd() && ['sales', 'Продажи']].filter(Boolean);
 
@@ -1001,7 +1002,7 @@ function buildTabs() {
   if (canOrd()) t.push(['orders', 'order', 'Заказы']);
   t.push(['journal', 'journal', 'Журнал']);
   if(S.role==='manager') t.push(['stats','chart','Отчёты']);
-  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+`<span class="org-title">${orgTitle()}</span></div>` + orgSwitchButton('Сменить лесопилку', 'side-org-switch') + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile"><span class="side-avatar">${esc((S.name || '?')[0].toUpperCase())}</span><span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span>${ic('chev')}</button></div>`;
+  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+`<span class="org-title">${orgTitle()}</span></div>` + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile"><span class="side-avatar">${esc((S.name || '?')[0].toUpperCase())}</span><span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span>${ic('chev')}</button></div>`;
   theme();
 }
 const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-label="Создать: ${l}" title="Создать: ${l}">${ic('plus')}<span>${l}</span></button>`;
@@ -1009,7 +1010,6 @@ function setAct(v) {
   const actions = v === 'staff' ? hbtn('user','Сотрудник') : v === 'cons' ? '<button class="hbtn" data-a="cedit" data-v="new">'+ic('plus')+'<span>Контрагент</span></button>' : v === 'orders' ? hbtn('order', 'Новый заказ')
     : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
   $('#hact').innerHTML = (v === 'home' ?
-    orgSwitchButton('Сменить лесопилку', 'home-org-switch') +
     (S.role === 'manager' ? '<button class="hbtn home-reports" data-a="go" data-v="stats" aria-label="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
     '<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль" title="Профиль">' + esc((S.name || '?')[0].toUpperCase()) + '</button>' : '') + actions;
   theme();
@@ -1033,19 +1033,21 @@ function show(v, p) {
   closeSheet();
   S.cur = v;
   document.body.dataset.view = v;
-  const f = FORMS[v], sub = !!f || v === 'stats' || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog' || v === 'orgs';
+  const f = FORMS[v], sub = !!f || v === 'stats' || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog';
   document.body.classList.toggle('form', !!f);
   document.body.classList.toggle('sub', sub);
-  if (v === 'home') $('#title').innerHTML = `<span class="org-title">${orgTitle()}</span>`;
+  if (v === 'home') $('#title').innerHTML = canSwitchOrg()
+    ? `<button class="org-title" type="button" data-a="orgswitch" aria-label="Сменить лесопилку, текущая — ${esc(orgName())}">${orgTitle()}<span class="org-chevron" aria-hidden="true">▾</span></button>`
+    : `<span class="org-title">${orgTitle()}</span>`;
   else $('#title').textContent = f ? f.t : TT[v] || orgName();
   setAct(v);
   const profileButton=$('.side-profile'); if(profileButton){profileButton.classList.toggle('on',v==='profile');v==='profile'?profileButton.setAttribute('aria-current','page'):profileButton.removeAttribute('aria-current');}
   $$('.tab').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
   try { sub ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {}
   scrollTo(0, 0); $('#workspace').scrollTop=0; $('#view').scrollTop=0;
-  if (f) run(vForm(v, p)); else run(({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff, cons: vCons, adjlog: vAdjLog, orgs: vOrgs}[v] || (() => {}))());
+  if (f) run(vForm(v, p)); else run(({home: vHome, stock: vStock, orders: vOrders, journal: vJournal, stats: vStats, profile: vProfile, staff: vStaff, cons: vCons, adjlog: vAdjLog}[v] || (() => {}))());
 }
-tg.BackButton.onClick(back);
+tg?.BackButton.onClick(back);
 $('#hb').innerHTML = ic('back');
 
 /* ---------- помощники отображения ---------- */
@@ -1403,21 +1405,15 @@ async function loadStats() {
 /* ---------- профиль и вход ---------- */
 function vProfile() {
   const j = jwt() || {};
-  $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><div><h2>${esc(S.name)}</h2><p class="profile-meta"><span class="role-badge">${esc(ROLE[S.role] || S.role)}</span> ${S.isSuperAdmin ? '<span class="role-badge">Супер-Админ</span>' : ''} · ID ${esc(j.user_id || '—')}</p></div></div>
-    ${orgSwitchButton()}
-    <button class="btn ghost org-check" data-a="orgpending">Войти по коду приглашения</button>
-    ${S.isSuperAdmin ? `<button class="profile-link profile-group" data-a="go" data-v="orgs"><span class="profile-icon">${ic('box')}</span><b>Организации (Лесопилки)</b>${ic('chev')}</button>` : ''}
+  $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><div><h2>${esc(S.name)}</h2><p class="profile-meta"><span class="role-badge">${esc(ROLE[S.role] || S.role)}</span> · ID ${esc(j.user_id || '—')}</p></div></div>
+    ${canSwitchOrg() ? `<div class="profile-group"><button class="profile-link" data-a="orgswitch"><span class="profile-icon">${ic('box')}</span><b>Сменить лесопилку</b>${ic('chev')}</button></div>` : ''}
     <h2 class="profile-heading">Настройки приложения</h2>
     <div class="profile-group settings-group">
       <div class="profile-setting"><div><b>Оформление</b><p class="mut sm">${document.documentElement.dataset.t === 'dark' ? 'Тёмная тема' : 'Светлая тема'}</p></div><button class="sw" role="switch" aria-checked="${document.documentElement.dataset.t === 'dark'}" aria-label="Тёмная тема" data-a="theme"></button></div>
       <div class="profile-setting"><div><b>Экономный режим</b><p class="mut sm">Меньше анимаций</p></div><button class="sw" role="switch" aria-checked="${isLite()}" aria-label="Экономный режим" data-a="lite"></button></div>
     </div>
-    ${S.isSuperAdmin ? `<div class="profile-group role-preview"><b>Смотреть интерфейс как</b>
-      <div class="seg">${STAFF_ROLES.map(role => `<button data-a="previewrole" data-v="${role}" class="${S.previewRole === role ? 'on' : ''}" aria-pressed="${S.previewRole === role}">${ROLE[role]}</button>`).join('')}</div>
-      ${S.previewRole ? '<button class="lnk" data-a="previewrole" data-v="">Вернуться в режим супер-админа</button>' : ''}
-    </div>` : ''}
     ${S.role === 'manager' ? `<h2 class="profile-heading">Управление</h2><div class="profile-group">${[['staff','user','Сотрудники'],['cons','box','Контрагенты'],['adjlog','box','Корректировки склада'],['stats','chart','Отчёты']].map(([v,i,t])=>`<button class="profile-link" data-a="go" data-v="${v}"><span class="profile-icon">${ic(i)}</span><b>${t}</b>${ic('chev')}</button>`).join('')}</div>` : ''}
-    ${canSuper() && S.org?.is_demo ? '<button class="btn ghost admin-delete profile-logout" data-a="resetdata">Очистить тестовые данные</button>' : ''}
+    ${S.isSuperAdmin ? `<div class="profile-group">${adminLink()}</div>` : ''}
     ${inTg ? '' : '<button class="btn ghost profile-logout" data-a="logout">Выйти</button>'}`;
 }
 /* ---------- корректировки склада (только руководитель) ---------- */
@@ -1473,11 +1469,10 @@ function staffList(){
   $('#stafflist').innerHTML=grp('Сотрудники',list.length,list.map(u=>`<button class="staff-card" data-a="staff" data-v="${esc(u.id)}"><span class="staff-avatar">${esc(Array.from(staffBaseName(u).replace(/^@/,''))[0]?.toUpperCase()||'?')}</span><span class="staff-main"><b>${esc(staffName(u))}</b><small>${esc(staffSub(u))}</small></span><span class="staff-end"><span class="staff-role ${Object.hasOwn(ROLE,u.role)?u.role:'worker'}">${esc(u.role === 'pending' ? 'Ожидает доступа' : canSuper() && u.is_super_admin ? 'Супер-Админ' : ROLE[u.role]||u.role)}</span><small>${esc(sdate(u.created_at))}</small></span></button>`).join('')||none('Сотрудники не найдены'));
 }
 const orgName = () => S.org?.name || 'Лесопилка';
-const orgTitle = () => `<span class="org-title-name" title="${esc(orgName())}">${esc(orgName())}</span>${orgDemoBadge(S.org)}`;
+const orgTitle = () => `<span class="org-title-name" title="${esc(orgName())}">${esc(orgName())}</span>`;
 const orgDemoBadge = org => org?.is_demo ? '<span class="role-badge org-demo">ДЕМО</span>' : '';
-const canSwitchOrg = () => S.orgs.length > 1 || S.isSuperAdmin;
-const orgSwitchButton = (label = 'Сменить лесопилку', cls = '') =>
-  canSwitchOrg() ? `<button class="org-switch ${cls}" data-a="orgswitch" aria-label="${esc(label)}" title="${esc(label)}">${ic('box')}<span>${esc(label)}</span>${ic('chev')}</button>` : '';
+const canSwitchOrg = () => S.orgs.length > 1;
+const adminLink = () => `<a class="profile-link" href="/admin"><span class="profile-icon">${ic('lock')}</span><b>Панель управления платформой</b>${ic('chev')}</a>`;
 const logoutButton = () => inTg ? '' : '<button class="btn ghost" data-a="logout">Выйти</button>';
 
 function orgGate(view, body) {
@@ -1500,12 +1495,20 @@ function orgChoices() {
     </button>`).join('') || '<p class="mut">Активных лесопилок пока нет</p>';
 }
 
-function vOrgSelect() {
+function vOrgSelect(message = '') {
   orgGate('orgselect', `<section class="login org-gate"><div class="logo">${ic('box')}</div>
     <h1>Выберите лесопилку</h1>
+    ${message ? `<p class="sub">${esc(message)}</p>` : ''}
     <div class="org-list">${orgChoices()}</div>
     <button class="btn ghost" data-a="orgpending">У меня есть код приглашения</button>
-    ${S.isSuperAdmin ? '<button class="btn ghost" data-a="orgadmin">Организации (Лесопилки)</button>' : ''}
+    ${S.org ? '<button class="btn ghost" data-a="orgback">Вернуться в лесопилку</button>' : ''}
+    ${logoutButton()}</section>`);
+}
+
+function vNoOrganizations() {
+  orgGate('orgselect', `<section class="login org-gate"><div class="logo">${ic('box')}</div>
+    <h1>Нет доступных лесопилок</h1>
+    ${adminLink()}
     ${logoutButton()}</section>`);
 }
 
@@ -1525,7 +1528,7 @@ function vPending() {
 }
 
 function startInviteCode() {
-  const param = String(tg.initDataUnsafe?.start_param || '').trim();
+  const param = String(tg?.initDataUnsafe?.start_param || '').trim();
   const code = param.replace(/^inv_/i, '');
   return /^[A-HJ-NP-Z2-9]{10}$/i.test(code) ? code.toUpperCase() : '';
 }
@@ -1554,7 +1557,7 @@ function inviteSheet() {
   if (S.role !== 'manager') return;
   sheet(`<h3>Пригласить по коду</h3><form id="invite-create" class="org-editor">
     <div class="fld"><label for="invite-role">Роль</label><select id="invite-role" name="role">
-      ${(canSuper() ? ['master', 'worker', 'manager'] : ['master', 'worker']).map(r => `<option value="${r}">${ROLE[r]}</option>`).join('')}
+      ${['master', 'worker'].map(r => `<option value="${r}">${ROLE[r]}</option>`).join('')}
     </select></div>
     <div class="fld"><label for="invite-uses">Количество использований</label><input id="invite-uses" name="max_uses" type="number" min="1" max="2147483647" value="1" required></div>
     <div class="fld"><label for="invite-days">Срок действия, дней</label><input id="invite-days" name="expires_in_days" type="number" min="1" max="365" value="7" required></div>
@@ -1590,50 +1593,6 @@ async function copyInvite(text) {
   toast(copied ? 'Скопировано' : 'Выделите и скопируйте код вручную', copied ? 'ok' : 'err');
 }
 
-async function vOrgs() {
-  if (!S.isSuperAdmin) return;
-  if (!S.org && (S.cur !== 'orgs' || !document.body.classList.contains('noauth'))) orgGate('orgs', '');
-  const v = $('#view');
-  v.innerHTML = sk(3);
-  const list = await safe('/admin/organizations');
-  if (S.cur !== 'orgs') return;
-  if (!list) {
-    v.innerHTML = '<button class="btn ghost" data-a="orgadmin">Повторить загрузку</button>';
-    return;
-  }
-  D.organizations = list;
-  v.innerHTML = `<section class="${S.org ? 'workspace-card' : 'login org-gate'}">
-    <h2>${list.length ? 'Организации (Лесопилки)' : 'Создайте первую лесопилку'}</h2>
-    <button class="btn org-check" data-a="orgedit">Создать организацию</button>
-    ${list.map(o => `<article class="org-admin-card">
-      <b>${esc(o.name)}</b>
-      <p class="mut">${o.is_active ? 'Активна' : 'Скрыта'} · ${o.is_demo ? 'Демо' : 'Рабочая'}</p>
-      <div class="org-actions">
-        ${o.is_active && o.id !== S.orgId ? `<button class="btn ghost" data-a="orgpick" data-v="${esc(o.id)}">Переключиться</button>` : ''}
-        <button class="btn ghost" data-a="orgedit" data-v="${esc(o.id)}">Редактировать</button>
-        ${o.is_active ? `<button class="btn ghost" data-a="orgmanagerinvite" data-v="${esc(o.id)}">Выдать код руководителю</button>` : ''}
-      </div>
-    </article>`).join('')}
-    ${!S.org && S.orgs.length ? '<button class="btn ghost" data-a="orgselect">К выбору лесопилки</button>' : ''}
-    ${!S.org ? logoutButton() : ''}
-  </section>`;
-}
-
-function orgEditor(id) {
-  if (!S.isSuperAdmin) return;
-  const org = id ? D.organizations.find(o => o.id === +id) : null;
-  if (id && !org) return;
-  sheet(`<h3>${org ? 'Редактировать организацию' : 'Создать организацию'}</h3>
-    <form id="org-editor" class="org-editor" data-org-id="${esc(org?.id || '')}">
-      <div class="fld"><label for="org-name">Название</label><input id="org-name" name="name" value="${esc(org?.name || '')}" required></div>
-      <div class="fld"><label for="org-info">Реквизиты для PDF</label><textarea id="org-info" name="company_info">${esc(org?.company_info || '')}</textarea></div>
-      <label class="org-checkline"><input type="checkbox" name="is_demo" ${org?.is_demo ? 'checked' : ''}>Демонстрационная организация</label>
-      ${org ? `<label class="org-checkline"><input type="checkbox" name="is_active" ${org.is_active ? 'checked' : ''}>Активна</label>`
-        : '<label class="org-checkline"><input type="checkbox" name="create_manager_invite" checked>Создать одноразовый код для руководителя</label>'}
-      <button class="btn" type="submit">${org ? 'Сохранить' : 'Создать'}</button>
-    </form>`);
-}
-
 function vLogin(msg) {
   document.body.classList.add('noauth'); S.cur = 'login';
   $('#view').innerHTML = `<section class="login"><div class="logo">${ic('mark')}</div><h1>Лесопилка</h1><p class="sub">Учёт производства</p>
@@ -1660,9 +1619,10 @@ async function finish(tkn, name) {
   const priorUser = jwt()?.user_id;
   localStorage.setItem('jwt_token', tkn);
   const account = jwt() || {};
-  resetOrgState(priorUser && priorUser !== account.user_id ? 0 : S.orgId);
+  const switchedUser = priorUser && priorUser !== account.user_id;
+  if (switchedUser) clearRolePreview();
+  resetOrgState(switchedUser ? 0 : S.orgId);
   S.orgs = [];
-  S.accountRole = account.role || 'pending';
   S.isSuperAdmin = account.is_super_admin === true;
   S.name = name || localStorage.getItem('uname') || 'Сотрудник';
   orgGate('orgloading', '<section class="login" aria-busy="true">' + sk(3) + '</section>');
@@ -2044,29 +2004,13 @@ const ACT = {
  fwhistory:v=>fwHistory(+v||0),
  fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){ if (e === staleRequest) return;toast(e.message,'err')}},
   theme: toggleTheme,
-  previewrole: role => {
-    if (!S.isSuperAdmin || (role && !STAFF_ROLES.includes(role))) return;
-    S.previewRole = role; S.role = role || S.accountRole; S.tab = 'home'; S.stack = [];
-    buildTabs(); show('profile');
-  },
-  orgswitch: () => sheet(`<h3>Выберите лесопилку</h3><div class="org-list">${orgChoices()}</div>
-    <button class="btn ghost" data-a="orgpending">У меня есть код приглашения</button>`),
+  orgswitch: () => vOrgSelect(),
   orgpick: id => selectOrg(id),
   orgpending: vPending,
   orgback: () => loadConfig({open: 'home'}),
-  orgselect: vOrgSelect,
-  orgadmin: () => S.org ? go('orgs') : vOrgs(),
-  orgedit: orgEditor,
+  orgselect: () => vOrgSelect(),
   invitecreate: inviteSheet,
   invitecopy: copyInvite,
-  orgmanagerinvite: async (id, button) => {
-    if (!S.isSuperAdmin) return;
-    button.disabled = true;
-    try {
-      const invite = await api(`/admin/organizations/${id}/invites`, {method: 'POST', body: JSON.stringify({role: 'manager', max_uses: 1, expires_in_days: 7})});
-      inviteCodeSheet(invite);
-    } finally { button.disabled = false; }
-  },
   inviterevoke: async id => {
     if (!await ask('user', 'Отозвать приглашение?', 'По этому коду больше нельзя будет войти.', 'Отозвать')) return;
     await api(`/invites/${id}`, {method: 'DELETE'});
@@ -2082,30 +2026,9 @@ const ACT = {
       } else await loadConfig({open: 'home'});
     } finally { button.disabled = false; }
   },
-  resetdata: () => {
-    if (!canSuper() || !S.org?.is_demo) return;
-    sheet(`<h3>Очистить тестовые данные</h3>
-      <p class="mut">Очистить тестовые данные в демо-организации «${esc(S.org.name)}»?</p>
-      <p class="mut">Операции будут удалены, остатки обнулятся, нумерация заказов начнётся с №1.</p>
-      <div class="fld"><label for="reset-word">Для подтверждения введите СБРОС</label><input id="reset-word" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false"></div>
-      <button class="btn ghost admin-delete" data-a="resetdataok" data-v="${esc(S.org.id)}">Очистить данные</button>`);
-  },
-  resetdataok: async (id, button) => {
-    if (!canSuper() || !S.org?.is_demo || S.org.id !== +id) return;
-    const input = $('#sheet.on #sb input#reset-word');
-    if (!input) return;
-    const confirm = input.value.trim().toUpperCase().replace(/C/g,'С').replace(/B/g,'Б').replace(/P/g,'Р').replace(/O/g,'О');
-    if (confirm !== 'СБРОС') { input.focus(); toast('Для подтверждения введите СБРОС', 'err'); return; }
-    button.disabled = true;
-    try {
-      await api(`/admin/organizations/${id}/reset-test-data`, {method:'POST', body:JSON.stringify({confirm})});
-      await selectOrg(id);
-      if (S.org?.id === +id) { notify('success'); toast('Тестовые данные очищены'); }
-    } finally { button.disabled = false; }
-  },
   homekpi: v => { if(['boards','logs','firewood'].includes(v)){S.wt=v;S.wq='';S.wsp='';go('stock');}else{if(v==='orders'){S.of='open';S.oq='';}go(v);} },
   go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK, formParams),
-  logout: () => { localStorage.removeItem('jwt_token'); resetOrgState(0); S.orgs = []; S.isSuperAdmin = false; orgGate('login', ''); vLogin(); },
+  logout: () => { clearRolePreview(); localStorage.removeItem('jwt_token'); resetOrgState(0); S.orgs = []; S.isSuperAdmin = false; orgGate('login', ''); vLogin(); },
   new: v => { closeSheet(); go(v); },
   order: v => {
     const o = D.orders.find(x => x.id == v); if (!o) return;
@@ -2357,7 +2280,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('submit', async e => {
   const form = e.target;
-  if (['invite-accept', 'invite-create', 'org-editor'].includes(form.id)) {
+  if (['invite-accept', 'invite-create'].includes(form.id)) {
     e.preventDefault();
     const button = form.querySelector('button[type="submit"]');
     if (!button || button.disabled) return;
@@ -2366,25 +2289,12 @@ document.addEventListener('submit', async e => {
     try {
       if (form.id === 'invite-accept') {
         await acceptOrgInvite(String(fields.get('code') || ''));
-      } else if (form.id === 'invite-create') {
+      } else {
         if (S.role !== 'manager') return;
         const payload = {role: fields.get('role'), max_uses: +fields.get('max_uses'), expires_in_days: +fields.get('expires_in_days')};
         const invite = await api('/invites', {method: 'POST', body: JSON.stringify(payload)});
         if (S.cur === 'staff') run(vStaff());
         inviteCodeSheet(invite);
-      } else {
-        if (!S.isSuperAdmin) return;
-        const id = +form.dataset.orgId;
-        const payload = {name: fields.get('name'), company_info: fields.get('company_info'), is_demo: fields.has('is_demo')};
-        if (id) payload.is_active = fields.has('is_active');
-        else payload.create_manager_invite = fields.has('create_manager_invite');
-        const result = await api(id ? `/admin/organizations/${id}` : '/admin/organizations', {method: id ? 'PUT' : 'POST', body: JSON.stringify(payload)});
-        closeSheet();
-        if (id && id === S.orgId && !payload.is_active) resetOrgState(0);
-        await loadConfig({stayAdmin: true});
-        if (S.cur !== 'orgs') return;
-        if (result.manager_invite?.code) inviteCodeSheet(result.manager_invite);
-        toast(result.manager_invite_error || (id ? 'Организация обновлена' : 'Организация создана'), result.manager_invite_error ? 'err' : 'ok');
       }
     } catch (error) { reportError(error); }
     finally { button.disabled = false; }

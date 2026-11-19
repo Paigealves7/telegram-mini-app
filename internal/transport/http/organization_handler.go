@@ -78,14 +78,31 @@ func (h OrganizationHandler) AcceptInvite(w http.ResponseWriter, r *http.Request
 }
 
 func (h OrganizationHandler) ListInvites(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := requireOrgID(w, r)
+	if orgID, ok := requireOrgID(w, r); ok {
+		h.listInvites(w, r, orgID)
+	}
+}
+
+func (h OrganizationHandler) ListAdminInvites(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := adminID(w, r)
 	if !ok {
 		return
 	}
+	if _, err := h.repo.GetOrganizationByID(r.Context(), orgID); err != nil {
+		adminResult(w, r, "не удалось получить организацию", err)
+		return
+	}
+	h.listInvites(w, r, orgID)
+}
+
+func (h OrganizationHandler) listInvites(w http.ResponseWriter, r *http.Request, orgID int64) {
 	invites, err := h.repo.ListOrganizationInvites(r.Context(), orgID)
 	if err != nil {
 		serverError(w, r, "не удалось получить приглашения", err)
 		return
+	}
+	if invites == nil {
+		invites = []domain.OrganizationInvite{}
 	}
 	pdfWriteJSON(w, http.StatusOK, invites)
 }
@@ -149,6 +166,23 @@ func (h OrganizationHandler) RevokeInvite(w http.ResponseWriter, r *http.Request
 		return
 	}
 	revoked, err := h.repo.RevokeInvite(r.Context(), orgID, id)
+	writeInviteRevocation(w, r, revoked, err)
+}
+
+func (h OrganizationHandler) RevokeAdminInvite(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := adminID(w, r)
+	if !ok {
+		return
+	}
+	inviteID, ok := recordID(w, r, "inviteID")
+	if !ok {
+		return
+	}
+	revoked, err := h.repo.RevokeAdminInvite(r.Context(), orgID, inviteID)
+	writeInviteRevocation(w, r, revoked, err)
+}
+
+func writeInviteRevocation(w http.ResponseWriter, r *http.Request, revoked bool, err error) {
 	if err == nil && !revoked {
 		http.Error(w, "приглашение не найдено или уже отозвано", http.StatusNotFound)
 		return
