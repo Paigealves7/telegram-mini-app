@@ -132,7 +132,7 @@ button.li:active{background-color:rgba(255,255,255,.06)}
 /* формы */
 .fgrid{display:grid;grid-template-columns:1fr 1fr;column-gap:16px}
 .fs{grid-column:span 2;margin:32px 0 16px;font-size:20px;font-weight:500}.fgrid>.fs:first-child{margin-top:0}
-.fld{grid-column:span 2;margin-bottom:16px;min-width:0}.fld.half{grid-column:span 1}
+.fld{grid-column:span 2;margin-bottom:16px;min-width:0}.fld.half{grid-column:span 1;align-self:end}
 .fld>label{display:block;margin-bottom:8px;color:var(--t2);font-size:14px;font-weight:500}
 .fld input,.fld select{width:100%;height:52px;padding:0 18px;border:1px solid var(--line);border-radius:20px;outline:0;background:var(--s1);box-shadow:inset 0 1px 0 rgba(255,255,255,.06);appearance:none;-webkit-appearance:none;transition:border-color .2s,box-shadow .2s}
 .fld input::placeholder{color:var(--t3)}
@@ -142,6 +142,8 @@ button.li:active{background-color:rgba(255,255,255,.06)}
 .num{display:flex;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:var(--s1);box-shadow:inset 0 1px 0 rgba(255,255,255,.06);transition:border-color .2s,box-shadow .2s}
 .num input{flex:1;min-width:0;height:50px;padding:0 8px;border:0;border-radius:0;background:none;text-align:center;font-size:18px;font-weight:500;box-shadow:none!important}
 .num button{width:52px;border:0;background:none;color:var(--t1);font-size:20px;transition:background .2s}.num button:active{background:var(--s3)}
+.fld.half .num button{width:36px;flex:none}
+.fld.half .num input{flex:1 1 0;min-width:0;padding:0 2px;font-size:15px;font-variant-numeric:tabular-nums}
 @media(max-width:359px){.fld.half{grid-column:span 2}}
 .fld .chips{flex-wrap:wrap;margin:12px 0 0;padding:0;overflow:visible}
 .pv{display:grid;gap:16px;margin-top:32px;padding-top:24px;border-top:1px solid var(--line)}
@@ -1745,8 +1747,8 @@ const FORM_ROWS = {
   log: {title: 'Брёвна', fields: [
     {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1},
     {k: 'len', l: 'Длина, мм', t: 'num', v: 6000, s: 100, half: 1},
-    {k: 'dia', l: 'Диаметр верхнего торца, мм', t: 'num', v: 220, s: 10, half: 1},
-    {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1},
+    {k: 'dia', l: 'Диаметр, мм', t: 'num', v: 220, s: 10, half: 1},
+    {k: 'cnt', l: 'Количество, шт', t: 'num', v: 1, s: 1, half: 1},
     {k: 'vol', l: 'Объём, м³', t: 'num', v: 0, s: .1, half: 1}
   ]},
   sawnboard: {title: 'Полученная доска', fields: [
@@ -1996,7 +1998,14 @@ function addFormRow(type, boardId) {
     const stock = D.boards.find(b => String(b.id) === fe('board', row).value);
     if (stock) fe('cnt', row).value = Math.min(stock.count, 10);
   }
-  if (type === 'log') updateLogRow(row);
+  if (type === 'log') {
+    const previousLog = row.previousElementSibling;
+    if (previousLog?.dataset.formRow === 'log') {
+      fe('species', row).value = fe('species', previousLog).value;
+      fe('len', row).value = fe('len', previousLog).value;
+    }
+    updateLogRow(row);
+  }
   if (type === 'sawnboard') updateSawnBoard(row);
   return row;
 }
