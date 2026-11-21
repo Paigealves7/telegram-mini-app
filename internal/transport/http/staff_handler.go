@@ -14,7 +14,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // StaffHandler: управление сотрудниками. Все маршруты доступны только руководителю (см. router.go).
@@ -42,6 +41,22 @@ func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	h.list(w, r, orgID)
+}
+
+func (h *StaffHandler) ListAdminMembers(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := adminID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.repo.GetOrganizationByID(r.Context(), orgID); err != nil {
+		adminResult(w, r, "не удалось получить организацию", err)
+		return
+	}
+	h.list(w, r, orgID)
+}
+
+func (h *StaffHandler) list(w http.ResponseWriter, r *http.Request, orgID int64) {
 	users, err := h.repo.ListUsers(r.Context(), orgID)
 	if err != nil {
 		serverError(w, r, "не удалось получить список сотрудников", err)
@@ -49,14 +64,115 @@ func (h *StaffHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]staffItem, 0, len(users))
 	for _, u := range users {
-		kind := "password"
-		if strings.HasPrefix(u.PasswordHash, tgPasswordPrefix) {
-			kind = "telegram"
-		}
-		out = append(out, staffItem{ID: u.ID, Username: u.Username, Role: u.Role, Kind: kind, Name: u.DisplayName, TGUser: u.TGUsername, CreatedAt: u.CreatedAt, IsSuperAdmin: u.IsSuperAdmin()})
+		out = append(out, newStaffItem(&u))
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	pdfWriteJSON(w, http.StatusOK, out)
+}
+
+func newStaffItem(u *domain.User) staffItem {
+	kind := "password"
+	if strings.HasPrefix(u.PasswordHash, tgPasswordPrefix) {
+		kind = "telegram"
+	}
+	return staffItem{ID: u.ID, Username: u.Username, Role: u.Role, Kind: kind, Name: u.DisplayName, TGUser: u.TGUsername, CreatedAt: u.CreatedAt, IsSuperAdmin: u.IsSuperAdmin()}
+}
+
+func (h *StaffHandler) CreateAdminWebUser(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := adminID(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	var req RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	if !validWebUsername(w, req.Username) {
+		return
+	}
+	switch req.Role {
+	case domain.RoleManager, domain.RoleMaster, domain.RoleWorker:
+	default:
+		http.Error(w, "неизвестная роль", http.StatusBadRequest)
+		return
+	}
+	var hash string
+	if req.Password != "" {
+		hash, ok = hashWebPassword(w, req.Password)
+		if !ok {
+			return
+		}
+	}
+	user, err := h.repo.CreateOrganizationWebUser(r.Context(), orgID, req.Username, hash, req.Role)
+	switch {
+	case err == nil:
+		pdfWriteJSON(w, http.StatusCreated, newStaffItem(user))
+	case errors.Is(err, repository.ErrWebUserNotFound):
+		http.Error(w, "для нового аккаунта укажите пароль", http.StatusBadRequest)
+	case errors.Is(err, repository.ErrWebUserProtected):
+		http.Error(w, "этот аккаунт нельзя добавить через веб-доступ", http.StatusConflict)
+	case errors.Is(err, repository.ErrOrganizationMemberExists):
+		http.Error(w, "пользователь уже состоит в лесопилке", http.StatusConflict)
+	default:
+		adminResult(w, r, "не удалось создать веб-аккаунт", err)
+	}
+}
+
+func (h *StaffHandler) SetAdminWebPassword(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := adminID(w, r)
+	if !ok {
+		return
+	}
+	userID, ok := recordID(w, r, "userID")
+	if !ok {
+		return
+	}
+	hash, ok := readWebPassword(w, r)
+	if !ok {
+		return
+	}
+	updated, err := h.repo.UpdateOrganizationUserPassword(r.Context(), orgID, userID, hash)
+	switch {
+	case errors.Is(err, repository.ErrWebUserProtected):
+		http.Error(w, "нельзя изменить пароль этого аккаунта", http.StatusConflict)
+	case err != nil:
+		adminResult(w, r, "не удалось изменить пароль", err)
+	case !updated:
+		http.Error(w, "веб-аккаунт сотрудника не найден", http.StatusNotFound)
+	default:
+		actor, _ := currentUser(r)
+		log.Printf("STAFF: пользователь %d сменил пароль сотрудника %d", actor.UserID, userID)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (h *StaffHandler) DeleteAdminMember(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := adminID(w, r)
+	if !ok {
+		return
+	}
+	userID, ok := recordID(w, r, "userID")
+	if !ok {
+		return
+	}
+	actor, _ := currentUser(r)
+	if actor.UserID == userID {
+		http.Error(w, "нельзя удалить собственное членство", http.StatusConflict)
+		return
+	}
+	err := h.repo.DeleteOrganizationMember(r.Context(), orgID, userID)
+	switch {
+	case err == nil:
+		w.WriteHeader(http.StatusNoContent)
+	case errors.Is(err, repository.ErrWebUserProtected):
+		http.Error(w, "нельзя удалить членство супер-администратора", http.StatusConflict)
+	case errors.Is(err, pgx.ErrNoRows), errors.Is(err, repository.ErrOrganizationMembershipNotFound):
+		http.Error(w, "сотрудник не найден в лесопилке", http.StatusNotFound)
+	default:
+		adminResult(w, r, "не удалось удалить сотрудника", err)
+	}
 }
 
 func staffID(w http.ResponseWriter, r *http.Request) (int64, bool) {
@@ -180,24 +296,11 @@ func (h *StaffHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	if h.staffTarget(w, r, id) == nil {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
-	var req struct {
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
+	hash, ok := readWebPassword(w, r)
+	if !ok {
 		return
 	}
-	if len(req.Password) < 8 || len(req.Password) > 72 {
-		http.Error(w, "пароль: от 8 до 72 символов", http.StatusBadRequest)
-		return
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		http.Error(w, "ошибка хеширования пароля", http.StatusInternalServerError)
-		return
-	}
-	updated, err := h.repo.UpdateUserPassword(r.Context(), id, string(hash))
+	updated, err := h.repo.UpdateUserPassword(r.Context(), id, hash)
 	if err != nil {
 		serverError(w, r, "не удалось изменить пароль", err)
 		return
@@ -210,4 +313,16 @@ func (h *StaffHandler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		log.Printf("STAFF: пользователь %d сменил пароль сотрудника %d", claims.UserID, id)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func readWebPassword(w http.ResponseWriter, r *http.Request) (string, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
+		return "", false
+	}
+	return hashWebPassword(w, req.Password)
 }

@@ -154,6 +154,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/login", loginLimiter.Middleware(authHandler.Login))
+			r.Post("/register-invite", loginLimiter.Middleware(authHandler.RegisterInvite))
 			r.Post("/telegram", tgLimiter.Middleware(tgAuthHandler.LoginViaTelegram))
 		})
 
@@ -172,6 +173,10 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			adminOrganizations.Get("/admin/organizations/{id}/invites", organizations.ListAdminInvites)
 			adminOrganizations.Post("/admin/organizations/{id}/invites", organizations.CreateAdminInvite)
 			adminOrganizations.Delete("/admin/organizations/{id}/invites/{inviteID}", organizations.RevokeAdminInvite)
+			adminOrganizations.Get("/admin/organizations/{id}/members", staffHandler.ListAdminMembers)
+			adminOrganizations.Post("/admin/organizations/{id}/users", staffHandler.CreateAdminWebUser)
+			adminOrganizations.Put("/admin/organizations/{id}/users/{userID}/password", staffHandler.SetAdminWebPassword)
+			adminOrganizations.Delete("/admin/organizations/{id}/users/{userID}", staffHandler.DeleteAdminMember)
 			adminOrganizations.Post("/admin/organizations/{id}/reset-test-data", organizations.Reset)
 			r = r.With(ResolveOrganization(repo), RequireRoles(domain.RoleManager, domain.RoleMaster, domain.RoleWorker))
 

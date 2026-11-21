@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"telegram-mini-app/internal/domain"
@@ -15,6 +16,10 @@ var (
 	ErrOrganizationMembershipNotFound = errors.New("пользователь не состоит в активной организации")
 	ErrInviteNotFound                 = errors.New("приглашение не найдено")
 	ErrInviteUnavailable              = errors.New("приглашение отозвано, просрочено или исчерпано")
+	ErrInviteCredentials              = errors.New("указанный логин недоступен или пароль неверен")
+	ErrOrganizationMemberExists       = errors.New("пользователь уже состоит в этой лесопилке")
+	ErrWebUserNotFound                = errors.New("укажите пароль для нового веб-аккаунта")
+	ErrWebUserProtected               = errors.New("эта операция недоступна для выбранного аккаунта")
 )
 
 const organizationColumns = "id, name, company_info, is_demo, is_active, last_order_number, created_at"
@@ -28,17 +33,25 @@ func organizationError(err error) error {
 }
 
 func lockOrgShare(ctx context.Context, tx pgx.Tx, orgID int64) error {
+	return lockOrganizationShare(ctx, tx, orgID, true)
+}
+
+func lockOrganizationShare(ctx context.Context, tx pgx.Tx, orgID int64, activeOnly bool) error {
 	var id int64
-	err := tx.QueryRow(ctx, `SELECT id FROM organizations WHERE id = $1 AND is_active = TRUE FOR SHARE`, orgID).Scan(&id)
+	err := tx.QueryRow(ctx, `SELECT id FROM organizations WHERE id = $1 AND (is_active OR NOT $2::boolean) FOR SHARE`, orgID, activeOnly).Scan(&id)
 	return organizationError(err)
 }
 
 func (r *Repository) beginOrgWrite(ctx context.Context, orgID int64) (pgx.Tx, error) {
+	return r.beginOrganizationWrite(ctx, orgID, true)
+}
+
+func (r *Repository) beginOrganizationWrite(ctx context.Context, orgID int64, activeOnly bool) (pgx.Tx, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := lockOrgShare(ctx, tx, orgID); err != nil {
+	if err := lockOrganizationShare(ctx, tx, orgID, activeOnly); err != nil {
 		_ = tx.Rollback(ctx)
 		return nil, err
 	}
@@ -262,6 +275,49 @@ func (r *Repository) RevokeAdminInvite(ctx context.Context, orgID, inviteID int6
 	return tag.RowsAffected() > 0, err
 }
 
+func lockInviteForUse(ctx context.Context, tx pgx.Tx, codeHash string) (*domain.OrganizationInvite, error) {
+	// Блокировки берём в том же порядке, что при отзыве приглашения: организация, затем приглашение.
+	var invite domain.OrganizationInvite
+	err := tx.QueryRow(ctx, `SELECT organization_id FROM organization_invites WHERE code_hash = $1`, codeHash).
+		Scan(&invite.OrganizationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrInviteNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := lockOrgShare(ctx, tx, invite.OrganizationID); err != nil {
+		return nil, err
+	}
+
+	var expired bool
+	err = tx.QueryRow(ctx, `SELECT id, role, max_uses, used_count, expires_at <= clock_timestamp(), revoked_at
+		FROM organization_invites WHERE code_hash = $1 AND organization_id = $2 FOR UPDATE`, codeHash, invite.OrganizationID).
+		Scan(&invite.ID, &invite.Role, &invite.MaxUses, &invite.UsedCount, &expired, &invite.RevokedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrInviteNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if invite.RevokedAt != nil || invite.UsedCount >= invite.MaxUses || expired {
+		return nil, ErrInviteUnavailable
+	}
+	return &invite, nil
+}
+
+func consumeInvite(ctx context.Context, tx pgx.Tx, invite *domain.OrganizationInvite) error {
+	tag, err := tx.Exec(ctx, `UPDATE organization_invites SET used_count = used_count + 1
+		WHERE id = $1 AND organization_id = $2 AND expires_at > clock_timestamp()`, invite.ID, invite.OrganizationID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrInviteUnavailable
+	}
+	return nil
+}
+
 func (r *Repository) AcceptInvite(ctx context.Context, codeHash string, userID int64) (*domain.UserOrganization, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -269,37 +325,12 @@ func (r *Repository) AcceptInvite(ctx context.Context, codeHash string, userID i
 	}
 	defer tx.Rollback(ctx)
 
-	// Блокировки берём в том же порядке, что при отзыве приглашения: организация, затем приглашение.
-	var membership domain.UserOrganization
-	err = tx.QueryRow(ctx, `SELECT organization_id FROM organization_invites WHERE code_hash = $1`, codeHash).
-		Scan(&membership.OrganizationID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrInviteNotFound
-	}
+	invite, err := lockInviteForUse(ctx, tx, codeHash)
 	if err != nil {
 		return nil, err
 	}
-	orgID := membership.OrganizationID
-	if err := lockOrgShare(ctx, tx, orgID); err != nil {
-		return nil, err
-	}
-
-	var inviteID int64
-	var maxUses, usedCount int
-	var expiresAt time.Time
-	var revokedAt *time.Time
-	err = tx.QueryRow(ctx, `SELECT id, role, max_uses, used_count, expires_at, revoked_at
-		FROM organization_invites WHERE code_hash = $1 AND organization_id = $2 FOR UPDATE`, codeHash, orgID).
-		Scan(&inviteID, &membership.Role, &maxUses, &usedCount, &expiresAt, &revokedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrInviteNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	if revokedAt != nil || usedCount >= maxUses {
-		return nil, ErrInviteUnavailable
-	}
+	orgID := invite.OrganizationID
+	membership := domain.UserOrganization{OrganizationID: orgID, Role: invite.Role}
 
 	// Удаление сотрудника использует ту же блокировку аккаунта перед записью в список исключений.
 	var username string
@@ -316,13 +347,8 @@ func (r *Repository) AcceptInvite(ctx context.Context, codeHash string, userID i
 		return nil, ErrDeletedUser
 	}
 
-	tag, err := tx.Exec(ctx, `UPDATE organization_invites SET used_count = used_count + 1
-		WHERE id = $1 AND organization_id = $2 AND expires_at > clock_timestamp()`, inviteID, orgID)
-	if err != nil {
+	if err := consumeInvite(ctx, tx, invite); err != nil {
 		return nil, err
-	}
-	if tag.RowsAffected() == 0 {
-		return nil, ErrInviteUnavailable
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3)
 		ON CONFLICT (organization_id, user_id) DO UPDATE SET role = EXCLUDED.role`, orgID, userID, membership.Role)
@@ -341,4 +367,148 @@ func (r *Repository) AcceptInvite(ctx context.Context, codeHash string, userID i
 		return nil, err
 	}
 	return &membership, nil
+}
+
+func protectedWebUser(user *domain.User) bool {
+	return user.IsSuperAdmin() || strings.HasPrefix(strings.ToLower(user.Username), "tg_") ||
+		strings.HasPrefix(user.PasswordHash, "tg_")
+}
+
+// findOrCreateWebUser returns an existing account locked for credential and membership changes.
+func findOrCreateWebUser(ctx context.Context, tx pgx.Tx, username, passwordHash string, role domain.Role) (*domain.User, bool, error) {
+	var user domain.User
+	if protectedWebUser(&domain.User{Username: username}) {
+		return nil, false, ErrWebUserProtected
+	}
+	if passwordHash != "" {
+		id, err := nextUserID(ctx, tx)
+		if err != nil {
+			return nil, false, err
+		}
+		err = tx.QueryRow(ctx, `INSERT INTO users (id, username, password_hash, role) VALUES ($1, $2, $3, $4)
+			ON CONFLICT (username) DO NOTHING RETURNING id, username, password_hash, role, created_at`,
+			id, username, passwordHash, role).
+			Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt)
+		if err == nil {
+			return &user, true, nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, false, err
+		}
+	}
+	err := tx.QueryRow(ctx, `SELECT id, username, password_hash, role, created_at FROM users WHERE username = $1 FOR UPDATE`, username).
+		Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, ErrWebUserNotFound
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if protectedWebUser(&user) {
+		return nil, false, ErrWebUserProtected
+	}
+	return &user, false, nil
+}
+
+func insertWebMembership(ctx context.Context, tx pgx.Tx, orgID, userID int64, role domain.Role) error {
+	tag, err := tx.Exec(ctx, `INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3)
+		ON CONFLICT (organization_id, user_id) DO NOTHING`, orgID, userID, role)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrOrganizationMemberExists
+	}
+	return nil
+}
+
+func (r *Repository) RegisterWithInvite(ctx context.Context, codeHash, username, passwordHash string, verifyPassword func(string) bool) (*domain.User, int64, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback(ctx)
+
+	invite, err := lockInviteForUse(ctx, tx, codeHash)
+	if err != nil {
+		return nil, 0, err
+	}
+	user, created, err := findOrCreateWebUser(ctx, tx, username, passwordHash, invite.Role)
+	if errors.Is(err, ErrWebUserProtected) || errors.Is(err, ErrWebUserNotFound) {
+		return nil, 0, ErrInviteCredentials
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	if !created && (verifyPassword == nil || !verifyPassword(user.PasswordHash)) {
+		return nil, 0, ErrInviteCredentials
+	}
+	if err := insertWebMembership(ctx, tx, invite.OrganizationID, user.ID, invite.Role); err != nil {
+		return nil, 0, err
+	}
+	if err := consumeInvite(ctx, tx, invite); err != nil {
+		return nil, 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, 0, err
+	}
+	user.Role = invite.Role
+	return user, invite.OrganizationID, nil
+}
+
+func (r *Repository) CreateOrganizationWebUser(ctx context.Context, orgID int64, username, passwordHash string, role domain.Role) (*domain.User, error) {
+	tx, err := r.beginOrganizationWrite(ctx, orgID, false)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	user, created, err := findOrCreateWebUser(ctx, tx, username, passwordHash, role)
+	if err != nil {
+		return nil, err
+	}
+	if err := insertWebMembership(ctx, tx, orgID, user.ID, role); err != nil {
+		return nil, err
+	}
+	if !created && passwordHash != "" {
+		if _, err := tx.Exec(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1`, user.ID, passwordHash); err != nil {
+			return nil, err
+		}
+		user.PasswordHash = passwordHash
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	user.Role = role
+	return user, nil
+}
+
+func (r *Repository) UpdateOrganizationUserPassword(ctx context.Context, orgID, userID int64, passwordHash string) (bool, error) {
+	tx, err := r.beginOrganizationWrite(ctx, orgID, false)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	user := domain.User{ID: userID}
+	err = tx.QueryRow(ctx, `SELECT username, password_hash FROM users WHERE id = $1 AND EXISTS (
+		SELECT 1 FROM organization_members WHERE organization_id = $2 AND user_id = $1
+	) FOR UPDATE`, userID, orgID).Scan(&user.Username, &user.PasswordHash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if protectedWebUser(&user) {
+		return false, ErrWebUserProtected
+	}
+	// Повторная проверка членства учитывает удаление, завершившееся во время ожидания блокировки пользователя.
+	tag, err := tx.Exec(ctx, `UPDATE users SET password_hash = $3 WHERE id = $1 AND EXISTS (
+		SELECT 1 FROM organization_members WHERE organization_id = $2 AND user_id = $1
+	)`, userID, orgID, passwordHash)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, tx.Commit(ctx)
 }

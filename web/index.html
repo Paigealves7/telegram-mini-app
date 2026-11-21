@@ -176,6 +176,8 @@ body.noauth{overflow:hidden}body.noauth #view{padding:20px;min-height:100dvh;dis
 .login .logo{display:grid;place-items:center;margin-bottom:24px;color:var(--wood)}.login .logo svg{width:48px;height:48px;stroke-width:1.4}
 .login h1{font-size:28px;line-height:36px;font-weight:700;letter-spacing:-.02em}.login .sub{margin:8px 0 32px;color:var(--t2);font-size:14px}
 .login .fld{text-align:left}.login .btn{margin-top:8px}
+.login .login-mode{min-height:44px;margin-top:12px;white-space:normal}
+body[data-view="login"].noauth{overflow-y:auto}
 /* запасные варианты */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.stock,.tabs,.login,.hbtn,.avatar,.rbtn,.panel,#toast{background:rgba(34,38,34,.94)}}
 html.lite *,html.lite *::before,html.lite *::after{animation:none!important;transition:none!important}
@@ -1564,7 +1566,7 @@ async function loadStats() {
 function vProfile() {
   const j = jwt() || {};
   $('#view').innerHTML = `<div class="who"><div class="avatar">${esc((S.name || '?')[0].toUpperCase())}</div><div><h2>${esc(S.name)}</h2><p class="profile-meta"><span class="role-badge">${esc(ROLE[S.role] || S.role)}</span> · ID ${esc(j.user_id || '—')}</p></div></div>
-    ${canSwitchOrg() ? `<div class="profile-group"><button class="profile-link" data-a="orgswitch"><span class="profile-icon">${ic('box')}</span><b>Сменить лесопилку</b>${ic('chev')}</button></div>` : ''}
+    <div class="profile-group"><button class="profile-link" data-a="orgswitch"><span class="profile-icon">${ic('box')}</span><b>${canSwitchOrg() ? 'Сменить лесопилку' : 'Лесопилки'}</b>${ic('chev')}</button></div>
     <h2 class="profile-heading">Настройки приложения</h2>
     <div class="profile-group settings-group">
       <div class="profile-setting"><div><b>Оформление</b><p class="mut sm">${document.documentElement.dataset.t === 'dark' ? 'Тёмная тема' : 'Светлая тема'}</p></div><button class="sw" role="switch" aria-checked="${document.documentElement.dataset.t === 'dark'}" aria-label="Тёмная тема" data-a="theme"></button></div>
@@ -1751,35 +1753,76 @@ async function copyInvite(text) {
   toast(copied ? 'Скопировано' : 'Выделите и скопируйте код вручную', copied ? 'ok' : 'err');
 }
 
-function vLogin(msg) {
-  document.body.classList.add('noauth'); S.cur = 'login';
-  $('#view').innerHTML = `<section class="login"><div class="logo">${ic('mark')}</div><h1>Лесопилка</h1><p class="sub">Учёт производства</p>
-    <div class="fld"><label for="lu">Логин</label><input id="lu" autocomplete="username"></div>
-    <div class="fld"><label for="lp">Пароль</label><input id="lp" type="password" autocomplete="current-password"></div>
-    <button class="btn" id="lb" data-a="login">Войти</button></section>`;
-  if (msg) toast(msg, 'err');
+function vLogin(inviteMode = false, username = '') {
+  orgGate('login', `<section class="login"><div class="logo">${ic('mark')}</div>
+    <h1>Лесопилка</h1><p class="sub">${inviteMode ? 'Вход по коду приглашения' : 'Учёт производства'}</p>
+    <form id="login-form" data-invite="${inviteMode}" novalidate>
+      ${inviteMode ? `<div class="fld"><label for="login-invite-code">Код приглашения</label>
+        <input id="login-invite-code" name="code" required maxlength="32" autocapitalize="characters" autocomplete="off" spellcheck="false">
+      </div>` : ''}
+      <div class="fld"><label for="lu">${inviteMode ? 'Придумайте логин (для входа с ПК)' : 'Логин'}</label>
+        <input id="lu" name="username" required autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(username)}">
+      </div>
+      <div class="fld"><label for="lp">${inviteMode ? 'Придумайте пароль (от 8 символов)' : 'Пароль'}</label>
+        <input id="lp" name="password" type="password" required autocomplete="${inviteMode ? 'new-password' : 'current-password'}">
+      </div>
+      <button class="btn" type="submit" id="lb" data-a="login">${inviteMode ? 'Активировать код и войти' : 'Войти'}</button>
+    </form>
+    <button class="lnk login-mode" type="button" data-a="loginmode">${inviteMode ? 'Войти по логину и паролю' : 'Есть код приглашения? Создать аккаунт'}</button>
+  </section>`);
 }
 function vAuthErr(msg) {
   document.body.classList.add('noauth');
   $('#view').innerHTML = `<section class="login"><div class="logo">${ic('lock')}</div><h1>Не удалось войти</h1><p class="sub">${esc(msg)}</p><button class="btn" data-a="retry">Повторить</button></section>`;
 }
 async function login() {
-  const b = $('#lb'), u = $('#lu').value.trim();
-  if (b.disabled) return;
+  const form = $('#login-form'), b = $('#lb'), mode = $('[data-a="loginmode"]');
+  if (!b || b.disabled) return;
+  const u = $('#lu').value.trim(), password = $('#lp').value;
+  const inviteMode = form.dataset.invite === 'true';
+  const credentials = {username: u, password};
+  if (inviteMode) {
+    const code = $('#login-invite-code').value.trim().replace(/^inv_/i, '').toUpperCase();
+    if (!/^[A-HJ-NP-Z2-9]{10}$/.test(code)) {
+      $('#login-invite-code').focus();
+      toast('Проверьте код приглашения', 'err');
+      return;
+    }
+    if (!/^[A-Za-z0-9._-]{3,32}$/.test(u) || /^tg_/i.test(u)) {
+      $('#lu').focus();
+      toast('Логин должен содержать от 3 до 32 латинских букв, цифр или знаков . _ - и не начинаться с tg_', 'err');
+      return;
+    }
+    const size = pwBytes(password);
+    if (size < 8 || size > 72) {
+      $('#lp').focus();
+      toast('Пароль должен содержать от 8 до 72 байт', 'err');
+      return;
+    }
+    credentials.code = code;
+  } else if (!u || !password) {
+    $(u ? '#lp' : '#lu').focus();
+    toast('Введите логин и пароль', 'err');
+    return;
+  }
   b.disabled = true; b.classList.add('busy');
+  mode.disabled = true;
   try {
-    const d = await api('/auth/login', {method: 'POST', body: JSON.stringify({username: u, password: $('#lp').value})});
-    if (d?.token) { localStorage.setItem('uname', u); await finish(d.token, u); }
+    const d = await api(inviteMode ? '/auth/register-invite' : '/auth/login', {method: 'POST', body: JSON.stringify(credentials)});
+    if (!d?.token || (inviteMode && !(+d.organization_id > 0))) throw new Error('Сервер вернул неполные данные для входа');
+    localStorage.setItem('uname', u);
+    if (inviteMode) localStorage.setItem('org_id', d.organization_id);
+    await finish(d.token, u, inviteMode ? d.organization_id : undefined);
   } catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
-  b.disabled = false; b.classList.remove('busy');
+  finally { b.disabled = false; b.classList.remove('busy'); mode.disabled = false; }
 }
-async function finish(tkn, name) {
+async function finish(tkn, name, organizationId) {
   const priorUser = jwt()?.user_id;
   localStorage.setItem('jwt_token', tkn);
   const account = jwt() || {};
   const switchedUser = priorUser && priorUser !== account.user_id;
   if (switchedUser) clearRolePreview();
-  resetOrgState(switchedUser ? 0 : S.orgId);
+  resetOrgState(organizationId ?? (switchedUser ? 0 : S.orgId));
   S.orgs = [];
   S.isSuperAdmin = account.is_super_admin === true;
   S.name = name || localStorage.getItem('uname') || 'Сотрудник';
@@ -1793,7 +1836,7 @@ async function finish(tkn, name) {
       catch (e) { if (e === staleRequest) return; reportError(e); }
     }
   }
-  await loadConfig({open: 'home'});
+  await loadConfig({open: organizationId ? 'stock' : 'home'});
   perfProbe();
 }
 async function tgAuth() {
@@ -2242,6 +2285,11 @@ const ACT = {
  fwhistory:v=>fwHistory(+v||0),
  fwdelete:async v=>{if(!await ask('sawing','Удалить переработку?','Сырьё вернётся на склад, готовый объём будет снят.','Удалить'))return;try{await api('/firewood/processing/'+v,{method:'DELETE'});closeSheet();await loadStock();stockList();toast('Операция удалена');}catch(e){ if (e === staleRequest) return;toast(e.message,'err')}},
   theme: toggleTheme,
+  loginmode: () => {
+    const inviteMode = $('#login-form').dataset.invite !== 'true';
+    vLogin(inviteMode, $('#lu').value);
+    $(inviteMode ? '#login-invite-code' : '#lu').focus();
+  },
   orgswitch: () => vOrgSelect(),
   orgpick: id => selectOrg(id),
   orgpending: vPending,
@@ -2265,7 +2313,8 @@ const ACT = {
     } finally { button.disabled = false; }
   },
   homekpi: v => { if(['boards','logs','firewood'].includes(v)){S.wt=v;S.wq='';S.wsp='';go('stock');}else{if(v==='orders'){S.of='open';S.oq='';}go(v);} },
-  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, login, retry: tgAuth, retryform: () => vForm(FK, formParams),
+  go: v => go(v), lite: () => { setLite(!isLite()); vProfile(); }, back, yes: () => settle(true), no: () => settle(false), ok: submitForm, retry: tgAuth, retryform: () => vForm(FK, formParams),
+  login: (_, button, event) => { event.preventDefault(); return login(); },
   logout: () => { clearRolePreview(); localStorage.removeItem('jwt_token'); resetOrgState(0); S.orgs = []; S.isSuperAdmin = false; orgGate('login', ''); vLogin(); },
   new: v => { closeSheet(); go(v); },
   order: v => {
@@ -2546,10 +2595,15 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return;
-  const f = ACT[el.dataset.a]; if (f) { hap(); run(f(el.dataset.v, el)); }
+  const f = ACT[el.dataset.a]; if (f) { hap(); run(f(el.dataset.v, el, e)); }
 });
 document.addEventListener('submit', async e => {
   const form = e.target;
+  if (form.id === 'login-form') {
+    e.preventDefault();
+    await login();
+    return;
+  }
   if (['invite-accept', 'invite-create'].includes(form.id)) {
     e.preventDefault();
     const button = form.querySelector('button[type="submit"]');
@@ -2608,7 +2662,7 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.tagName === 'SELECT' && t.dataset.k && FK) { if (FK === 'sawing' && t.dataset.k === 'log') syncLog(); rowFormChanged(t); }
 });
-document.addEventListener('keydown', e => { if(e.key==='Escape' && $('#sheet').classList.contains('on')) { settle(false); return; } if (e.key === 'Enter' && e.target.id === 'lp') login(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape' && $('#sheet').classList.contains('on')) settle(false); });
 
 /* ---------- старт ---------- */
 if (inTg) run(tgAuth());

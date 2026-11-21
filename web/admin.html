@@ -108,6 +108,10 @@ body:has(dialog[open]){overflow:hidden}
 .dialog-content{padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
 .dialog-content .card{background:var(--bg)}
 .invite{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-top:1px solid var(--line);padding:8px 0}
+.password-field{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}
+.credentials,.member{display:grid;gap:8px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px;min-width:0}
+.credentials code{user-select:all}.member details>summary{cursor:pointer;width:fit-content;padding-block:10px}.member details>form{padding-top:8px}
+.member-list{display:grid;gap:8px}.member-list:empty,#web-user-result:empty{display:none}
 .code{font:700 19px ui-monospace,monospace;letter-spacing:.06em;user-select:all}
 .notice{position:fixed;z-index:4;bottom:calc(74px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);padding:10px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);max-width:calc(100% - 24px)}
 dialog .notice{position:sticky;left:auto;transform:none;bottom:0;max-width:none;margin:0 16px 12px}
@@ -466,9 +470,147 @@ function createOrg() {
   const current = openSheet('Новая лесопилка',`<form id="new-org" class="stack">${orgFields()}<button class="button primary" type="submit">Создать и выдать код руководителя</button></form>`);
   bindForm($('#new-org'),async values => {
     const created = await api('/admin/organizations',{method:'POST',body:{...orgValues(values),create_manager_invite:true}});
-    if (current()) manageOrg(created.organization,created.manager_invite,created.manager_invite_error);
+    if (current()) manageOrg(created.organization,created.manager_invite,created.manager_invite_error,'invites');
     void refresh();
   });
+}
+function passwordField() {
+  return `<div class="password-field"><label>Пароль<input type="password" name="password" autocomplete="new-password"></label>
+    <button class="button" type="button" data-generate-password>Сгенерировать</button></div>`;
+}
+function webAccess() {
+  return `<section class="card stack" aria-labelledby="web-access-title">
+    <h3 id="web-access-title">Веб-доступ (Логин и Пароль)</h3>
+    <form class="stack" id="new-web-user">
+      <label>Роль<select name="role">${Object.entries(roles).map(([key,label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
+      <label>Логин<input name="username" autocomplete="off" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" required></label>
+      ${passwordField()}
+      <small>Для нового аккаунта задайте пароль. Если логин уже существует, пустое поле сохранит текущий пароль, а заполненное сменит его во всех лесопилках сотрудника.</small>
+      <p class="error" role="alert"></p><button class="button primary" type="submit">+ Создать веб-аккаунт</button>
+    </form>
+    <div id="web-user-result" aria-live="polite"></div>
+  </section>
+  <section class="stack" aria-labelledby="members-title"><h3 id="members-title">Сотрудники</h3><div id="org-members" class="member-list" aria-live="polite"></div></section>`;
+}
+function randomPassword() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const limit = 256 - 256 % alphabet.length;
+  const sample = new Uint8Array(1);
+  let password = '';
+  while (password.length < 10) {
+    crypto.getRandomValues(sample);
+    if (sample[0] < limit) password += alphabet[sample[0] % alphabet.length];
+  }
+  return password;
+}
+function readPassword(values,optional=false) {
+  const password = values.get('password');
+  if (!password && optional) return '';
+  const length = new TextEncoder().encode(password).length;
+  if (length < 8 || length > 72) throw new Error('Пароль должен содержать от 8 до 72 байт.');
+  return password;
+}
+function memberCard(member) {
+  const telegram = member.kind === 'telegram';
+  const displayName = member.name || member.username;
+  const account = telegram ? (member.tg_username ? '@'+String(member.tg_username).replace(/^@/,'') : '') : (member.name ? member.username : '');
+  return `<article class="member">
+    <div class="row between"><b>${esc(displayName)}</b><span class="pill" style="--dot:${telegram?'var(--logs)':'var(--good)'}">${telegram?'Telegram':'По паролю'}</span></div>
+    <small>${[roles[member.role],account].filter(Boolean).map(esc).join(' · ')}</small>
+    ${!telegram && !member.is_super_admin ? `<details><summary>Сменить пароль</summary>
+      <form class="stack" data-password-user="${esc(member.id)}">${passwordField()}
+        <small>Новый пароль действует во всех лесопилках сотрудника.</small>
+        <p class="error" role="alert"></p><button class="button" type="submit">Сохранить пароль</button>
+      </form></details>` : ''}
+    ${!member.is_super_admin ? `<div><button class="button danger" type="button" data-remove-user="${esc(member.id)}" data-member-name="${esc(displayName)}">Удалить из лесопилки</button></div>` : ''}
+  </article>`;
+}
+function bindWebAccess(org,path,current) {
+  const form = $('#new-web-user');
+  const members = $('#org-members');
+  const result = $('#web-user-result');
+  let request = 0;
+
+  function showCredentials(username,password) {
+    result.innerHTML = `<section class="credentials"><h3>Доступ для входа с ПК</h3>
+      <p>Логин <code>${esc(username)}</code></p>
+      ${password ? `<p>Пароль <code>${esc(password)}</code></p>
+      <button class="button" type="button">Скопировать доступ для входа с ПК</button>` : '<small>Сотрудник может войти со своим паролем.</small>'}
+    </section>`;
+    if (password) result.querySelector('button').onclick = async () => {
+      try {
+        await copy(`https://sawmill.urmanit.ru\nЛесопилка: ${org.name}\nЛогин: ${username}\nПароль: ${password}`);
+        if (current()) notice('Данные доступа скопированы');
+      } catch {
+        if (current()) notice('Не удалось скопировать данные доступа');
+      }
+    };
+    result.scrollIntoView({block:'nearest'});
+  }
+  async function loadMembers() {
+    const version = ++request;
+    members.innerHTML = '<p class="muted">Загрузка сотрудников…</p>';
+    try {
+      const list = await api(path+'/members');
+      if (!current() || version !== request) return;
+      members.innerHTML = (list || []).map(memberCard).join('') || '<p class="muted">Сотрудников пока нет</p>';
+      for (const member of list || []) {
+        const reset = members.querySelector(`form[data-password-user="${CSS.escape(String(member.id))}"]`);
+        if (!reset) continue;
+        bindForm(reset,async values => {
+          const password = readPassword(values);
+          await api(path+'/users/'+encodeURIComponent(member.id)+'/password',{method:'PUT',body:{password}});
+          if (current()) {
+            reset.reset();
+            reset.closest('details').open = false;
+            showCredentials(member.username,password);
+            notice('Пароль изменён');
+          }
+        });
+      }
+    } catch (error) {
+      if (current() && version === request) members.innerHTML = `<p class="error">${esc(error.message)}</p><button class="button" type="button" data-retry-members>Повторить</button>`;
+    }
+  }
+  members.addEventListener('click',async event => {
+    if (event.target.closest('[data-retry-members]')) {
+      await loadMembers();
+      return;
+    }
+    const button = event.target.closest('[data-remove-user]');
+    if (!button || button.disabled || !window.confirm(`Удалить сотрудника «${button.dataset.memberName}» из лесопилки «${org.name}»?`)) return;
+    button.disabled = true;
+    try {
+      await api(path+'/users/'+encodeURIComponent(button.dataset.removeUser),{method:'DELETE'});
+      if (current()) {
+        result.replaceChildren();
+        notice('Сотрудник удалён из лесопилки');
+        await loadMembers();
+      }
+      void refresh();
+    } catch (error) {
+      if (current()) notice(error.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+  form.closest('[data-pane]').addEventListener('click',event => {
+    const button = event.target.closest('[data-generate-password]');
+    if (button) button.form.elements.password.value = randomPassword();
+  });
+  bindForm(form,async values => {
+    const username = values.get('username').trim();
+    if (!/^[a-z\d._-]{3,32}$/i.test(username) || /^tg_/i.test(username)) throw new Error('Логин должен содержать от 3 до 32 латинских букв, цифр или символов . _ -. Начало tg_ зарезервировано.');
+    const password = readPassword(values,true);
+    const user = await api(path+'/users',{method:'POST',body:{username,role:values.get('role'),...(password ? {password} : {})}});
+    if (current()) {
+      form.reset();
+      showCredentials(user.username,password);
+      await loadMembers();
+    }
+    void refresh();
+  });
+  return () => { if (!request) void loadMembers(); };
 }
 function manageOrg(org,newInvite,warning='',initialTab=newInvite || warning ? 'invites' : 'access') {
   const path = orgPath(org.id);
@@ -485,6 +627,7 @@ function manageOrg(org,newInvite,warning='',initialTab=newInvite || warning ? 'i
       ${org.is_active?'':'<small>Для выдачи кода разморозьте лесопилку.</small>'}</form>
       <div id="invite-result" aria-live="polite">${warning ? `<p class="warn">${esc(warning)}</p>` : ''}${inviteResult(newInvite,org.name)}</div>
       <div><h3>Активные коды</h3><div id="invites" aria-live="polite"></div></div>
+      ${webAccess()}
     </section>
     <section class="stack" data-pane="settings"><form class="stack" id="edit-org">${orgFields(org)}<button class="button primary" type="submit">Сохранить</button></form>
     ${org.is_demo ? `<details class="divider"><summary>Сброс демо-данных</summary><form class="stack" id="reset-org">
@@ -494,7 +637,10 @@ function manageOrg(org,newInvite,warning='',initialTab=newInvite || warning ? 'i
   function selectPane(key) {
     for (const pane of el.sheetContent.querySelectorAll('[data-pane]')) pane.hidden = pane.dataset.pane !== key;
     for (const tab of el.sheetContent.querySelectorAll('[data-section]')) tab.setAttribute('aria-pressed',String(tab.dataset.section===key));
-    if (key === 'invites' && !inviteRequest) void loadInvites();
+    if (key === 'invites') {
+      if (!inviteRequest) void loadInvites();
+      loadWebAccess();
+    }
   }
   el.sheetContent.querySelector('.sheet-tabs').onclick = event => {
     const tab = event.target.closest('[data-section]');
@@ -502,6 +648,7 @@ function manageOrg(org,newInvite,warning='',initialTab=newInvite || warning ? 'i
   };
   const inviteList = $('#invites');
   const result = $('#invite-result');
+  const loadWebAccess = bindWebAccess(org,path,current);
   let inviteRequest = 0;
   async function loadInvites() {
     const version = ++inviteRequest;
@@ -626,6 +773,9 @@ $('#search').addEventListener('input',renderOrgs);
 $('#create').onclick = createOrg;
 $('#refresh').onclick = () => refresh();
 $('#close').onclick = () => el.sheet.close();
+el.sheet.addEventListener('close',() => {
+  if (!el.sheet.open) el.sheetContent.replaceChildren();
+});
 $('#logout').onclick = () => signOut();
 $('#theme-switch').onchange = event => {
   localStorage.setItem('theme',event.target.checked ? 'dark' : 'light');

@@ -90,23 +90,34 @@ func (r *Repository) DeleteContractor(ctx context.Context, orgID int64, id int64
 
 var ErrDeletedUser = errors.New("этот аккаунт удалён")
 
-func (r *Repository) CreateUser(ctx context.Context, username, passwordHash string, role domain.Role) (*domain.User, error) {
+type userRowQuerier interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func nextUserID(ctx context.Context, db userRowQuerier) (int64, error) {
 	var id int64
 	for {
-		if err := r.db.QueryRow(ctx, `SELECT nextval(pg_get_serial_sequence('users','id'))`).Scan(&id); err != nil {
-			return nil, err
+		if err := db.QueryRow(ctx, `SELECT nextval(pg_get_serial_sequence('users','id'))`).Scan(&id); err != nil {
+			return 0, err
 		}
 		// Новый аккаунт не должен случайно получить зарезервированный ID.
 		if !(domain.User{ID: id}).IsSuperAdmin() {
-			break
+			return id, nil
 		}
+	}
+}
+
+func (r *Repository) CreateUser(ctx context.Context, username, passwordHash string, role domain.Role) (*domain.User, error) {
+	id, err := nextUserID(ctx, r.db)
+	if err != nil {
+		return nil, err
 	}
 	query := `
 		INSERT INTO users (id, username, password_hash, role)
 		SELECT $1::bigint, $2::text, $3::text, $4::role
 		RETURNING id, username, role, created_at`
 	var user domain.User
-	err := r.db.QueryRow(ctx, query, id, username, passwordHash, role).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedAt)
+	err = r.db.QueryRow(ctx, query, id, username, passwordHash, role).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedAt)
 	return &user, err
 }
 
@@ -989,7 +1000,15 @@ func (r *Repository) UpdateUserRole(ctx context.Context, orgID, id int64, role d
 }
 
 func (r *Repository) DeleteUser(ctx context.Context, orgID, id int64) error {
-	tx, err := r.beginOrgWrite(ctx, orgID)
+	return r.deleteOrganizationMember(ctx, orgID, id, false)
+}
+
+func (r *Repository) DeleteOrganizationMember(ctx context.Context, orgID, id int64) error {
+	return r.deleteOrganizationMember(ctx, orgID, id, true)
+}
+
+func (r *Repository) deleteOrganizationMember(ctx context.Context, orgID, id int64, platformAdmin bool) error {
+	tx, err := r.beginOrganizationWrite(ctx, orgID, !platformAdmin)
 	if err != nil {
 		return err
 	}
@@ -1005,6 +1024,9 @@ func (r *Repository) DeleteUser(ctx context.Context, orgID, id int64) error {
 	}
 	if tag.RowsAffected() == 0 {
 		return pgx.ErrNoRows
+	}
+	if platformAdmin && (domain.User{ID: id, Username: username}).IsSuperAdmin() {
+		return ErrWebUserProtected
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO deleted_telegram_users (organization_id, username)
 		SELECT $1, $2::text WHERE $2::text ~ '^tg_[0-9]+$' ON CONFLICT DO NOTHING`, orgID, username)
