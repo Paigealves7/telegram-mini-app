@@ -10,8 +10,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-:root{color-scheme:dark;--bg:#141619;--surface:#1e2125;--panel:#262a2f;--line:#3a4047;--text:#f4f5f6;--muted:#aeb6bf;--accent:#b8ef90;--accent-ink:#172613;--good:#b8ef90;--warn:#ffd58b;--danger:#ffaaa4;--shadow:0 20px 55px #0005;--ease:cubic-bezier(.22,1,.36,1)}
-:root[data-theme=light]{color-scheme:light;--bg:#eef1ef;--surface:#fbfcfa;--panel:#e7ede7;--line:#cbd4cb;--text:#1a251e;--muted:#4d5d53;--accent:#285f34;--accent-ink:#fff;--good:#285f34;--warn:#775000;--danger:#a22521;--shadow:0 20px 55px #263e2920}
+:root{color-scheme:dark;--bg:#111315;--surface:#191c1f;--panel:#25292c;--line:#34393c;--text:#f5efe6;--muted:#a5acb1;--accent:#f5efe6;--accent-ink:#202223;--good:#3ecf8e;--warn:#dcba84;--danger:#f19c99;--logs:#73b1cd;--boards:#6fbc9d;--raw:#c9ae86;--ready:#9c99cb;--shadow:0 20px 55px #0005;--ease:cubic-bezier(.22,1,.36,1)}
+:root[data-theme=light]{color-scheme:light;--bg:#f5f5f2;--surface:#fff;--panel:#efefec;--line:#d8dbd8;--text:#242725;--muted:#596360;--accent:#303732;--accent-ink:#fff;--good:#18744e;--warn:#815c23;--danger:#a33835;--logs:#538aa3;--boards:#428b70;--raw:#a18456;--ready:#847eac;--shadow:0 20px 55px #28302a20}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 Onest,system-ui,sans-serif;overflow-wrap:anywhere}
@@ -34,7 +34,7 @@ small,.muted{color:var(--muted)}
 .between{justify-content:space-between}
 .stack{display:grid;gap:16px}
 .row>*,.stack>*,.metrics>*,.org-grid>*{min-width:0}
-.card{padding:clamp(14px,2vw,24px);border:1px solid var(--line);border-radius:22px;background:var(--surface)}
+.card{padding:clamp(14px,2vw,24px);border:1px solid var(--line);border-radius:16px;background:var(--surface)}
 .pill{display:inline-flex;padding:4px 9px;border-radius:999px;background:var(--panel);font-size:12px;font-weight:700;color:var(--muted)}
 .good{color:var(--good)}
 .warn{color:var(--warn)}
@@ -53,30 +53,41 @@ small,.muted{color:var(--muted)}
 .sidebar .brand{display:none}
 nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
 nav button{display:grid;justify-items:center;align-content:center;gap:3px;min-height:52px;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--muted);font-size:12px;font-weight:600;padding:4px}
-nav button[aria-current=page]{border-color:var(--line);background:var(--panel);color:var(--good)}
+nav button[aria-current=page]{color:var(--text)}
 nav svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 main{max-width:1300px;margin-inline:auto;padding:calc(22px + max(env(safe-area-inset-top),var(--tg-top,0px))) max(12px,env(safe-area-inset-right)) calc(86px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
 .top .button{flex:none}
-.metrics,.org-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.org-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
-.metric{display:grid;align-content:start;gap:5px;background:var(--panel);padding:12px;border-radius:14px}
-.metric small{font-size:12px}
-.metric b{font-size:clamp(15px,2.3vw,24px);line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.035em}
-.metric>span{font-size:12px;color:var(--muted)}
-.activity{display:grid;margin-top:10px}
-.activity button{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:52px;border:0;border-top:1px solid var(--line);padding:10px 0;background:transparent;text-align:left}
-.activity time{color:var(--muted);text-align:right;font-size:12px}
-.org{display:grid;align-content:start;gap:12px;color:var(--text);text-align:left}
-.org:hover{border-color:var(--muted)}
-.org .metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.org .metric{padding:7px}
-.org .metric b{font-size:15px}
-.company{white-space:pre-wrap;line-height:1.4}
-.org .company{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.filters{display:flex;flex-wrap:wrap;gap:6px}
-.filters .button{min-height:40px;padding-inline:10px;font-size:13px}
-.filters .button[aria-pressed=true]{color:var(--accent-ink);background:var(--accent);border-color:transparent}
+.org-grid,.kpis,.charts{display:grid;gap:12px;min-width:0}
+.org-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+.kpis,.segments,.sheet-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.metric{display:flex;flex-direction:column;align-items:start;gap:6px;min-width:0;padding:clamp(9px,1.6vw,22px)}
+.metric b{font-size:clamp(24px,3.4vw,42px);letter-spacing:-.055em;line-height:1.12}
+.metric b .unit{font-size:.88em}.metric small,.metric>span{font-size:clamp(11px,1.1vw,14px);color:var(--muted)}
+.health{display:flex;align-items:center;gap:5px;border-block:1px solid var(--line);color:var(--muted);font-size:12px}
+.health-line{display:flex;align-items:center;gap:.7em;overflow:auto;white-space:nowrap;scrollbar-width:none;flex:1}
+.health-line span+span:before{content:'·';margin-right:.7em}
+.health button,.quiet{background:none;border:0;color:var(--text);min-height:42px;padding:4px 7px}
+.health button{font-size:20px;min-width:36px}.online:before,.pill:before,.legend-dot{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--dot,var(--good));margin-right:5px}
+.online:before{animation:blink 2s ease-in-out infinite}@keyframes blink{50%{opacity:.5}}
+.charts{align-items:start}.chart{min-width:0;display:grid;gap:17px}.chart h2{font-size:18px}.chart-total{font-size:28px;letter-spacing:-.045em}
+.track{display:block;width:100%;height:8px;border-radius:6px;overflow:hidden;background:var(--panel)}
+.legend,.ranking{display:grid}.legend-row,.rank{display:grid;align-items:center;gap:8px;padding:10px 0;border:0;border-top:1px solid var(--line);background:none;text-align:left}
+.legend-row{grid-template-columns:minmax(0,1fr) auto 48px;font-size:13px}.legend-row small{text-align:right}.legend-name{display:grid;gap:5px}.legend-name .track{height:3px;max-width:112px}.rank>b{text-align:right}.rank{grid-template-columns:minmax(0,1fr) 112px!important}
+@media(max-width:540px){.health{font-size:11px;gap:2px}.health-line{gap:3px}.health-line span+span:before{margin-right:3px}.health button{min-width:30px;padding-inline:4px}}
+.rank{grid-template-columns:minmax(0,1fr) auto}.rank strong{font-weight:600}.rank small{text-align:right}
+.rank .track{height:5px}.chart .track{align-self:center}.org{display:grid;align-content:start;gap:13px}.org h2{font-size:18px}.org-head,.org-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}.org-head>div{min-width:0}.org-head button,.org-foot button{flex:none}.org-foot{border-top:1px solid var(--line);padding-top:6px}
+.badges,.summary,.legend-mini{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px}.badges{margin-top:5px}.pill{align-items:center;font-size:11px;padding:2px 7px;font-weight:500}.pill:before{width:5px;height:5px}
+.summary{justify-content:space-between;gap:4px;font-size:12px}.summary b{display:block;font-size:18px;color:var(--text)}.summary>span{color:var(--muted)}
+.legend-mini{font-size:12px;color:var(--muted)}.company{white-space:pre-wrap}
+.search{position:relative}.search svg{position:absolute;left:13px;top:13px;width:18px;fill:none;stroke:var(--muted);stroke-width:1.7}.search input[type=search]{padding-left:40px;background:var(--surface)}
+.filters{display:flex;flex-wrap:wrap;gap:5px}.filters .button{min-height:36px;border-radius:100px;font-size:12px;padding-inline:10px;background:none}.filters .button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.settings-list{padding-block:2px}.settings-list>*{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:55px;background:none;border:0;text-align:left;text-decoration:none;color:inherit;font-weight:500;padding:5px 0}.settings-list>*+*{border-top:1px solid var(--line)}.settings-list .danger{color:var(--danger)}
+.sheet-tabs,.segments{border-radius:12px;padding:4px;background:var(--bg);gap:2px}.sheet-tabs button,.segments label{display:grid;place-items:center;text-align:center;position:relative;border:0;border-radius:9px;color:var(--muted);background:none;font-size:13px;min-height:42px;padding:4px}.sheet-tabs [aria-pressed=true],.segments label:has(:checked){background:var(--panel);color:var(--text)}.segments input{position:absolute;opacity:0;width:1px;height:1px}.segments label:focus-within{outline:2px solid var(--accent)}
+.roles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.roles button{font-size:13px;padding:5px}.divider{border-top:1px solid var(--line);padding-top:12px}.code{font-size:25px!important}
+nav button{position:relative}nav [aria-current=page]:before{content:'';position:absolute;top:-8px;width:23px;height:2px;background:var(--text);border-radius:2px}
+@media(min-width:960px){.charts{grid-template-columns:1fr 1.2fr}nav [aria-current=page]:before{left:0;top:13px;width:2px;height:20px}}
+html.lite *,html.lite *:before{animation:none!important;transition:none!important}
 label{display:grid;gap:6px;font-weight:600}
 input:not([type=checkbox]),textarea,select{width:100%;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:12px;padding:9px 12px;background:var(--panel)}
 textarea{resize:vertical}
@@ -112,7 +123,7 @@ dialog .notice{position:sticky;left:auto;transform:none;bottom:0;max-width:none;
 </div>
 <div class="shell" id="shell" hidden>
   <aside class="sidebar">
-    <div class="brand"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17l4-7 4 7H4Zm8 0 4-7 4 7h-8ZM8 9l4-6 4 6"/></svg></span><span class="logo-text">Лесопилка<small>Управление платформой</small></span></div>
+    <div class="brand"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17l4-7 4 7H4Zm8 0 4-7 4 7h-8ZM8 9l4-6 4 6"/></svg></span><span class="logo-text">Urmanit Control<small>Управление платформой</small></span></div>
     <nav aria-label="Разделы панели">
       <button type="button" data-tab="pulse" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h5l3-7 4 14 3-7h5"/></svg>Пульс</button>
       <button type="button" data-tab="orgs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V9l6 3V9l6 3V4h4l2 16H3Zm4-4h1m4 0h1m4 0h1"/></svg>Лесопилки</button>
@@ -125,7 +136,7 @@ dialog .notice{position:sticky;left:auto;transform:none;bottom:0;max-width:none;
     <p class="muted status" id="loading" role="status"></p>
     <section class="stack" id="pulse" aria-labelledby="page-title"></section>
     <section class="stack" id="orgs" aria-labelledby="page-title" hidden>
-      <label>Поиск по названию<input type="search" id="search" placeholder="Название лесопилки"></label>
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" id="search" aria-label="Поиск по названию" placeholder="Найти лесопилку"></label>
       <div class="filters" id="filters" role="group" aria-label="Фильтр лесопилок">
         <button class="button" type="button" data-filter="all" aria-pressed="true">Все</button>
         <button class="button" type="button" data-filter="work" aria-pressed="false">Рабочие</button>
@@ -135,9 +146,11 @@ dialog .notice{position:sticky;left:auto;transform:none;bottom:0;max-width:none;
       <div class="org-grid" id="org-list"></div>
     </section>
     <section class="stack" id="settings" aria-labelledby="page-title" hidden>
-      <div class="card stack">
+      <div class="card settings-list">
         <label class="toggle"><span>Тёмная тема</span><input type="checkbox" role="switch" id="theme-switch"></label>
-        <div class="row"><button type="button" class="button" id="refresh">Обновить данные</button><a class="button" href="/">Основное приложение</a><button type="button" class="button danger" id="logout">Выйти</button></div>
+        <a href="/">Перейти в основное приложение лесопилки <span>→</span></a>
+        <button type="button" id="refresh">Обновить данные <span>↻</span></button>
+        <button type="button" class="danger" id="logout">Выйти <span>↗</span></button>
       </div>
     </section>
   </main>
@@ -172,7 +185,7 @@ function applyTheme() {
   const theme = ['dark','light'].includes(selection) ? selection : (tg?.colorScheme || 'dark');
   document.documentElement.dataset.theme = theme;
   $('#theme-switch').checked = theme === 'dark';
-  const color = theme === 'dark' ? '#141619' : '#eef1ef';
+  const color = theme === 'dark' ? '#111315' : '#f5f5f2';
   $('meta[name="theme-color"]').content = color;
   try { tg?.setHeaderColor(color); } catch {}
   try { tg?.setBackgroundColor(color); } catch {}
@@ -300,13 +313,13 @@ function showTab(tab) {
   window.scrollTo(0,0);
 }
 function metric(label,value,detail='') {
-  return `<div class="metric"><small>${label}</small><b>${value}</b>${detail ? `<span>${detail}</span>` : ''}</div>`;
+  return `<div class="card metric"><small>${label}</small><b>${value}</b>${detail ? `<span>${detail}</span>` : ''}</div>`;
 }
 function uptime(seconds) {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor(seconds / 3600) % 24;
   const minutes = Math.floor(seconds / 60) % 60;
-  return seconds < 60 ? `${seconds} с` : [days && `${days} д`,hours && `${hours} ч`,`${minutes} мин`].filter(Boolean).join(' ');
+  return seconds < 60 ? `${seconds} с` : [days && `${days} д`,hours && `${hours} ч`,`${minutes}м`].filter(Boolean).join(' ');
 }
 async function probe(path,signal) {
   try {
@@ -339,34 +352,53 @@ async function refresh() {
     if (state.refresh === controller) $('#loading').textContent = '';
   }
 }
+const categories = [
+  ['Брёвна','logs_volume_m3','var(--logs)'],['Пиломатериалы','boards_volume_m3','var(--boards)'],
+  ['Дрова сырьё','firewood_raw_m3','var(--raw)'],['Дрова готовые','firewood_ready_m3','var(--ready)']
+];
+const volumes = org => categories.map(([,key]) => Number(org[key]) || 0);
+const total = values => values.reduce((sum,value) => sum + value,0);
+const stock = org => total(volumes(org));
+function bar(values,maximum=total(values)) {
+  let offset = 0;
+  const marks = values.map((value,i) => {
+    const width = maximum ? 100 * value / maximum : 0;
+    const mark = `<rect x="${offset}" width="${width}" height="8" fill="${categories[i][2]}"/>`;
+    offset += width;
+    return mark;
+  });
+  return `<svg class="track" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">${marks.join('')}</svg>`;
+}
 function renderPulse(health) {
   const data = state.overview;
   const orgs = data?.organizations || [];
-  const activeDemo = orgs.filter(org => org.is_active && org.is_demo).length;
-  const sum = key => orgs.reduce((total,org) => total + (Number(org[key]) || 0),0);
-  const stateLabel = online => `<span class="${online ? 'good' : 'warn'}">${online ? 'Онлайн' : 'Недоступен'}</span>`;
-  const sorted = [...orgs].sort((first,second) => (Date.parse(second.last_activity_at) || 0) - (Date.parse(first.last_activity_at) || 0));
+  const sums = categories.map(([,key]) => total(orgs.map(org => Number(org[key]) || 0)));
+  const volume = total(sums);
+  const demo = orgs.filter(org => org.is_active && org.is_demo).length;
   const pool = data?.db_pool;
-  $('#pulse').innerHTML = `<section class="card stack">
-    <div class="row between"><h2>Состояние сервиса</h2><button class="button" type="button" data-refresh>Обновить</button></div>
-    <div class="metrics">
-      ${metric('Сервер',stateLabel(health?.serverOnline ?? true),data ? `Аптайм · ${uptime(data.uptime_seconds || 0)}` : '')}
-      ${metric('База данных',stateLabel(health?.dbOnline ?? true))}
-      ${metric('Задержка БД',data && !health ? `<span class="unit">${format(data.db_latency_ms)}&nbsp;мс</span>` : '—')}
-      ${metric('Размер БД',data ? `<span class="unit">${format(data.db_size_bytes / 1000000)}&nbsp;МБ</span>` : '—')}
-    </div>
-    ${pool && !health ? `<small>Соединения БД · ${format(pool.acquired_connections)} занято · ${format(pool.idle_connections)} свободно · лимит ${format(pool.max_connections)}</small>` : ''}
-  </section>
-  ${data ? `<section class="card stack"><h2>Платформа</h2><div class="metrics">
-    ${metric('Активных лесопилок',format(data.active_organizations),`Демо · ${format(activeDemo)} · Всего · ${format(data.total_organizations)}`)}
-    ${metric('Всего сотрудников',format(data.total_users))}
-    ${metric('Всего заказов',format(data.total_orders))}
-    ${metric('Общий склад досок и дров',amount(sum('boards_volume_m3')+sum('firewood_raw_m3')+sum('firewood_ready_m3')),
-      `Доски · ${amount(sum('boards_volume_m3'))} · Дрова · ${amount(sum('firewood_raw_m3')+sum('firewood_ready_m3'))}`)}
-  </div></section>
-  <section class="card"><h2>Активность лесопилок</h2><div class="activity">
-    ${sorted.map(org => `<button type="button" data-org="${esc(org.id)}"><b>${esc(org.name)}</b><time>${when(org.last_activity_at)}</time></button>`).join('') || '<p class="muted">Лесопилок пока нет</p>'}
-  </div></section>` : ''}`;
+  const sorted = [...orgs].sort((a,b) => stock(b)-stock(a) || b.orders_count-a.orders_count || (Date.parse(b.last_activity_at)||0)-(Date.parse(a.last_activity_at)||0));
+  const online = !health || health.serverOnline;
+  $('#pulse').innerHTML = `<div class="health"><div class="health-line">
+    <span class="${online?'online good':'warn'}">${online?'Онлайн':'Нет связи'}</span>
+    <span>БД ${health ? (health.dbOnline?'онлайн':'недоступна') : format(data.db_latency_ms)+' мс'}</span>
+    <span>${data ? format(data.db_size_bytes/1000000)+' МБ' : '— МБ'}</span>
+    <span>Аптайм ${data ? uptime(data.uptime_seconds) : '—'}</span><span>Пул ${pool && !health ? format(pool.acquired_connections)+'/'+format(pool.max_connections) : '—'}</span></div>
+    <button type="button" data-refresh aria-label="Обновить данные">↻</button></div>
+    ${data ? `<div class="kpis">
+      ${metric('Лесопилки',format(data.active_organizations),'Рабочие '+format(data.active_organizations-demo)+' · Демо '+demo)}
+      ${metric('Команда',format(data.total_users),format(orgs.length ? data.total_users/orgs.length : 0)+' на фирму')}
+      ${metric('Склад платформы',amount(volume),'Заказов · '+format(data.total_orders))}
+    </div><div class="charts"><section class="card chart"><h2>Структура объёмов платформы</h2>
+    <b class="chart-total">${amount(volume)}</b>${bar(sums)}
+    <div class="legend">${categories.map(([label,,color],i) => `<div class="legend-row"><span class="legend-name"><span><i class="legend-dot" style="--dot:${color}"></i>${label}</span>${bar(categories.map((_,index) => index===i ? sums[i] : 0),volume)}</span><b>${amount(sums[i])}</b><small>${format(volume ? 100*sums[i]/volume : 0)} %</small></div>`).join('')}</div></section>
+    <section class="card chart"><h2>Топ лесопилок по объёму и активности</h2><div class="ranking">
+    ${sorted.map(org => `<button type="button" class="rank" data-org="${esc(org.id)}"><strong>${esc(org.name)}</strong><b>${amount(stock(org))}</b>${bar([stock(org)],stock(sorted[0]))}<small>${format(org.members_count)} сотр. · ${format(org.orders_count)} зак.</small></button>`).join('') || '<small>Лесопилок пока нет</small>'}</div></section></div>` : ''}`;
+}
+function stockSummary(org) {
+  const [logs,boards,raw,ready] = volumes(org);
+  const values = [logs,boards,raw+ready];
+  return `<div class="summary"><span>Склад<b>${amount(total(values))}</b></span><span>Сотрудников<b>${format(org.members_count)}</b></span><span>Заказов<b>${format(org.orders_count)}</b></span></div>
+    ${bar(values)}<div class="legend-mini">${values.map((value,i) => value>0 ? `<span><i class="legend-dot" style="--dot:${categories[i][2]}"></i>${['Брёвна','Доски','Дрова'][i]} · ${amount(value)}</span>` : '').join('') || 'Склад пуст'}</div>`;
 }
 function renderOrgs() {
   const query = $('#search').value.trim().toLocaleLowerCase('ru');
@@ -374,23 +406,13 @@ function renderOrgs() {
     const matches = {all:true,work:org.is_active && !org.is_demo,demo:org.is_demo,frozen:!org.is_active};
     return matches[state.filter] && org.name.toLocaleLowerCase('ru').includes(query);
   });
-  $('#org-list').innerHTML = orgs.map(org => `<button class="card org" type="button" data-org="${esc(org.id)}">
-    <div class="row between"><h2>${esc(org.name)}</h2><small>ID ${esc(org.id)}</small></div>
-    ${badges(org)}
-    <p class="muted company">${esc(org.company_info || 'Реквизиты PDF не заполнены')}</p>
-    <div class="metrics">
-      ${metric('Сотрудников',format(org.members_count))}
-      ${metric('Заказов',format(org.orders_count))}
-      ${metric('Доски',amount(org.boards_volume_m3))}
-      ${metric('Брёвна',amount(org.logs_volume_m3))}
-      ${metric('Сырьё для дров',amount(org.firewood_raw_m3))}
-      ${metric('Готовые дрова',amount(org.firewood_ready_m3))}
-    </div>
-    <small>Последняя операция · ${when(org.last_activity_at)}</small>
-  </button>`).join('') || (state.overview ? '<p class="muted">Лесопилки не найдены</p>' : '');
+  $('#org-list').innerHTML = orgs.map(org => `<article class="card org">
+    <header class="org-head"><div><h2>${esc(org.name)}</h2>${badges(org)}</div><button class="button" data-stock="${esc(org.id)}" data-role="manager">Склад →</button></header>
+    ${stockSummary(org)}<footer class="org-foot"><small>${org.last_activity_at?'Последняя операция · ':''}${when(org.last_activity_at)}</small><button class="quiet" data-org="${esc(org.id)}">Управление</button></footer>
+  </article>`).join('') || (state.overview ? '<p class="muted">Лесопилки не найдены</p>' : '');
 }
 function badges(org) {
-  return `<div class="row"><span class="pill ${org.is_demo ? 'warn' : ''}">${org.is_demo ? 'Демо' : 'Рабочая'}</span><span class="pill ${org.is_active ? 'good' : 'warn'}">${org.is_active ? 'Активна' : 'Заморожена'}</span></div>`;
+  return `<div class="badges"><span class="pill" style="--dot:${org.is_demo?'var(--raw)':'var(--logs)'}">${org.is_demo?'Демо':'Рабочая'}</span><span class="pill" style="--dot:${org.is_active?'var(--good)':'var(--muted)'}">${org.is_active?'Активна':'Заморожена'}</span></div>`;
 }
 
 function openSheet(title,content) {
@@ -422,24 +444,22 @@ function bindForm(form,submit) {
 function orgFields(org={}) {
   return `<label>Название<input name="name" value="${esc(org.name)}" required></label>
     <label>Реквизиты для PDF<textarea name="company_info" rows="3">${esc(org.company_info)}</textarea></label>
-    <label class="toggle"><span>Демонстрационная</span><input type="checkbox" role="switch" name="is_demo" ${org.is_demo ? 'checked' : ''}></label>
-    ${org.id ? `<label class="toggle"><span>Доступ активен</span><input type="checkbox" role="switch" name="is_active" ${org.is_active ? 'checked' : ''}></label>` : ''}
+    <label class="toggle"><span>Демо-режим</span><input type="checkbox" role="switch" name="is_demo" ${org.is_demo ? 'checked' : ''}></label>
+    ${org.id ? `<label class="toggle"><span>Активна (доступ открыт)</span><input type="checkbox" role="switch" name="is_active" ${org.is_active ? 'checked' : ''}></label>` : ''}
     <p class="error" role="alert"></p>`;
 }
 function orgValues(values) {
   return {name:values.get('name').trim(),company_info:values.get('company_info').trim(),is_demo:values.has('is_demo')};
 }
-function roleOptions() {
-  return Object.entries(roles).map(([key,label]) => `<option value="${key}">${label}</option>`).join('');
-}
-function inviteResult(invite) {
+function inviteResult(invite,name) {
   if (!invite?.code) return '';
   const bot = state.botUsername.replace(/^@/,'');
   const url = /^[a-z\d_]+$/i.test(bot) ? `https://t.me/${bot}?startapp=inv_${encodeURIComponent(invite.code)}` : '';
-  return `<section class="card stack"><h3>Приглашение · ${roles[invite.role] || 'Код доступа'}</h3>
+  const message = `Приглашение в лесопилку «${name}». Роль — ${roles[invite.role] || 'Сотрудник'}. Одноразовый код: ${invite.code}.${url ? '\n'+url : ''}`;
+  return `<section class="stack divider"><h3>Приглашение · ${roles[invite.role] || 'Код доступа'}</h3>
     <p class="code">${esc(invite.code)}</p><small>Действует до ${when(invite.expires_at)}</small>
-    <div class="row"><button class="button" type="button" data-copy="${esc(invite.code)}">Копировать код</button>
-    ${url ? `<a class="button" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Открыть ссылку</a><button class="button" type="button" data-copy="${esc(url)}">Копировать ссылку</button>` : ''}</div>
+    <div class="row"><button class="button" type="button" data-copy="${esc(invite.code)}">Скопировать код</button><button class="button" type="button" data-copy="${esc(message)}">Скопировать сообщение для отправки</button>
+    ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Открыть ссылку</a>` : ''}</div>
   </section>`;
 }
 function createOrg() {
@@ -450,35 +470,36 @@ function createOrg() {
     void refresh();
   });
 }
-function manageOrg(org,newInvite,warning='') {
+function manageOrg(org,newInvite,warning='',initialTab=newInvite || warning ? 'invites' : 'access') {
   const path = orgPath(org.id);
   const current = openSheet(org.name,`
-    <div class="row"><small>ID ${esc(org.id)}</small>${badges(org)}</div>
-    <div class="stack" id="invite-result">${warning ? `<p class="warn" role="status">${esc(warning)}</p>` : ''}${inviteResult(newInvite)}</div>
-    <form class="card stack" id="open-stock">
-      <h3>Открыть склад лесопилки</h3>
-      <label>Роль просмотра<select name="role"><option value="">Текущая роль</option>${roleOptions()}</select></label>
-      <button class="button primary" type="submit">Открыть склад лесопилки</button>
-    </form>
-    <section class="card stack">
-      <h3>Приглашения</h3>
-      <div id="invites" aria-live="polite"></div>
-      <form class="stack" id="new-invite">
-        <label>Роль для приглашения<select name="role">${roleOptions()}</select></label>
-        <p class="error" role="alert"></p>
-      <button class="button" type="submit" ${org.is_active ? '' : 'disabled'}>+ Выдать код</button>
-      ${org.is_active ? '' : '<small>Для выдачи кода разморозьте лесопилку.</small>'}
-      </form>
+    <div class="sheet-tabs" role="group" aria-label="Управление лесопилкой">${[['access','Вход и доступ'],['invites','Приглашения'],['settings','Настройки']].map(([key,label])=>`<button type="button" data-section="${key}">${label}</button>`).join('')}</div>
+    <section class="stack" data-pane="access"><h3>Войти на склад в роли</h3>
+      <div class="roles" id="open-stock">${Object.entries(roles).map(([key,label])=>`<button class="button" data-stock="${esc(org.id)}" data-role="${key}">${label}</button>`).join('')}</div>
+      ${stockSummary(org)}<div class="divider"><small>Реквизиты для PDF · ID ${esc(org.id)}</small><p class="company">${esc(org.company_info || 'Реквизиты не заполнены')}</p>${badges(org)}</div>
     </section>
-    <form class="card stack" id="edit-org"><h3>Редактировать реквизиты и статус</h3>
-      ${orgFields(org)}<button class="button" type="submit">Сохранить</button>
-    </form>
-    ${org.is_demo ? `<form class="card stack" id="reset-org">
-      <h3>Сброс тестовых данных</h3><p class="muted">Операции, заказы и складские остатки этой лесопилки будут удалены.</p>
-      <label>Для подтверждения введите СБРОС<input name="confirm" autocomplete="off" autocapitalize="characters" spellcheck="false" required></label>
-      <p class="error" role="alert"></p><button class="button danger" type="submit">Сбросить тестовые данные</button>
-    </form>` : ''}`);
-
+    <section class="stack" data-pane="invites">
+      <form class="stack" id="new-invite"><h3>Роль приглашённого</h3>
+      <div class="segments" role="radiogroup" aria-label="Роль приглашённого">${Object.entries(roles).map(([key,label]) => `<label><input type="radio" name="role" value="${key}" ${key==='manager'?'checked':''}>${label}</label>`).join('')}</div>
+      <p class="error" role="alert"></p><button class="button primary" type="submit" ${org.is_active?'':'disabled'}>+ Создать одноразовый код</button>
+      ${org.is_active?'':'<small>Для выдачи кода разморозьте лесопилку.</small>'}</form>
+      <div id="invite-result" aria-live="polite">${warning ? `<p class="warn">${esc(warning)}</p>` : ''}${inviteResult(newInvite,org.name)}</div>
+      <div><h3>Активные коды</h3><div id="invites" aria-live="polite"></div></div>
+    </section>
+    <section class="stack" data-pane="settings"><form class="stack" id="edit-org">${orgFields(org)}<button class="button primary" type="submit">Сохранить</button></form>
+    ${org.is_demo ? `<details class="divider"><summary>Сброс демо-данных</summary><form class="stack" id="reset-org">
+      <small>Операции, заказы и складские остатки этой лесопилки будут удалены.</small>
+      <label>Для подтверждения введите СБРОС<input name="confirm" autocomplete="off" required></label>
+      <p class="error" role="alert"></p><button class="button danger" type="submit">Сбросить демо-данные</button></form></details>` : ''}</section>`);
+  function selectPane(key) {
+    for (const pane of el.sheetContent.querySelectorAll('[data-pane]')) pane.hidden = pane.dataset.pane !== key;
+    for (const tab of el.sheetContent.querySelectorAll('[data-section]')) tab.setAttribute('aria-pressed',String(tab.dataset.section===key));
+    if (key === 'invites' && !inviteRequest) void loadInvites();
+  }
+  el.sheetContent.querySelector('.sheet-tabs').onclick = event => {
+    const tab = event.target.closest('[data-section]');
+    if (tab) selectPane(tab.dataset.section);
+  };
   const inviteList = $('#invites');
   const result = $('#invite-result');
   let inviteRequest = 0;
@@ -521,18 +542,12 @@ function manageOrg(org,newInvite,warning='') {
       button.disabled = false;
     }
   });
-  $('#open-stock').onsubmit = event => {
-    event.preventDefault();
-    const role = new FormData(event.currentTarget).get('role');
-    localStorage.setItem('org_id',String(org.id));
-    location.assign(Object.hasOwn(roles,role) ? `/?preview_role=${role}` : '/');
-  };
   bindForm($('#new-invite'),async values => {
     const invite = await api(path+'/invites',{method:'POST',body:{role:values.get('role')}});
     if (current()) {
       newInvite = invite;
       warning = '';
-      result.innerHTML = inviteResult(invite);
+      result.innerHTML = inviteResult(invite,org.name);
       result.scrollIntoView({block:'nearest'});
       await loadInvites();
     }
@@ -540,11 +555,7 @@ function manageOrg(org,newInvite,warning='') {
   bindForm($('#edit-org'),async values => {
     const updated = await api(path,{method:'PUT',body:{...orgValues(values),is_active:values.has('is_active')}});
     if (current()) {
-      if (org.is_demo !== updated.is_demo || org.is_active !== updated.is_active) manageOrg(updated,newInvite,warning);
-      else {
-        $('#sheet-title').textContent = updated.name;
-        el.sheetContent.firstElementChild.innerHTML = `<small>ID ${esc(updated.id)}</small>${badges(updated)}`;
-      }
+      manageOrg({...org,...updated},newInvite,warning,'settings');
       notice('Лесопилка обновлена');
     }
     void refresh();
@@ -560,7 +571,7 @@ function manageOrg(org,newInvite,warning='') {
     }
     void refresh();
   });
-  void loadInvites();
+  selectPane(initialTab);
 }
 
 async function copy(value) {
@@ -587,6 +598,10 @@ document.addEventListener('click',async event => {
   if (!button) return;
   if (button.dataset.tab) showTab(button.dataset.tab);
   if (button.hasAttribute('data-refresh')) void refresh();
+  if (button.dataset.stock && Object.hasOwn(roles,button.dataset.role)) {
+    localStorage.setItem('org_id',button.dataset.stock);
+    location.assign('/?preview_role='+button.dataset.role);
+  }
   if (button.dataset.org) {
     const org = state.overview?.organizations?.find(item => String(item.id) === button.dataset.org);
     if (org) manageOrg(org);
