@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"telegram-mini-app/internal/domain"
 
 	"github.com/jackc/pgx/v5"
@@ -165,6 +166,25 @@ func (r *Repository) GetLogArrivals(ctx context.Context, orgID int64, limit, off
 }
 
 func (r *Repository) CreateLogArrival(ctx context.Context, orgID int64, arrival *domain.LogArrival, items []domain.LogItem) (*domain.LogArrival, error) {
+	type logDimensions struct {
+		species    string
+		lengthMM   int
+		diameterMM int
+	}
+	grouped := make([]domain.LogItem, 0, len(items))
+	groupIndex := make(map[logDimensions]int, len(items))
+	for _, item := range items {
+		item.Species = strings.TrimSpace(item.Species)
+		key := logDimensions{species: item.Species, lengthMM: item.LengthMM, diameterMM: item.DiameterMM}
+		if i, ok := groupIndex[key]; ok {
+			grouped[i].Count += item.Count
+			grouped[i].VolumeM3 += item.VolumeM3
+			continue
+		}
+		groupIndex[key] = len(grouped)
+		grouped = append(grouped, item)
+	}
+
 	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return nil, err
@@ -180,9 +200,11 @@ func (r *Repository) CreateLogArrival(ctx context.Context, orgID int64, arrival 
 	}
 
 	itemQuery := `INSERT INTO log_items (organization_id, arrival_id, length_mm, diameter_mm, species, count, volume_m3) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
-	for i := range items {
-		items[i].ArrivalID = arrival.ID
-		err := tx.QueryRow(ctx, itemQuery, orgID, arrival.ID, items[i].LengthMM, items[i].DiameterMM, items[i].Species, items[i].Count, items[i].VolumeM3).Scan(&items[i].ID)
+	for i := range grouped {
+		item := &grouped[i]
+		item.ArrivalID = arrival.ID
+		item.VolumeM3 = round3(item.VolumeM3)
+		err := tx.QueryRow(ctx, itemQuery, orgID, arrival.ID, item.LengthMM, item.DiameterMM, item.Species, item.Count, item.VolumeM3).Scan(&item.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -190,7 +212,7 @@ func (r *Repository) CreateLogArrival(ctx context.Context, orgID int64, arrival 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
-	arrival.Items = items
+	arrival.Items = grouped
 	return arrival, nil
 }
 

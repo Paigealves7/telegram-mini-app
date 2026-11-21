@@ -391,6 +391,17 @@ body[data-view="home"] #view{display:block}
 .form-row-head .lnk,.form-row .lnk{padding:8px 0}
 .form-row-tools{margin-bottom:16px}
 .form-row-tools .btn{flex:1 1 auto;width:auto;min-height:42px;padding:0 12px;font-size:14px}
+.form-row[data-form-row="sawnboard"] .num button{width:40px;flex:none}
+.form-row[data-form-row="sawnboard"] .num input{padding-inline:4px}
+.li[data-a="loggroup"] .li-e>span,.log-diameters .li-e>span,.log-group-balance span{white-space:nowrap}
+.log-group-action{margin:14px 0;transition:transform 100ms var(--ease)}
+.log-diameters .li{min-height:48px;margin-top:6px;padding-block:8px}
+.li[data-a="loggroup"],.log-diameters button.li{transition:transform 100ms var(--ease)}
+.li[data-a="loggroup"]:active,.log-diameters button.li:active{transform:scale(.97)}
+html.lite :is(.li[data-a="loggroup"],.log-diameters button.li,.log-group-action):active{transform:none}
+@media(prefers-reduced-motion:reduce){
+  :is(.li[data-a="loggroup"],.log-diameters button.li,.log-group-action):active{transform:none}
+}
 .home-feed .order-card{background:var(--bg)}
 .resource-grid{display:grid;gap:10px}.resource-grid .srow{margin:0;border-radius:14px}.resource-grid small{font-size:12px}
 .who{display:grid;grid-template-columns:56px 1fr;gap:2px 14px;text-align:left;align-items:center;padding:8px 0 20px}
@@ -1243,6 +1254,33 @@ const skey = x => {
 };
 let DEB;
 const boardGroupKey = x => JSON.stringify([x.species,x.height_mm,x.width_mm,x.length_mm,x.grade]);
+const logGroupKey = x => JSON.stringify([x.arrival_id, x.species, x.length_mm]);
+const logGroupTitle = x => `Партия №${x.arrival_id} · ${x.species || 'Порода не указана'} · ${lenM(x.length_mm)}`;
+function groupLogs(items = D.logs) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = logGroupKey(item);
+    if (!groups.has(key)) groups.set(key, {...item, count: 0, volume_m3: 0, items: []});
+    const group = groups.get(key);
+    group.items.push(item);
+    group.count += +item.count;
+    group.volume_m3 += +item.volume_m3;
+  }
+  return groups;
+}
+function logDiameters(items) {
+  const diameters = new Map();
+  for (const item of items) {
+    const diameter = +item.diameter_mm;
+    if (!diameters.has(diameter)) diameters.set(diameter, []);
+    diameters.get(diameter).push(item);
+  }
+  return [...diameters].sort(([a], [b]) => a - b);
+}
+function diameterRange(diameters) {
+  const min = diameters[0][0], max = diameters.at(-1)[0];
+  return min === max ? 'Ø' + min : `Ø${min}–${max}`;
+}
 function stockList() {
   if (S.wt === 'firewood') {
     const f = D.fw || {raw_m3: 0};
@@ -1252,7 +1290,9 @@ function stockList() {
   }
   const t = S.wt, q = S.wq.toLowerCase().replace(/(\d)\s*[*xх]\s*(\d)/g, '$1×$2');
   let list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
-  if(t === 'boards') {
+  if (t === 'logs') {
+    list = [...groupLogs(list).values()].sort((a, b) => b.volume_m3 - a.volume_m3);
+  } else {
     const groups = new Map();
     list.forEach(x=>{
       const key=boardGroupKey(x);
@@ -1262,12 +1302,18 @@ function stockList() {
     list=[...groups.values()].sort((a,b)=>b.volume_m3-a.volume_m3);
   }
   $('#ssum').innerHTML = tots([['Позиций', fmt(list.length, 0)], ['Штук', fmt(sum(list, 'count'), 0)], ['Объём, м³', fmt(sum(list, 'volume_m3'), 2)]]);
-  const g = {}; list.forEach(x => (g[x.species || '—'] = g[x.species || '—'] || []).push(x));
+  const g = Object.create(null); list.forEach(x => (g[x.species || '—'] = g[x.species || '—'] || []).push(x));
   const row = x => {
-    const low = t === 'boards' && (+x.count || 0) <= LOW_STOCK_PCS, d = sdate(x.created_at || x.updated_at);
-    return li((t === 'boards' ? esc(boardTitle(x)) : `Бревно Ø${esc(x.diameter_mm)}`),
-      esc([lenM(x.length_mm), t === 'boards' ? [x.grade ? 'сорт ' + x.grade : '', x.batches?.length > 1 ? x.batches.length + ' ' + pl(x.batches.length,['партия','партии','партий']) : 'Позиция №' + x.id].filter(Boolean).join(' · ') : 'партия №' + x.arrival_id, d].filter(Boolean).join(' · ')),
-      `${fmt(x.volume_m3, 3)} м³`, `${fmt(x.count, 0)} шт`, {a: t === 'boards' && x.batches.length > 1 ? 'boardgroup' : 'item', d: t === 'boards' && x.batches.length > 1 ? boardGroupKey(x) : `${t}:${x.id}`, lines: low ? lowTag('Мало на складе') : ''});
+    const volume = fmt(x.volume_m3, 3) + ' м³', count = fmt(x.count, 0) + ' шт';
+    if (t === 'logs') {
+      const diameters = logDiameters(x.items);
+      return li(`Партия №${esc(x.arrival_id)} · ${lenM(x.length_mm)}`, `${diameterRange(diameters)} мм · ${diameters.length} диам.`,
+        volume, count, {a: 'loggroup', d: logGroupKey(x)});
+    }
+    const low = (+x.count || 0) <= LOW_STOCK_PCS, d = sdate(x.created_at || x.updated_at);
+    const batch = x.batches.length > 1 ? x.batches.length + ' ' + pl(x.batches.length, ['партия','партии','партий']) : 'Позиция №' + x.id;
+    return li(esc(boardTitle(x)), esc([lenM(x.length_mm), x.grade ? 'сорт ' + x.grade : '', batch, d].filter(Boolean).join(' · ')),
+      volume, count, {a: x.batches.length > 1 ? 'boardgroup' : 'item', d: x.batches.length > 1 ? boardGroupKey(x) : 'boards:' + x.id, lines: low ? lowTag('Мало на складе') : ''});
   };
   $('#sl').innerHTML = list.length ? Object.entries(g).sort((a, b) => sum(b[1], 'volume_m3') - sum(a[1], 'volume_m3')).map(([n, a]) =>
     grp(esc(n), fmt(sum(a, 'volume_m3'), 2) + ' м³', a.map(row).join(''))).join('')
@@ -1654,7 +1700,8 @@ const SRC = {
   con: () => Object.entries(D.con),
   sup: () => conOpts('is_supplier'), car: () => conOpts('is_carrier'), cli: () => conOpts('is_client'),
   boards: () => D.boards.map(b => [b.id, `№${b.id} · ${boardLabel(b)} · ${b.count} шт`]),
-  logs: () => D.logs.map(l => [l.id, `${l.species || 'Бревно'} Ø${l.diameter_mm} × ${lenM(l.length_mm)} · ${l.count} шт · ${fmt(l.volume_m3, 2)} м³ · партия №${l.arrival_id}`])
+  logs: () => [...groupLogs()].filter(([, g]) => g.volume_m3 > 0).map(([key, g]) => [key,
+    `${logGroupTitle(g)} (остаток ${fmt(g.volume_m3, 2)} м³ · ${fmt(g.count, 0)} шт · ${diameterRange(logDiameters(g.items))})`])
 };
 const pwBytes = x => new TextEncoder().encode(x || '').length;
 const FW_NAMES = {split: 'Колотые', round: 'Чурбаки (пиленые)'};
@@ -1701,10 +1748,32 @@ const FORM_ROWS = {
     {k: 'dia', l: 'Диаметр верхнего торца, мм', t: 'num', v: 220, s: 10, half: 1},
     {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1},
     {k: 'vol', l: 'Объём, м³', t: 'num', v: 0, s: .1, half: 1}
+  ]},
+  sawnboard: {title: 'Полученная доска', fields: [
+    {k: 'size', l: 'Типовой размер', t: 'pre', c: SIZES},
+    {k: 'th', l: 'Толщина, мм', t: 'num', v: 50, s: 5, half: 1},
+    {k: 'wd', l: 'Ширина, мм', t: 'num', v: 150, s: 10, half: 1},
+    {k: 'len', l: 'Длина, мм', t: 'num', v: 6000, s: 100, half: 1},
+    {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1},
+    {k: 'grade', l: 'Сорт', t: 'sel', o: [['1', '1 сорт'], ['2', '2 сорт'], ['3', '3 сорт']], half: 1},
+    {k: 'vol', l: 'Объём, м³', t: 'num', v: 0, s: .1, half: 1}
   ]}
 };
 const ARRIVAL_ROWS = {log: '+ Ещё диаметр/порода в машине'};
 const ORDER_ROWS = {board: '+ Добавить ещё доску', firewood: '+ Добавить дрова'};
+const SAWING_ROWS = {sawnboard: '+ Ещё размер доски'};
+function sawingLogs(items, volume) {
+  let remaining = Math.round(volume * 1000);
+  const logs = [];
+  for (const item of [...items].sort((a, b) => a.id - b.id)) {
+    const amount = Math.min(remaining, Math.round(item.volume_m3 * 1000));
+    if (amount <= 0) continue;
+    logs.push({log_id: +item.id, volume_m3: amount / 1000});
+    remaining -= amount;
+    if (remaining === 0) break;
+  }
+  return logs;
+}
 function orderDraft(v) {
   const boards = new Map(D.boards.map(b => [String(b.id), b]));
   const requested = new Map();
@@ -1789,20 +1858,33 @@ const FORMS = {
     body: v => ({supplier_id: +v.supplier, carrier_id: +v.carrier, truck_number: v.truck, arrival_date: ymd(new Date()), volume_m3: v.vol})
   },
   sawing: {
-    t: 'Распиловка', e: 'sawing', ok: 'Сохранить распиловку', path: '/sawing', done: 'Распиловка сохранена', after: 'home', auto: 'vol', need: ['logs'],
-    f: [{k: 'log', l: 'Сырьё (позиция прихода)', t: 'sel', src: 'logs'}, {k: 'lvol', l: 'Объём сырья, м³', t: 'num', v: 0, s: .1},
-      {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1, h: 'Полученная продукция'},
-      {k: 'size', l: 'Типовой размер', t: 'pre', c: SIZES},
-      {k: 'th', l: 'Толщина, мм', t: 'num', v: 50, s: 5, half: 1}, {k: 'wd', l: 'Ширина, мм', t: 'num', v: 150, s: 10, half: 1},
-      {k: 'len', l: 'Длина, мм', t: 'num', v: 6000, s: 100, half: 1}, {k: 'cnt', l: 'Количество, шт', t: 'num', v: 10, s: 1, half: 1},
-      {k: 'grade', l: 'Сорт', t: 'sel', o: [['1', '1 сорт'], ['2', '2 сорт'], ['3', '3 сорт']], half: 1}, {k: 'vol', l: 'Объём, м³', t: 'num', v: 0, s: .1, half: 1}],
-    calc: v => ({vol: v.th * v.wd * v.len * v.cnt / 1e9}),
-    pv: v => `<div class="pvr"><span class="hint">Получено досок</span><b>${fmt(v.vol, 3)} м³</b></div><div class="pvr"><span class="hint">Выход из сырья</span><b>${v.lvol > 0 ? fmt(v.vol / v.lvol * 100, 0) : 0}%</b></div>`,
-    req: v => !v.log ? 'Выберите сырьё' : v.lvol <= 0 ? 'Укажите объём сырья' : v.cnt <= 0 ? 'Укажите количество досок' : v.vol <= 0 ? 'Объём досок должен быть больше нуля' : null,
-    sum: v => `${v.species} ${v.th}×${v.wd}×${v.len}: ${fmt(v.cnt, 0)} шт, ${fmt(v.vol, 3)} м³ из ${fmt(v.lvol, 2)} м³ сырья`,
+    t: 'Распиловка', e: 'sawing', ok: 'Сохранить распиловку', path: '/sawing', done: 'Распиловка сохранена', after: 'home', need: ['logs'], rows: SAWING_ROWS,
+    f: [{k: 'log', l: 'Сырьё (партия прихода)', t: 'sel', src: 'logs'}, {k: 'lvol', l: 'Объём сырья в распил, м³', t: 'num', v: 0, s: .1},
+      {k: 'species', l: 'Порода', t: 'txt', c: SP, v: 'Сосна', m: 1, h: 'Полученная продукция'}],
+    pv: v => {
+      const volume = sum(v.rows, 'vol');
+      return `<div class="pvr"><span class="hint">Получено досок</span><b>${fmt(volume, 3)} м³</b></div>
+        <div class="pvr"><span class="hint">Выход из сырья</span><b>${v.lvol > 0 ? fmt(volume / v.lvol * 100, 0) : 0}%</b></div>`;
+    },
+    req: v => {
+      const group = groupLogs().get(v.log);
+      if (!group) return 'Выберите партию сырья';
+      if (!(v.lvol >= .001) || rounded(v.lvol, 1000) !== v.lvol) return 'Укажите объём сырья от 0,001 м³ с точностью до трёх знаков';
+      if (v.lvol > rounded(group.volume_m3, 1000)) return `В партии осталось ${fmt(group.volume_m3, 3)} м³`;
+      if (!v.species || v.species.length > 64) return 'Укажите породу досок до 64 символов';
+      if (!v.rows.length) return 'Добавьте полученные доски';
+      for (const [i, row] of v.rows.entries()) {
+        if (![row.th, row.wd, row.len, row.cnt].every(positiveInt)) return `Укажите целые положительные размеры и количество досок в строке ${i + 1}`;
+        if (!(row.vol >= .001 && row.vol < 1e9) || rounded(row.vol, 1000) !== row.vol) return `Проверьте объём досок в строке ${i + 1}`;
+      }
+      if (rounded(sum(v.rows, 'vol'), 1000) > v.lvol) return 'Объём досок превышает объём сырья';
+      return null;
+    },
+    sum: v => `${v.species} · ${fmt(sum(v.rows, 'cnt'), 0)} шт · ${fmt(sum(v.rows, 'vol'), 3)} м³ из ${fmt(v.lvol, 3)} м³ сырья\n` +
+      v.rows.map(r => `${r.th}×${r.wd}×${r.len} мм · ${r.cnt} шт · ${fmt(r.vol, 3)} м³`).join('\n'),
     mem: ['species'],
-    body: v => ({date: ymd(new Date()), logs: [{log_id: +v.log, volume_m3: v.lvol}],
-      boards: [{species: v.species, grade: v.grade, height_mm: Math.round(v.th), width_mm: Math.round(v.wd), length_mm: Math.round(v.len), count: Math.round(v.cnt), volume_m3: v.vol}]})
+    body: v => ({date: ymd(new Date()), logs: sawingLogs(groupLogs().get(v.log).items, v.lvol),
+      boards: v.rows.map(r => ({species: v.species, grade: r.grade, height_mm: r.th, width_mm: r.wd, length_mm: r.len, count: r.cnt, volume_m3: r.vol}))})
   },
   order: {
     t: 'Новый заказ', e: 'order', ok: 'Создать заказ', path: '/orders', done: 'Заказ создан', after: 'orders', need: ['con', 'boards'], rows: ORDER_ROWS,
@@ -1890,6 +1972,10 @@ function updateLogRow(row, field) {
   $('.log-method', row).textContent = manual ? 'Объём указан вручную' : !volume ? 'Укажите длину и диаметр' :
     exact ? 'Расчёт по ГОСТ 2708-75' : 'Оценка по сбегу на основе ГОСТ 2708-75';
 }
+function updateSawnBoard(row) {
+  const {th, wd, len, cnt} = readFields(FORM_ROWS.sawnboard.fields, row, true);
+  fe('vol', row).value = ([th, wd, len, cnt].every(positiveInt) ? th * wd * len * cnt / 1e9 : 0).toFixed(3);
+}
 function addFormRow(type, boardId) {
   const list = $('#form-rows'), {title, fields} = FORM_ROWS[type];
   if (type !== 'log' && $$('[data-form-row]', list).filter(r => r.dataset.formRow === type).length >= 100) {
@@ -1911,10 +1997,13 @@ function addFormRow(type, boardId) {
     if (stock) fe('cnt', row).value = Math.min(stock.count, 10);
   }
   if (type === 'log') updateLogRow(row);
+  if (type === 'sawnboard') updateSawnBoard(row);
   return row;
 }
 function rowFormChanged(el, row = el.closest('[data-form-row]')) {
-  if (row?.dataset.formRow === 'log') updateLogRow(row, el.dataset.k);
+  const type = row?.dataset.formRow, key = el.dataset.k;
+  if (type === 'log') updateLogRow(row, key);
+  if (type === 'sawnboard' && ['size', 'th', 'wd', 'len', 'cnt'].includes(key)) updateSawnBoard(row);
   calcForm(!row && el.dataset.k === FORMS[FK].auto);
 }
 function calcForm(fromAuto) {
@@ -1938,12 +2027,21 @@ async function vForm(kind, p = {}) {
   $('#ok').disabled = false;
   F.f.forEach(f => {
     if (f.t !== 'sel' || !f.src) return;
-    fillSelect(f, target, p[f.k] ?? (f.m ? MEM[f.k] : null));
+    if (kind === 'sawing' && f.k === 'log') {
+      const want = preferredLogGroup(p);
+      fillSelect(f, target, want);
+      const select = fe(f.k, target);
+      if (want != null && select.value !== want) {
+        select.prepend(new Option('Выберите партию сырья', ''));
+        select.value = '';
+      }
+    } else fillSelect(f, target, p[f.k] ?? (f.m ? MEM[f.k] : null));
   });
   if (F.rows) {
     $('.form-row-tools', target).innerHTML = Object.entries(F.rows).map(([type, label]) =>
       `<button type="button" class="btn ghost" data-a="addrow" data-v="${type}">${label}</button>`).join('');
-    addFormRow(kind === 'arrival' ? 'log' : D.boards.length || p.board ? 'board' : 'firewood', p.board);
+    const type = kind === 'order' ? (D.boards.length || p.board ? 'board' : 'firewood') : Object.keys(F.rows)[0];
+    addFormRow(type, p.board);
   }
   if (kind === 'fwsettings' || kind === 'fwproc') {
     try {const settings=await api('/firewood/settings');
@@ -1952,17 +2050,38 @@ async function vForm(kind, p = {}) {
       else {FORMS.fwproc.pv=v=>`<div class="pvr"><span>Списание сырья</span><b>${fmt(v.vol*settings[v.kind],4)} м³</b></div><p class="hint">Коэффициент: ${settings[v.kind]}. При сохранении применяется актуальный коэффициент из настроек.</p>`;if(!$('#pv'))target.insertAdjacentHTML('beforeend','<section class="pv" id="pv"></section>');}
     }catch(e){ if (e === staleRequest) return;toast(e.message,'err');$('#ok').disabled=true;return;}
   }
-  if (kind === 'sawing') syncLog();
+  if (kind === 'sawing') {
+    fe('lvol', target).setAttribute('aria-describedby', 'sawing-stock');
+    fe('lvol', target).closest('.fld').insertAdjacentHTML('beforeend', '<p class="hint" id="sawing-stock"></p>');
+    syncLog();
+  }
   calcForm();
 }
-function syncLog() { const l = D.logs.find(x => x.id == fe('log').value); if (l) fe('lvol').value = (+l.volume_m3).toFixed(3); }
+function preferredLogGroup(p) {
+  if (p.batch != null) return String(p.batch);
+  const logId = p.log_id ?? p.log;
+  const arrivalId = p.arrival_id ?? p.arrival;
+  if (logId == null && arrivalId == null) return null;
+  const log = logId != null ? D.logs.find(x => String(x.id) === String(logId)) :
+    D.logs.filter(x => String(x.arrival_id) === String(arrivalId) && +x.volume_m3 > 0).reduce((first, x) =>
+      !first || +x.id < +first.id ? x : first, null);
+  return log ? logGroupKey(log) : '';
+}
+function syncLog() {
+  const select = fe('log'), group = groupLogs().get(select.value);
+  select.title = select.selectedOptions[0]?.text || '';
+  fe('lvol').value = (group?.volume_m3 || 0).toFixed(3);
+  if (group?.species) fe('species').value = group.species;
+  $('#sawing-stock').textContent = group ? `В партии ${fmt(group.volume_m3, 3)} м³ · ${fmt(group.count, 0)} шт` : '';
+}
 async function submitForm() {
   const kind = FK, F = FORMS[kind], v = vals(), e = F.req(v);
   if (e) { notify('error'); toast(e, 'err'); return; }
+  const sawingBody = kind === 'sawing' ? F.body(v) : null;
   if (!await ask(F.e, F.t, F.sum(v), 'Сохранить')) return;
   const b = $('#ok'); b.disabled = true; b.classList.add('busy');
   try {
-    await api(F.path, {method: 'POST', body: JSON.stringify(F.body(v))});
+    await api(F.path, {method: 'POST', body: JSON.stringify(sawingBody ?? F.body(v))});
     F.mem.forEach(k => mem(k, v[k]));
     const firstBoard = kind === 'order' && v.rows.find(r => r.type === 'board');
     if (firstBoard) mem('price', firstBoard.price);
@@ -2206,8 +2325,30 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
     if(!batches.length)return;
     sheet(`<h3>${esc(boardTitle(batches[0]))}</h3><p class="mut">${fmt(sum(batches,'count'),0)} шт · ${fmt(sum(batches,'volume_m3'),3)} м³</p><p class="mut sm">Выберите партию для заказа или корректировки остатка.</p>${batches.map(x=>li('Позиция №'+esc(x.id),esc([lenM(x.length_mm),sdate(x.created_at)].filter(Boolean).join(' · ')),fmt(x.volume_m3,3)+' м³',fmt(x.count,0)+' шт',{a:'item',d:'boards:'+x.id})).join('')}`);
   },
+  loggroup: key => {
+    const group = groupLogs().get(key);
+    if (!group) return;
+    const rows = logDiameters(group.items).map(([diameter, items]) => li(`Бревно Ø${diameter} · ${lenM(group.length_mm)}`, '',
+      fmt(sum(items, 'volume_m3'), 3) + ' м³', fmt(sum(items, 'count'), 0) + ' шт',
+      {a: 'item', d: (items.length === 1 ? 'logs:' : 'logdiameter:') + items[0].id}));
+    sheet(`<h3>${esc(logGroupTitle(group))}</h3>
+      <p class="mut log-group-balance"><span>${fmt(group.count, 0)} шт</span> · <span>${fmt(group.volume_m3, 3)} м³</span></p>
+      <button class="btn rip log-group-action" data-a="mk" data-v="sawing:batch:${esc(key)}">Записать распиловку из этой партии</button>
+      <div class="log-diameters">${rows.join('')}</div>`);
+  },
   item: v => {
     const [t, id] = v.split(':'), x = find(t, id); if (!x) return;
+    if (t === 'logdiameter') {
+      const key = logGroupKey(x);
+      const items = D.logs.filter(l => logGroupKey(l) === key && l.diameter_mm === x.diameter_mm).sort((a, b) => a.id - b.id);
+      sheet(`<h3>Бревно Ø${esc(x.diameter_mm)} · ${lenM(x.length_mm)}</h3>
+        <p class="mut">${esc(logGroupTitle(x))}</p>
+        <p class="mut log-group-balance"><span>${fmt(sum(items, 'count'), 0)} шт</span> · <span>${fmt(sum(items, 'volume_m3'), 3)} м³</span></p>
+        <div class="log-diameters">${items.map(l => li('Позиция №' + esc(l.id), '',
+          fmt(l.volume_m3, 3) + ' м³', fmt(l.count, 0) + ' шт', {a: 'item', d: 'logs:' + l.id})).join('')}</div>
+        <button class="lnk" data-a="loggroup" data-v="${esc(key)}">Все диаметры партии</button>`);
+      return;
+    }
     sheet(`<h3>${t === 'boards' ? esc(boardTitle(x)) : `Бревно Ø${esc(x.diameter_mm)}`}</h3>
       <div class="dl"><span class="hint">Позиция склада</span><b>№${esc(x.id)}</b></div><div class="dl"><span class="hint">Порода</span><b>${esc(x.species || 'не указана')}</b></div>
       <div class="dl"><span class="hint">Длина</span><b>${lenM(x.length_mm)}</b></div>
@@ -2253,7 +2394,7 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
       } catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
     });
   },
-  mk: v => { const [f, k, id] = v.split(':'); closeSheet(); go(f, {[k]: id}); },
+  mk: v => { const [f, k, ...id] = v.split(':'); closeSheet(); go(f, {[k]: id.length ? id.join(':') : undefined}); },
   done: (v, el) => ask('ok', 'Завершить заказ №' + orderNumberFor(v), 'Товары будут списаны со склада и проведены как продажа.', 'Завершить').then(ok => ok && doComplete(v, el)),
   pdf: v => pdfSheet(v), pdfsend: (v, el) => pdfDo('send', v, el), pdfdl: (v, el) => pdfDo('dl', v, el), pdfview: (v, el) => pdfDo('view', v, el),
   addrow: type => { const row = addFormRow(type); row?.querySelector('input,select')?.focus(); calcForm(); },
@@ -2266,7 +2407,12 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
     const row = el.closest('[data-form-row]');
     fe(el.dataset.k, row || document).value = v; rowFormChanged(el, row);
   },
-  size: v => { const [a, b] = v.split('×'); fe('th').value = a; fe('wd').value = b; calcForm(); },
+  size: (v, el) => {
+    const row = el.closest('[data-form-row]'), [a, b] = v.split('×');
+    fe('th', row || document).value = a;
+    fe('wd', row || document).value = b;
+    rowFormChanged(el, row);
+  },
   st: (v, el) => {
     const row = el.closest('[data-form-row]');
     const fields = row ? FORM_ROWS[row.dataset.formRow].fields : FORMS[FK].f;
@@ -2325,7 +2471,10 @@ document.addEventListener('input', e => {
   const t = e.target;
   if(t.id === 'staffq'){S.staffq=t.value;staffList();}
   else if(t.id === 'jq') { S.jq=t.value; filterJournal(); }
-  else if (t.id === 'q') { S.wq = t.value; clearTimeout(DEB); DEB = setTimeout(() => stockList(false), 120); }
+  else if (t.id === 'q') {
+    S.wq = t.value; clearTimeout(DEB);
+    DEB = setTimeout(() => { if (S.cur === 'stock' && $('#sl')) stockList(); }, 120);
+  }
   else if (t.id === 'cq') { S.cq = t.value; clearTimeout(DEB); DEB = setTimeout(conList, 120); }
   else if (t.id === 'oq') { S.oq = t.value; clearTimeout(DEB); DEB = setTimeout(() => orderList(false), 120); }
   else if (t.id === 'd1' || t.id === 'd2') { S.range = 'custom'; $$('[data-a="range"]').forEach(b => b.classList.remove('on')); loadStats(); }
