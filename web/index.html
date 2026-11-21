@@ -656,7 +656,7 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
  .side-profile>span:nth-child(2){flex:1;min-width:0}
  .side-profile small{display:inline-block;padding:2px 6px;margin-top:3px;border-radius:999px;background:var(--s2)}
  .side-profile>svg{width:16px;height:16px;color:var(--t2)}
- #jl>.card-group>.li:only-of-type{grid-column:1/-1}
+ #jl>.card-group>.li:nth-child(2):last-child{grid-column:1/-1}
 }
 
 
@@ -742,6 +742,20 @@ html.lite .org-choice:active,html.lite #title button.org-title:active{transform:
 .home-order{padding-block:14px}.home-order:hover,.home-order:focus-visible{background:var(--s2)}
 .home-tools .hbtn:nth-child(2){background:var(--s2);border:1px solid var(--line);color:var(--t1)}
 @media(max-width:767px){body[data-view="home"] #hd{margin-top:8px}body[data-view="home"] .quickbar{margin-bottom:8px}.open-balance{margin-top:12px}}
+#jl .journal-entry{display:block;min-width:0;padding:0;align-self:start;overflow:hidden}
+#jl .journal-entry>.li{margin:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+#jl .journal-entry>button.li:hover{background:var(--s2)}
+.journal-toggle{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:40px;padding:8px 16px;border:0;border-top:1px solid var(--line);background:var(--s2);color:var(--t2);font-size:12px;text-align:left}
+.journal-toggle>span:last-child{display:flex;align-items:center;gap:6px;color:var(--t1);white-space:nowrap}
+.journal-toggle:hover{background:var(--s3)}
+.journal-toggle:focus-visible,#jl .journal-entry>button.li:focus-visible{outline-offset:-3px}
+.journal-chevron{transition:transform 200ms var(--ease)}
+.journal-toggle[aria-expanded="true"] .journal-chevron{transform:rotate(180deg)}
+.journal-entry>.li-l{margin:0;padding:12px 16px 14px 20px;min-width:0;overflow-wrap:anywhere;opacity:1;transition:opacity 200ms var(--ease),display 200ms allow-discrete}
+.journal-entry>.li-l[hidden]{opacity:0;transition-duration:150ms}
+@starting-style{.journal-entry>.li-l:not([hidden]){opacity:0}}
+html.lite :is(.journal-entry>.li-l,.journal-chevron){transition:none}
+@media(prefers-reduced-motion:reduce){.journal-entry>.li-l,.journal-chevron{transition:none}}
 </style>
 </head>
 <body class="noauth">
@@ -1240,8 +1254,28 @@ const journalLinks = new Map();
 function journalCard(kind, item, title, sub, value, unit, details) {
   const key = `${kind}:${item.id}`;
   if (canSuper()) journalLinks.set(key, {kind, item, title, sub, value, unit, details});
-  return li(esc(title), esc(sub), esc(value), esc(unit),
-    {lines: lines(details), ...(canSuper() ? {a:'opdetail', d:key} : {})});
+  const heading = li(esc(title), esc(sub), esc(value), esc(unit), canSuper() ? {a:'opdetail', d:key} : {});
+  if (!details.length) return heading;
+  const id = 'journal-' + key.replace(':', '-');
+  return `<div class="li journal-entry">
+    ${heading}
+    <button type="button" class="journal-toggle" data-a="jtoggle" aria-expanded="false" aria-controls="${esc(id)}">
+      <span>Строк: ${details.length}</span><span>Состав <span class="journal-chevron" aria-hidden="true">▾</span></span>
+    </button>
+    <div id="${esc(id)}" class="li-l" hidden>${lines(details)}</div>
+  </div>`;
+}
+function groupArrivalLogs(items) {
+  const groups = new Map();
+  for (const item of items) {
+    const species = (item.species || '').trim();
+    const key = JSON.stringify([species, item.length_mm, item.diameter_mm]);
+    if (!groups.has(key)) groups.set(key, {...item, species, count: 0, volume_m3: 0});
+    const group = groups.get(key);
+    group.count += +item.count || 0;
+    group.volume_m3 += +item.volume_m3 || 0;
+  }
+  return [...groups.values()].sort((a, b) => a.diameter_mm - b.diameter_mm);
 }
 async function jArrivals(box) {
   const [a, fw, c] = await Promise.all([safe('/arrivals?limit=100'), safe('/firewood/arrivals?limit=100'), ensureCon()]);
@@ -1249,11 +1283,11 @@ async function jArrivals(box) {
   if (!a || !c) { box.innerHTML = fail('Не удалось загрузить поступления', 'journal'); return; }
   const f = (fw || []).map(x => ({...x, fw: 1})), all = [...a, ...f].sort((x, y) => dayKey(y.arrival_date).localeCompare(dayKey(x.arrival_date)) || String(y.created_at).localeCompare(String(x.created_at)));
   box.innerHTML = all.length ? tots([['Приходов', all.length], ['Лес, м³', fmt(tot(a.flatMap(x => x.items || []), x => x.volume_m3), 2)], ['Дрова, м³', fmt(tot(f, x => x.volume_m3), 2)]]) + cap(a) + byDay(all, x => x.arrival_date, x => {
-    const it = x.items || [], sup = D.con[x.supplier_id] || 'Поставщик №' + x.supplier_id, car = D.con[x.carrier_id] || '№' + x.carrier_id;
+    const it = groupArrivalLogs(x.items || []), sup = D.con[x.supplier_id] || 'Поставщик №' + x.supplier_id, car = D.con[x.carrier_id] || '№' + x.carrier_id;
     const sub = `${sup}, машина ${x.truck_number}`, carrier = car !== sup ? ['Перевозчик: ' + car] : [];
     if (x.fw) return journalCard('fwarr', x, `Дрова №${x.id}`, sub, `${fmt(x.volume_m3, 3)} м³`, 'берёза', carrier);
     return journalCard('arrival', x, `Поступление №${x.id}`, sub, `${fmt(sum(it, 'volume_m3'), 3)} м³`, `${fmt(sum(it, 'count'), 0)} шт`,
-      [...carrier, ...it.map(i => `${i.species} Ø${i.diameter_mm} × ${lenM(i.length_mm)}, ${fmt(i.count, 0)} шт`)]);
+      [...carrier, ...it.map(i => `${i.species} Ø${i.diameter_mm} × ${lenM(i.length_mm)} — ${fmt(i.count, 0)} шт (${fmt(i.volume_m3, 3)} м³)`)]);
   }) : none('Поступлений пока нет');
 }
 async function jProduction(box) {
@@ -1287,11 +1321,26 @@ async function vJournal() {
   filterJournal();
 }
 
+function setJournalExpanded(toggle, expanded) {
+  toggle.setAttribute('aria-expanded', String(expanded));
+  document.getElementById(toggle.getAttribute('aria-controls')).hidden = !expanded;
+}
 function filterJournal() {
-  const box=$('#jl'); if(!box)return;
-  const q=(S.jq||'').trim().toLowerCase();
-  $$('.card-group',box).forEach(g=>{ const rows=$$('.li',g); rows.forEach(r=>r.hidden=!!q&&!r.textContent.toLowerCase().includes(q)); g.hidden=rows.length>0&&rows.every(r=>r.hidden); });
-  if($('#jempty')) $('#jempty').hidden=!q||$$('.li',box).some(r=>!r.hidden);
+  const box = $('#jl');
+  if (!box) return;
+  const q = (S.jq || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const rows = $$('.card-group > .li', box);
+  for (const row of rows) {
+    const toggle = $('.journal-toggle', row);
+    const heading = toggle ? $('.li', row) : row;
+    const parts = [heading.textContent, ...$$('.li-l > span', row).map(line => line.textContent)];
+    row.hidden = !!q && !parts.some(text => text.toLowerCase().replace(/\s+/g, ' ').includes(q));
+    if (toggle) setJournalExpanded(toggle, q ? !row.hidden : toggle.dataset.open === 'true');
+  }
+  for (const group of $$('.card-group', box)) {
+    group.hidden = !$(':scope > .li:not([hidden])', group);
+  }
+  $('#jempty').hidden = !q || rows.some(row => !row.hidden);
 }
 /* ---------- склад ---------- */
 async function vStock(fetchNew = true) {
@@ -2229,6 +2278,11 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
       ${osum(o) > 0 ? `<div class="dl"><span class="mut">Сумма</span><b>${fmt(osum(o), 0)} ₽</b></div><div class="dl"><span class="mut">Оплата</span><b>${esc(payTxt(o) || '—')}</b></div>` : ''}${positions ? `<div class="dl"><span class="mut">Позиций</span><b>${positions}</b></div>` : ''}
       <div class="dl"><span class="mut">Создан</span><b>${esc(odate(o, {day: 'numeric', month: 'long', year: 'numeric'}) || '—')}</b></div>
       <div class="stackb">${canOrd() && isOpen(o) ? `<button class="btn" data-a="done" data-v="${esc(o.id)}">Завершить заказ</button>` : ''}${orderStatusButtons(o,true)}${canOrd() && o.status !== 'canceled' && osum(o) > 0 ? `<button class="btn ghost" data-a="pay" data-v="${esc(o.id)}">Оплата</button>` : ''}<button class="btn ghost" data-a="pdf" data-v="${esc(o.id)}">Накладная PDF</button>${deleteButton('order',o.id)}</div>`);
+  },
+  jtoggle: (_, toggle) => {
+    const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.dataset.open = String(expanded);
+    setJournalExpanded(toggle, expanded);
   },
   opdetail: key => {
     const op = journalLinks.get(key);
