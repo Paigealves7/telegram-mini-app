@@ -88,7 +88,8 @@ func (h *FirewoodHandler) GetArrivals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit, offset := pageParams(r, 100, 1000)
-	list, err := h.repo.GetFirewoodArrivals(r.Context(), orgID, limit, offset)
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	list, err := h.repo.GetFirewoodArrivals(r.Context(), orgID, limit, offset, q)
 	if err != nil {
 		serverError(w, r, "не удалось получить приходы дров", err)
 		return

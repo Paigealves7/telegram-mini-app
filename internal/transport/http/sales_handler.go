@@ -3,6 +3,8 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 	"telegram-mini-app/internal/service"
@@ -23,7 +25,8 @@ func (h *SalesHandler) GetList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit, offset := pageParams(r, 100, 500)
-	sales, err := h.repo.GetSales(r.Context(), orgID, limit, offset)
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	sales, err := h.repo.GetSales(r.Context(), orgID, limit, offset, q)
 	if err != nil {
 		serverError(w, r, "не удалось получить историю продаж", err)
 		return

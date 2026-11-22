@@ -167,12 +167,13 @@ type Board struct {
 }
 
 type SawingOperation struct {
-	ID        int64      `json:"id"`
-	WorkerID  int64      `json:"worker_id"`
-	Date      string     `json:"date"`
-	CreatedAt time.Time  `json:"created_at"`
-	Logs      []SawedLog `json:"logs,omitempty"`
-	Boards    []Board    `json:"boards,omitempty"`
+	ID         int64      `json:"id"`
+	WorkerID   int64      `json:"worker_id"`
+	WorkerName string     `json:"worker_name,omitempty"`
+	Date       string     `json:"date"`
+	CreatedAt  time.Time  `json:"created_at"`
+	Logs       []SawedLog `json:"logs,omitempty"`
+	Boards     []Board    `json:"boards,omitempty"`
 }
 
 type SaleItem struct {
@@ -182,11 +183,17 @@ type SaleItem struct {
 	Count    int     `json:"count" validate:"required,gt=0"`
 	Price    float64 `json:"price" validate:"gte=0"`
 	VolumeM3 float64 `json:"volume_m3"` // считает сервер по складу; значение от клиента игнорируется
+	Species  string  `json:"species,omitempty"`
+	Grade    string  `json:"grade,omitempty"`
+	HeightMM int     `json:"height_mm,omitempty"`
+	WidthMM  int     `json:"width_mm,omitempty"`
+	LengthMM int     `json:"length_mm,omitempty"`
 }
 
 type Sale struct {
 	ID            int64      `json:"id"`
 	OrderID       *int64     `json:"order_id,omitempty"`
+	OrderNumber   int64      `json:"order_number,omitempty"`
 	IsOrderSale   bool       `json:"is_order_sale"`
 	ContractorID  int64      `json:"contractor_id"`
 	TruckNumber   string     `json:"truck_number"`
@@ -305,11 +312,24 @@ type DebtOrder struct {
 }
 
 type StatisticsSummary struct {
-	TotalBoardsProducedVolume float64 `json:"total_boards_produced_volume"`
-	TotalLogsArrivedVolume    float64 `json:"total_logs_arrived_volume"`
-	TotalLogsSawedVolume      float64 `json:"total_logs_sawed_volume"`
-	TotalSalesVolume          float64 `json:"total_sales_volume"`
-	TotalSalesAmount          float64 `json:"total_sales_amount"`
+	TotalBoardsProducedVolume   float64               `json:"total_boards_produced_volume"`
+	TotalLogsArrivedVolume      float64               `json:"total_logs_arrived_volume"`
+	TotalLogsSawedVolume        float64               `json:"total_logs_sawed_volume"`
+	TotalSalesVolume            float64               `json:"total_sales_volume"`
+	TotalSalesAmount            float64               `json:"total_sales_amount"`
+	FirewoodArrivedVolume       float64               `json:"firewood_arrived_volume"`
+	FirewoodSplitProducedVolume float64               `json:"firewood_split_produced_volume"`
+	FirewoodRoundProducedVolume float64               `json:"firewood_round_produced_volume"`
+	FirewoodRawConsumedVolume   float64               `json:"firewood_raw_consumed_volume"`
+	FirewoodStock               FirewoodStock         `json:"firewood_stock"`
+	Previous                    *StatisticsComparison `json:"previous,omitempty"`
+}
+
+type StatisticsComparison struct {
+	TotalLogsArrivedVolume float64 `json:"total_logs_arrived_volume"`
+	TotalLogsSawedVolume   float64 `json:"total_logs_sawed_volume"`
+	TotalSalesVolume       float64 `json:"total_sales_volume"`
+	TotalSalesAmount       float64 `json:"total_sales_amount"`
 }
 
 type BoardFilter struct {

@@ -243,7 +243,7 @@ html.lite body::after{display:none}
 .ra-i{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--s2);color:var(--wood)}.ra-i svg{width:20px;height:20px}
 .ra-m{display:flex;flex-direction:column;min-width:0;overflow-wrap:anywhere}.ra-e{display:flex;flex-direction:column;align-items:flex-end;text-align:right;white-space:nowrap}.ra-e b{font-weight:500}
 /* списки */
-.li-m{overflow-wrap:anywhere}.li-v{white-space:nowrap}.li-e{white-space:nowrap}.cap{margin:-8px 0 8px}
+.li-m{overflow-wrap:anywhere}.li-v{white-space:nowrap}.li-e{white-space:nowrap}
 .st{height:28px;gap:8px;padding:0 12px 0 10px;border:1px solid var(--hair);border-radius:var(--r-pill);background:rgba(255,255,255,.06);font-size:12px}
 .st i{box-shadow:none}.st svg{width:20px;height:20px;color:var(--c)}
 @supports(background:color-mix(in srgb,red 10%,transparent)){.st{background:color-mix(in srgb,var(--c) 14%,transparent);border-color:color-mix(in srgb,var(--c) 30%,transparent)}}
@@ -764,6 +764,7 @@ html.lite .org-choice:active,html.lite button:is(.side-org,.mobile-org):active{t
 .journal-toggle>span:last-child{display:flex;align-items:center;gap:6px;color:var(--t1);white-space:nowrap}
 .journal-toggle:hover{background:var(--s3)}
 .journal-toggle:focus-visible,#jl .journal-entry>button.li:focus-visible{outline-offset:-3px}
+#jmore:not([hidden]){display:flex;width:fit-content;max-width:100%;margin:14px auto 0;padding-inline:24px}
 .journal-chevron{transition:transform 200ms var(--ease)}
 .journal-toggle[aria-expanded="true"] .journal-chevron{transform:rotate(180deg)}
 .journal-entry>.li-l{margin:0;padding:12px 16px 14px 20px;min-width:0;overflow-wrap:anywhere;opacity:1;transition:opacity 200ms var(--ease),display 200ms allow-discrete}
@@ -938,17 +939,23 @@ async function api(path, opts = {}) {
   const headers = {'Content-Type': 'application/json', ...(opts.headers || {})};
   if (session) headers.Authorization = 'Bearer ' + session;
   if (S.orgId > 0) headers['X-Organization-ID'] = String(S.orgId);
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
+  const controller = new AbortController(), abort = () => controller.abort();
+  if (opts.signal?.aborted) throw staleRequest;
+  opts.signal?.addEventListener('abort', abort, {once: true});
+  const timer = setTimeout(abort, 15000);
   let r, text;
   try {
     r = await fetch('/api/v1' + path, {...opts, cache: 'no-store', headers, signal: controller.signal});
     text = await r.text();
   } catch (e) {
-    if (reqEpoch !== orgEpoch || session !== token()) throw staleRequest;
+    if (reqEpoch !== orgEpoch || session !== token() || opts.signal?.aborted) throw staleRequest;
     if (e.name === 'AbortError') throw new Error('Сервер долго не отвечает. Проверьте соединение и повторите попытку.');
     throw new Error('Не удалось связаться с сервером. Проверьте подключение и повторите попытку.');
-  } finally { clearTimeout(timer); }
-  if (reqEpoch !== orgEpoch || session !== token()) throw staleRequest;
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', abort);
+  }
+  if (reqEpoch !== orgEpoch || session !== token() || opts.signal?.aborted) throw staleRequest;
   let data = null;
   if (text) { try { data = JSON.parse(text); } catch {} }
   if (!r.ok) {
@@ -981,6 +988,7 @@ function resetOrgState(id) {
   closeSheet();
   clearTimeout(DEB);
   statsRequest++;
+  cancelJournal();
   Object.assign(D, {boards: [], logs: [], orders: [], con: {}, cl: [], debts: [], fw: {raw_m3: 0}, staff: [], invites: []});
   journalLinks.clear();
   Object.assign(S, {orgId: +id || 0, org: null, previewRole: '', tab: 'home', stack: [], jt: '', jq: '', wt: 'boards', wq: '', wsp: '', of: 'all', oq: '', donefilter: 'all', cq: '', staffq: '', range: 'month'});
@@ -1145,6 +1153,7 @@ function back() { if(S.cur==='stats'){go('home');return;} if(dockOrigin!==null){
 function show(v, p) {
   if(ASK) settle(false);
   closeSheet();
+  if (S.cur === 'journal' && v !== 'journal') cancelJournal();
   S.cur = v;
   document.body.dataset.view = v;
   const f = FORMS[v], sub = !!f || v === 'stats' || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog';
@@ -1210,7 +1219,6 @@ const pl = (n, f) => { n = Math.abs(n) % 100; const k = n % 10; return n > 10 &&
 const fmtR = n => n >= 1e6 ? fmt(n / 1e6, 1) + ' млн' : fmt(n, 0);
 const tot = (a, f) => a.reduce((x, y) => x + (+f(y) || 0), 0);
 const tots = a => `<div class="tots" style="--n:${a.length}">${a.map(([l, v]) => `<div class="tt"><span class="tt-l">${l}</span><b class="tt-v">${v}</b></div>`).join('')}</div>`;
-const cap = l => l.length >= 100 ? '<p class="mut sm cap">Показаны последние 100 записей</p>' : '';
 const LOW_STOCK_PCS = 20; // порог «мало на складе»: остаток позиции, шт
 const lowTag = t => `<span class="tag">${t}</span>`;
 const when = s => {
@@ -1225,7 +1233,7 @@ function rng(r) {
   if (r === 'week') s.setDate(s.getDate() - 6); else if (r === 'month') s.setDate(1); else if (r === 'year') { s.setMonth(0); s.setDate(1); }
   return [ymd(s), ymd(e)];
 }
-const sQ = (a, b) => `/statistics?start_date=${encodeURIComponent(a)}&end_date=${encodeURIComponent(b)}`;
+const sQ = (a, b) => `/statistics?start_date=${encodeURIComponent(a)}&end_date=${encodeURIComponent(b)}&compare=previous`;
 
 /* Шкала индикатора: сколько м³ соответствует 100% дуги. null = подбирается автоматически. */
 
@@ -1287,18 +1295,25 @@ async function homeExtra() {
 
 /* ---------- журнал: приходы, распилы, продажи ---------- */
 const journalLinks = new Map();
+const journalPageSize = 50;
+const journalFeeds = {
+  arrivals: ['/arrivals', '/firewood/arrivals'], production: ['/sawing'], sales: ['/sales'],
+};
+let journalState = null, journalTimer = 0;
+
 function journalCard(kind, item, title, sub, value, unit, details) {
   const key = `${kind}:${item.id}`;
   if (canSuper()) journalLinks.set(key, {kind, item, title, sub, value, unit, details});
   const heading = li(esc(title), esc(sub), esc(value), esc(unit), canSuper() ? {a:'opdetail', d:key} : {});
   if (!details.length) return heading;
   const id = 'journal-' + key.replace(':', '-');
+  const expanded = journalState.expanded.get(id) ?? !!journalState.q;
   return `<div class="li journal-entry">
     ${heading}
-    <button type="button" class="journal-toggle" data-a="jtoggle" aria-expanded="false" aria-controls="${esc(id)}">
+    <button type="button" class="journal-toggle" data-a="jtoggle" aria-expanded="${expanded}" aria-controls="${esc(id)}">
       <span>Строк: ${details.length}</span><span>Состав <span class="journal-chevron" aria-hidden="true">▾</span></span>
     </button>
-    <div id="${esc(id)}" class="li-l" hidden>${lines(details)}</div>
+    <div id="${esc(id)}" class="li-l" ${expanded ? '' : 'hidden'}>${lines(details)}</div>
   </div>`;
 }
 function groupArrivalLogs(items) {
@@ -1313,12 +1328,10 @@ function groupArrivalLogs(items) {
   }
   return [...groups.values()].sort((a, b) => a.diameter_mm - b.diameter_mm);
 }
-async function jArrivals(box) {
-  const [a, fw, c] = await Promise.all([safe('/arrivals?limit=100'), safe('/firewood/arrivals?limit=100'), ensureCon()]);
-  if (!box.isConnected) return;
-  if (!a || !c) { box.innerHTML = fail('Не удалось загрузить поступления', 'journal'); return; }
-  const f = (fw || []).map(x => ({...x, fw: 1})), all = [...a, ...f].sort((x, y) => dayKey(y.arrival_date).localeCompare(dayKey(x.arrival_date)) || String(y.created_at).localeCompare(String(x.created_at)));
-  box.innerHTML = all.length ? tots([['Приходов', all.length], ['Лес, м³', fmt(tot(a.flatMap(x => x.items || []), x => x.volume_m3), 2)], ['Дрова, м³', fmt(tot(f, x => x.volume_m3), 2)]]) + cap(a) + byDay(all, x => x.arrival_date, x => {
+function jArrivals(all) {
+  const logsVolume = tot(all.flatMap(x => x.items || []), x => x.volume_m3);
+  const firewoodVolume = sum(all.filter(x => x.fw), 'volume_m3');
+  return all.length ? tots([['Приходов', all.length], ['Лес, м³', fmt(logsVolume, 2)], ['Дрова, м³', fmt(firewoodVolume, 2)]]) + byDay(all, x => x.arrival_date, x => {
     const it = groupArrivalLogs(x.items || []), sup = D.con[x.supplier_id] || 'Поставщик №' + x.supplier_id, car = D.con[x.carrier_id] || '№' + x.carrier_id;
     const sub = `${sup}, машина ${x.truck_number}`, carrier = car !== sup ? ['Перевозчик: ' + car] : [];
     if (x.fw) return journalCard('fwarr', x, `Дрова №${x.id}`, sub, `${fmt(x.volume_m3, 3)} м³`, 'берёза', carrier);
@@ -1326,57 +1339,128 @@ async function jArrivals(box) {
       [...carrier, ...it.map(i => `${i.species} Ø${i.diameter_mm} × ${lenM(i.length_mm)} — ${fmt(i.count, 0)} шт (${fmt(i.volume_m3, 3)} м³)`)]);
   }) : none('Поступлений пока нет');
 }
-async function jProduction(box) {
-  const ops = await safe('/sawing?limit=100');
-  if (!box.isConnected) return;
-  if (!ops) { box.innerHTML = fail('Не удалось загрузить распилы', 'journal'); return; }
-  box.innerHTML = ops.length ? tots([['Распилов', ops.length], ['Сырья, м³', fmt(tot(ops.flatMap(x => x.logs || []), x => x.volume_m3), 2)], ['Досок, м³', fmt(tot(ops.flatMap(x => x.boards || []), x => x.volume_m3), 2)]]) + cap(ops) + byDay(ops, x => x.date, x => {
+function jProduction(ops) {
+  return ops.length ? tots([['Распилов', ops.length], ['Сырья, м³', fmt(tot(ops.flatMap(x => x.logs || []), x => x.volume_m3), 2)], ['Досок, м³', fmt(tot(ops.flatMap(x => x.boards || []), x => x.volume_m3), 2)]]) + byDay(ops, x => x.date, x => {
     const inp = sum(x.logs || [], 'volume_m3'), out = sum(x.boards || [], 'volume_m3');
-    return journalCard('sawing', x, `Распил №${x.id}`, x.worker_id ? `Сотрудник №${x.worker_id}` : 'Сотрудник не указан',
+    return journalCard('sawing', x, `Распил №${x.id}`, x.worker_name || (x.worker_id ? `Сотрудник №${x.worker_id}` : 'Сотрудник не указан'),
       `${fmt(out, 3)} м³`, `выход ${inp ? fmt(out / inp * 100, 0) : 0}%`,
       [`Сырья ушло ${fmt(inp, 3)} м³`, ...(x.boards || []).map(b => `${b.height_mm}×${b.width_mm}, ${lenM(b.length_mm)}, ${b.species}${b.grade ? ', сорт ' + b.grade : ''}: ${fmt(b.count, 0)} шт`)]);
   }) : none('Распилов пока нет');
 }
-async function jSales(box) {
-  const [sales, c] = await Promise.all([safe('/sales?limit=100'), ensureCon(), loadStock()]);
-  if (!box.isConnected) return;
-  if (!sales || !c) { box.innerHTML = fail('Не удалось загрузить продажи', 'journal'); return; }
-  const nm = i => { const b = D.boards.find(y => y.id === i.board_id); return b ? `${boardTitle(b)}, ${lenM(b.length_mm)}` : 'Позиция №' + i.board_id; };
-  box.innerHTML = sales.length ? tots([['Продаж', sales.length], ['Объём, м³', fmt(sum(sales, 'total_volume'), 2)], ['Сумма, ₽', fmtR(sum(sales, 'total_price'))]]) + cap(sales) + byDay(sales, x => x.created_at, x => journalCard('sale', x, `Продажа №${x.id}`,
-    (D.con[x.contractor_id] || 'Клиент №' + x.contractor_id) + (x.truck_number ? ', машина ' + x.truck_number : ''), `${fmt(x.total_price, 2)} ₽`, `${fmt(x.total_volume, 3)} м³`,
+function jSales(sales) {
+  const nm = i => {
+    const b = i.height_mm ? i : D.boards.find(y => y.id === i.board_id);
+    if (!b) return 'Позиция №' + i.board_id;
+    return [b.species, boardTitle(b), lenM(b.length_mm), b.grade && 'сорт ' + b.grade].filter(Boolean).join(' · ');
+  };
+  return sales.length ? tots([['Продаж', sales.length], ['Объём, м³', fmt(sum(sales, 'total_volume'), 2)], ['Сумма, ₽', fmtR(sum(sales, 'total_price'))]]) + byDay(sales, x => x.created_at, x => journalCard('sale', x, `Продажа №${x.id}`,
+    [D.con[x.contractor_id] || 'Клиент №' + x.contractor_id, x.truck_number && 'машина ' + x.truck_number, x.order_number && 'заказ №' + x.order_number].filter(Boolean).join(', '), `${fmt(x.total_price, 2)} ₽`, `${fmt(x.total_volume, 3)} м³`,
     [...(x.items || []).map(i => `${nm(i)}: ${fmt(i.count, 0)} шт, ${fmt(i.volume_m3, 3)} м³`), ...(+x.delivery_price > 0 ? ['Доставка ' + fmt(x.delivery_price, 2) + ' ₽'] : []), ...(+x.extra_price > 0 ? ['Услуги ' + fmt(x.extra_price, 2) + ' ₽'] : [])])
   ) : none('Продаж пока нет');
 }
-async function vJournal() {
+function vJournal() {
   const sg = jSegs(), v = $('#view');
-  journalLinks.clear();
   if (!sg.some(x => x[0] === S.jt)) S.jt = sg[0][0];
-  v.innerHTML = `<div class="filterbar"><div class="srch">${ic('search')}<input id="jq" aria-label="Поиск в журнале" placeholder="Контрагент, машина, операция" value="${esc(S.jq || '')}"></div>${sg.length > 1 ? `<div class="seg">${sg.map(([k, l]) => `<button class="${S.jt === k ? 'on' : ''}" data-a="jt" data-v="${k}">${l}</button>`).join('')}</div>` : ''}</div><div id="jl">${sk(4)}</div><p id="jempty" class="empty" hidden>По запросу ничего не найдено</p>`;
+  v.innerHTML = `<div class="filterbar"><div class="srch">${ic('search')}<input id="jq" aria-label="Поиск в журнале" placeholder="Контрагент, машина, операция" value="${esc(S.jq || '')}"></div>${sg.length > 1 ? `<div class="seg">${sg.map(([k, l]) => `<button class="${S.jt === k ? 'on' : ''}" data-a="jt" data-v="${k}">${l}</button>`).join('')}</div>` : ''}</div>
+    <div id="jl"></div><p id="jempty" class="empty" role="status" hidden>По запросу ничего не найдено</p>
+    <button type="button" id="jmore" class="btn ghost" data-a="jmore" hidden>Показать ещё</button>`;
   setAct('journal');
-  await ({arrivals: jArrivals, production: jProduction, sales: jSales}[S.jt])($('#jl'));
-  filterJournal();
+  return startJournalSearch();
 }
 
 function setJournalExpanded(toggle, expanded) {
+  const id = toggle.getAttribute('aria-controls');
+  journalState?.expanded.set(id, expanded);
   toggle.setAttribute('aria-expanded', String(expanded));
-  document.getElementById(toggle.getAttribute('aria-controls')).hidden = !expanded;
+  document.getElementById(id).hidden = !expanded;
 }
-function filterJournal() {
-  const box = $('#jl');
-  if (!box) return;
-  const q = (S.jq || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  const rows = $$('.card-group > .li', box);
-  for (const row of rows) {
-    const toggle = $('.journal-toggle', row);
-    const heading = toggle ? $('.li', row) : row;
-    const parts = [heading.textContent, ...$$('.li-l > span', row).map(line => line.textContent)];
-    row.hidden = !!q && !parts.some(text => text.toLowerCase().replace(/\s+/g, ' ').includes(q));
-    if (toggle) setJournalExpanded(toggle, q ? !row.hidden : toggle.dataset.open === 'true');
+
+function cancelJournal() {
+  clearTimeout(journalTimer);
+  journalState?.controller.abort();
+  journalState = null;
+}
+
+function startJournalSearch(debounce = false) {
+  const q = (S.jq || '').trim();
+  if (debounce && journalState?.q === q) return;
+  cancelJournal();
+  const state = journalState = {
+    q, tab: S.jt, box: $('#jl'), more: $('#jmore'), empty: $('#jempty'),
+    controller: new AbortController(), expanded: new Map(), rows: [], busy: false,
+    contractorsReady: S.jt === 'production',
+    streams: journalFeeds[S.jt].map(path => ({path, offset: 0, hasMore: true, buffer: []})),
+  };
+  journalLinks.clear();
+  state.box.innerHTML = sk(4);
+  state.empty.hidden = state.more.hidden = true;
+  if (debounce) {
+    journalTimer = setTimeout(() => run(loadJournalPage(state)), 250);
+    return;
   }
-  for (const group of $$('.card-group', box)) {
-    group.hidden = !$(':scope > .li:not([hidden])', group);
+  return loadJournalPage(state);
+}
+
+function compareArrivals(a, b) {
+  return dayKey(b.arrival_date).localeCompare(dayKey(a.arrival_date)) ||
+    new Date(b.created_at) - new Date(a.created_at) || b.id - a.id;
+}
+
+async function nextJournalRows(streams, {q, controller}) {
+  const rows = [];
+  const search = q ? '&q=' + encodeURIComponent(q) : '';
+  while (rows.length < journalPageSize) {
+    const empty = streams.filter(stream => !stream.buffer.length && stream.hasMore);
+    // Перед выбором следующей строки нужен первый элемент каждого потока.
+    if (empty.length) await Promise.all(empty.map(async stream => {
+      const page = await api(`${stream.path}?limit=${journalPageSize}&offset=${stream.offset}${search}`, {signal: controller.signal}) || [];
+      stream.buffer = stream.path === '/firewood/arrivals' ? page.map(row => ({...row, fw: 1})) : page;
+      stream.offset += page.length;
+      stream.hasMore = page.length === journalPageSize;
+    }));
+    const available = streams.filter(stream => stream.buffer.length);
+    if (!available.length) break;
+    if (available.length > 1) available.sort((a, b) => compareArrivals(a.buffer[0], b.buffer[0]));
+    rows.push(available[0].buffer.shift());
   }
-  $('#jempty').hidden = !q || rows.some(row => !row.hidden);
+  return rows;
+}
+
+async function loadJournalPage(state) {
+  const current = () => state === journalState && state.box.isConnected && S.cur === 'journal';
+  if (!current() || state.busy) return;
+  state.busy = state.more.disabled = true;
+  state.more.textContent = 'Загрузка…';
+  state.box.setAttribute('aria-busy', 'true');
+  const streams = state.streams.map(stream => ({...stream, buffer: [...stream.buffer]}));
+  try {
+    const [rows, contractorsReady] = await Promise.all([
+      nextJournalRows(streams, state),
+      state.contractorsReady || ensureCon(),
+    ]);
+    if (!current()) return;
+    if (!contractorsReady) throw new Error('Не удалось загрузить контрагентов.');
+    state.contractorsReady = true;
+    state.streams = streams;
+    state.rows.push(...rows);
+    state.empty.hidden = !state.q || !!state.rows.length;
+    state.more.hidden = !streams.some(stream => stream.hasMore || stream.buffer.length);
+    if (rows.length || !state.rows.length) {
+      const render = {arrivals: jArrivals, production: jProduction, sales: jSales}[state.tab];
+      journalLinks.clear();
+      state.box.innerHTML = state.empty.hidden ? render(state.rows) : '';
+    }
+  } catch (error) {
+    if (!current() || error === staleRequest) return;
+    if (state.rows.length) reportError(error);
+    else state.box.innerHTML = fail('Не удалось загрузить журнал', 'journal');
+  } finally {
+    if (current()) {
+      state.busy = state.more.disabled = false;
+      state.more.textContent = 'Показать ещё';
+      state.box.removeAttribute('aria-busy');
+    }
+  }
 }
 /* ---------- склад ---------- */
 async function vStock(fetchNew = true) {
@@ -1555,29 +1639,18 @@ async function vStats() {
     </div><div id="sr" style="margin-top:8px">${sk(3)}</div>`;
   loadStats();
 }
-const addD = (k, n) => { const d = new Date(k + 'T00:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
-const prevRange = (a, b) => { const x = new Date(a + 'T00:00:00'), y = new Date(b + 'T00:00:00'); if (isNaN(x) || isNaN(y) || y < x) return null; const n = Math.round((y - x) / 864e5) + 1; return [addD(a, -n), addD(a, -1)]; };
 const dchip = (c, p) => { if (!(p > 0)) return ''; const x = (c - p) / p * 100, z = Math.abs(x) < 0.5; return `<span class="dc ${z ? '' : x > 0 ? 'up' : 'dn'}">${x >= 0 ? '+' : '−'}${fmt(Math.abs(x), 0)}%</span>`; };
 const cmpRow = (l,c,p,mx) => `<div class="stat-row"><div class="stat-row-head"><b>${l}</b><strong>${fmt(c,2)} м³</strong></div><div class="stat-row-meta"><span class="mut">${p==null ? 'Нет данных за прошлый период' : 'Было '+fmt(p,2)+' м³'}</span>${p==null ? '' : p>0 ? dchip(c,p) : '<span class="dc">'+(c>0?'Новый объём':'0%')+'</span>'}</div><div class="bar"><i style="--w:${c/mx*100}%"></i></div></div>`;
 let statsRequest = 0;
-async function firewoodPeriod(path,a,b,dateKey) {
-  const result=[];
-  for(let offset=0;;offset+=1000){
-    const rows=await api(path+'?limit=1000&offset='+offset) || [];
-    result.push(...rows.filter(x=>{const d=dayKey(x[dateKey]);return d>=a&&d<=b;}));
-    if(rows.length<1000)return result;
-  }
-}
 async function loadStats() {
   const box=$('#sr'); if(!box)return;
   const request=++statsRequest, a=$('#d1').value, b=$('#d2').value;
   if(!a||!b||a>b){box.innerHTML=none('Проверьте даты','Начало периода должно быть не позже окончания.');return;}
   box.innerHTML=sk(3);
-  const pr=prevRange(a,b);
-  const fwPromise=Promise.all([firewoodPeriod('/firewood/arrivals',a,b,'arrival_date'),firewoodPeriod('/firewood/processing',a,b,'date'),api('/firewood/stock')]).catch(()=>null);
   try {
-    const [d,pd]=await Promise.all([api(sQ(a,b)),pr?api(sQ(...pr)).catch(()=>null):null]);
+    const d=await api(sQ(a,b));
     if(request!==statsRequest||!box.isConnected)return;
+    const pd=d.previous, stock=d.firewood_stock;
     const g=(o,k)=>o?+o[k]||0:null;
     const R=g(d,'total_sales_amount'),A=g(d,'total_logs_arrived_volume'),W=g(d,'total_logs_sawed_volume'),V=g(d,'total_sales_volume');
     const produced = d.total_boards_produced_volume;
@@ -1585,6 +1658,11 @@ async function loadStats() {
     const [yieldLabel, yieldColor] = yieldPct == null ? ['', 't2'] : yieldPct >= 60 ? ['Отлично', 'ok'] : yieldPct >= 50 ? ['Норма', 'warn'] : ['Низкий выход', 'err'];
     const PR=g(pd,'total_sales_amount'),PA=g(pd,'total_logs_arrived_volume'),PW=g(pd,'total_logs_sawed_volume'),PV=g(pd,'total_sales_volume');
     const mx=Math.max(A,W,V,.0001);
+    const row=(l,v)=>`<div class="dl"><span>${l}</span><b>${fmt(v,2)} м³</b></div>`;
+    const firewood=stock ? row('Пришло берёзы',d.firewood_arrived_volume)+row('Получено колотых',d.firewood_split_produced_volume)+
+      row('Получено чурбаков',d.firewood_round_produced_volume)+row('Списано сырья в переработку',d.firewood_raw_consumed_volume)+
+      '<h3 class="section-label">Остатки сейчас</h3>'+row('Сырьё',stock.raw_m3)+row('Колотые',stock.split_m3)+row('Чурбаки',stock.round_m3) :
+      '<p class="mut">Не удалось загрузить данные по дровам.</p>';
     box.innerHTML=`<section class="rev"><p class="lbl">Выручка за период</p><div class="big">${fmt(R,0)} ₽</div><div class="rv-d">${pd ? dchip(R,PR)+'<span class="mut">Было '+fmt(PR,0)+' ₽</span>' : '<span class="mut">Прошлый период недоступен</span>'}</div></section>
     ${tots([['Продано, м³',fmt(V,2)],['Пришло сырья, м³',fmt(A,2)],['Распилено, м³',fmt(W,2)]])}
     <section class="workspace-card stats-production"><h2>Динамика и КПД производства</h2>
@@ -1596,16 +1674,8 @@ async function loadStats() {
       <div class="dl"><span>Средний выход годной доски</span><b style="color:var(--${yieldColor})">${yieldPct == null ? '—' : fmt(yieldPct,1)+'% · '+yieldLabel}</b></div>
       <div class="dl"><span>Потери (опилки, горбыль, усушка)</span><b>${yieldPct == null ? '—' : fmt(W-produced,3)+' м³ · '+fmt(100-yieldPct,1)+'%'}</b></div>
     </section>
-    <section class="workspace-card stats-firewood"><h2>Сводка по дровам за период</h2><div id="fw-report">${sk(2)}</div></section>`;
-    const fw=await fwPromise;
-    if(request!==statsRequest||!box.isConnected)return;
-    const out=$('#fw-report',box);
-    if(!fw){out.innerHTML='<p class="mut">Не удалось загрузить данные по дровам.</p>';return;}
-    const [arr,proc,stock]=fw;
-    const row=(l,v)=>`<div class="dl"><span>${l}</span><b>${fmt(v,2)} м³</b></div>`;
-    out.innerHTML=row('Пришло берёзы',sum(arr,'volume_m3'))+row('Получено колотых',sum(proc.filter(x=>x.kind==='split'),'volume_m3'))+row('Получено чурбаков',sum(proc.filter(x=>x.kind==='round'),'volume_m3'))+row('Списано сырья в переработку',sum(proc,'raw_m3'))+
-      '<h3 class="section-label">Остатки сейчас</h3>'+row('Сырьё',stock.raw_m3)+row('Колотые',stock.split_m3)+row('Чурбаки',stock.round_m3);
-  } catch(e) { if(request===statsRequest&&box.isConnected)box.innerHTML=none('Не удалось загрузить отчёт',esc(e.message)); }
+    <section class="workspace-card stats-firewood"><h2>Сводка по дровам за период</h2><div id="fw-report">${firewood}</div></section>`;
+  } catch(e) { if(e!==staleRequest&&request===statsRequest&&box.isConnected)box.innerHTML=none('Не удалось загрузить отчёт',esc(e.message)); }
 }
 
 /* ---------- профиль и вход ---------- */
@@ -2626,7 +2696,8 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
     try { await api(`/users/${v}/password`, {method: 'PUT', body: JSON.stringify({password: p})}); notify('success'); closeSheet(); toast('Пароль изменён'); }
     catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); el.disabled = false; }
   },
-  jt: v => { S.jt = v; vJournal(); },
+  jt: v => { S.jt = v; return vJournal(); },
+  jmore: () => journalState && loadJournalPage(journalState),
   wt: v => { S.wt = v; S.wsp = ''; vStock(false); },
   sp: v => { S.wsp = v; vStock(false); },
   donefilter: v => {S.donefilter=v;orderList();},
@@ -2792,7 +2863,7 @@ document.addEventListener('submit', async e => {
 document.addEventListener('input', e => {
   const t = e.target;
   if(t.id === 'staffq'){S.staffq=t.value;staffList();}
-  else if(t.id === 'jq') { S.jq=t.value; filterJournal(); }
+  else if(t.id === 'jq') { S.jq=t.value; startJournalSearch(true); }
   else if (t.id === 'q') {
     S.wq = t.value; clearTimeout(DEB);
     DEB = setTimeout(() => { if (S.cur === 'stock' && $('#sl')) stockList(); }, 120);

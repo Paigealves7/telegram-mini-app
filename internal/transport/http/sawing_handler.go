@@ -3,6 +3,8 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 )
@@ -27,7 +29,8 @@ func (h *SawingHandler) GetList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit, offset := pageParams(r, 100, 500)
-	ops, err := h.repo.GetSawingOperations(r.Context(), orgID, limit, offset)
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	ops, err := h.repo.GetSawingOperations(r.Context(), orgID, limit, offset, q)
 	if err != nil {
 		serverError(w, r, "не удалось получить историю распилов", err)
 		return

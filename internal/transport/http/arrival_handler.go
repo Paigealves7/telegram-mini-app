@@ -3,6 +3,8 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 )
@@ -30,7 +32,8 @@ func (h *ArrivalHandler) GetList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit, offset := pageParams(r, 100, 500)
-	arrivals, err := h.repo.GetLogArrivals(r.Context(), orgID, limit, offset)
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	arrivals, err := h.repo.GetLogArrivals(r.Context(), orgID, limit, offset, q)
 	if err != nil {
 		serverError(w, r, "не удалось получить историю поступлений", err)
 		return

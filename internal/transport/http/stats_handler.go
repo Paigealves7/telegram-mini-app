@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+
 	"telegram-mini-app/internal/repository"
 )
 
@@ -20,8 +21,9 @@ func (h *StatsHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	startDate := r.URL.Query().Get("start_date")
-	endDate := r.URL.Query().Get("end_date")
+	query := r.URL.Query()
+	startDate := query.Get("start_date")
+	endDate := query.Get("end_date")
 
 	if startDate == "" || endDate == "" {
 		http.Error(w, "Параметры start_date и end_date обязательны", http.StatusBadRequest)
@@ -38,7 +40,7 @@ func (h *StatsHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stats, err := h.repo.GetStatisticsSummary(r.Context(), orgID, startDate, endDate)
+	stats, err := h.repo.GetStatisticsSummary(r.Context(), orgID, startDate, endDate, query.Get("compare") == "previous")
 	if err != nil {
 		serverError(w, r, "не удалось получить статистику", err)
 		return

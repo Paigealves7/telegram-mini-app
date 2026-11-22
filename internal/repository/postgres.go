@@ -128,11 +128,42 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*d
 	return &user, err
 }
 
-// GetLogArrivals returns the most recent arrivals and their tally items.
-func (r *Repository) GetLogArrivals(ctx context.Context, orgID int64, limit, offset int) ([]domain.LogArrival, error) {
+// journalSearchPattern возвращает шаблон для поиска буквального фрагмента.
+func journalSearchPattern(search []string) string {
+	if len(search) == 0 {
+		return ""
+	}
+	q := strings.TrimSpace(search[0])
+	if q == "" {
+		return ""
+	}
+	return "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(q) + "%"
+}
+
+// journalBoardDimensions используется в запросах, где boards имеет псевдоним b.
+const journalBoardDimensions = `(
+	b.height_mm::text ILIKE $4 OR b.width_mm::text ILIKE $4 OR b.length_mm::text ILIKE $4
+	OR concat_ws('×', b.height_mm, b.width_mm, b.length_mm) ILIKE translate($4, 'xXхХ ', '××××')
+)`
+
+// GetLogArrivals returns log arrivals and their tally items.
+func (r *Repository) GetLogArrivals(ctx context.Context, orgID int64, limit, offset int, search ...string) ([]domain.LogArrival, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, COALESCE(supplier_id, 0), COALESCE(carrier_id, 0), truck_number, arrival_date::text, COALESCE(created_by, 0), created_at
-		FROM log_arrivals WHERE organization_id = $1 ORDER BY arrival_date DESC, id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset)
+		SELECT la.id, COALESCE(la.supplier_id, 0), COALESCE(la.carrier_id, 0), la.truck_number, la.arrival_date::text, COALESCE(la.created_by, 0), la.created_at
+		FROM log_arrivals la
+		WHERE la.organization_id = $1
+			AND ($4 = '' OR ('Поступление №' || la.id::text) ILIKE $4 OR la.truck_number ILIKE $4
+				OR EXISTS (
+					SELECT 1 FROM contractors c
+					WHERE c.organization_id = la.organization_id
+						AND c.id IN (la.supplier_id, la.carrier_id) AND c.name ILIKE $4
+				)
+				OR EXISTS (
+					SELECT 1 FROM log_items li WHERE li.organization_id = la.organization_id AND li.arrival_id = la.id
+						AND (li.species ILIKE $4 OR li.diameter_mm::text ILIKE $4
+							OR ('Ø' || li.diameter_mm::text) ILIKE $4)
+				))
+		ORDER BY la.arrival_date DESC, la.created_at DESC, la.id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset, journalSearchPattern(search))
 	if err != nil {
 		return nil, err
 	}
@@ -338,18 +369,34 @@ func validateSawingYield(inputVolume, outputVolume float64) error {
 }
 
 // GetSales returns sales history with their line items.
-func (r *Repository) GetSales(ctx context.Context, orgID int64, limit, offset int) ([]domain.Sale, error) {
+func (r *Repository) GetSales(ctx context.Context, orgID int64, limit, offset int, search ...string) ([]domain.Sale, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, contractor_id, truck_number, delivery_price, extra_price, total_volume,
-		       total_price, COALESCE(created_by, 0), created_at, order_id, (order_id IS NOT NULL OR legacy_order_sale)
-		FROM sales WHERE organization_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset)
+		SELECT s.id, s.contractor_id, s.truck_number, s.delivery_price, s.extra_price, s.total_volume,
+		       s.total_price, COALESCE(s.created_by, 0), s.created_at, s.order_id,
+		       (s.order_id IS NOT NULL OR s.legacy_order_sale), COALESCE(o.order_number, 0)
+		FROM sales s
+		LEFT JOIN orders o ON o.organization_id = s.organization_id AND o.id = s.order_id
+		WHERE s.organization_id = $1
+			AND ($4 = '' OR ('Продажа №' || s.id::text) ILIKE $4 OR s.truck_number ILIKE $4
+				OR ('Заказ №' || o.order_number::text) ILIKE $4
+				OR EXISTS (
+					SELECT 1 FROM contractors c
+					WHERE c.organization_id = s.organization_id AND c.id = s.contractor_id AND c.name ILIKE $4
+				)
+				OR EXISTS (
+					SELECT 1 FROM sale_boards sb JOIN boards b
+						ON b.organization_id = sb.organization_id AND b.id = sb.board_id
+					WHERE sb.organization_id = s.organization_id AND sb.sale_id = s.id
+						AND (b.species ILIKE $4 OR `+journalBoardDimensions+`)
+				))
+		ORDER BY s.created_at DESC, s.id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset, journalSearchPattern(search))
 	if err != nil {
 		return nil, err
 	}
 	sales := make([]domain.Sale, 0)
 	for rows.Next() {
 		var sale domain.Sale
-		if err := rows.Scan(&sale.ID, &sale.ContractorID, &sale.TruckNumber, &sale.DeliveryPrice, &sale.ExtraPrice, &sale.TotalVolume, &sale.TotalPrice, &sale.CreatedBy, &sale.CreatedAt, &sale.OrderID, &sale.IsOrderSale); err != nil {
+		if err := rows.Scan(&sale.ID, &sale.ContractorID, &sale.TruckNumber, &sale.DeliveryPrice, &sale.ExtraPrice, &sale.TotalVolume, &sale.TotalPrice, &sale.CreatedBy, &sale.CreatedAt, &sale.OrderID, &sale.IsOrderSale, &sale.OrderNumber); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -361,14 +408,19 @@ func (r *Repository) GetSales(ctx context.Context, orgID int64, limit, offset in
 	}
 	rows.Close()
 	for i := range sales {
-		items, err := r.db.Query(ctx, `SELECT id, sale_id, board_id, count, volume_m3, price FROM sale_boards WHERE organization_id = $1 AND sale_id = $2 ORDER BY id`, orgID, sales[i].ID)
+		items, err := r.db.Query(ctx, `
+			SELECT sb.id, sb.sale_id, sb.board_id, sb.count, sb.volume_m3, sb.price,
+				b.species, b.grade, b.height_mm, b.width_mm, b.length_mm
+			FROM sale_boards sb JOIN boards b ON b.organization_id = sb.organization_id AND b.id = sb.board_id
+			WHERE sb.organization_id = $1 AND sb.sale_id = $2 ORDER BY sb.id`, orgID, sales[i].ID)
 		if err != nil {
 			return nil, err
 		}
 		sales[i].Items = make([]domain.SaleItem, 0)
 		for items.Next() {
 			var item domain.SaleItem
-			if err := items.Scan(&item.ID, &item.SaleID, &item.BoardID, &item.Count, &item.VolumeM3, &item.Price); err != nil {
+			if err := items.Scan(&item.ID, &item.SaleID, &item.BoardID, &item.Count, &item.VolumeM3, &item.Price,
+				&item.Species, &item.Grade, &item.HeightMM, &item.WidthMM, &item.LengthMM); err != nil {
 				items.Close()
 				return nil, err
 			}
@@ -721,15 +773,27 @@ func (r *Repository) GetOrders(ctx context.Context, orgID int64, limit, offset i
 }
 
 // GetSawingOperations returns recent production operations and their input/output records.
-func (r *Repository) GetSawingOperations(ctx context.Context, orgID int64, limit, offset int) ([]domain.SawingOperation, error) {
-	rows, err := r.db.Query(ctx, `SELECT id, COALESCE(worker_id,0), date::text, created_at FROM sawing_operations WHERE organization_id = $1 ORDER BY date DESC, id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset)
+func (r *Repository) GetSawingOperations(ctx context.Context, orgID int64, limit, offset int, search ...string) ([]domain.SawingOperation, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT so.id, COALESCE(so.worker_id, 0), to_char(so.date, 'YYYY-MM-DD'), so.created_at,
+			COALESCE(NULLIF(u.display_name, ''), u.username, '')
+		FROM sawing_operations so LEFT JOIN users u ON u.id = so.worker_id
+		WHERE so.organization_id = $1
+			AND ($4 = '' OR ('Распил №' || so.id::text) ILIKE $4 OR to_char(so.date, 'YYYY-MM-DD') ILIKE $4
+				OR to_char(so.date, 'DD.MM.YYYY') ILIKE $4
+				OR u.display_name ILIKE $4 OR u.username ILIKE $4 OR u.tg_username ILIKE $4
+				OR EXISTS (
+					SELECT 1 FROM boards b WHERE b.organization_id = so.organization_id AND b.sawing_id = so.id
+						AND (b.species ILIKE $4 OR `+journalBoardDimensions+`)
+				))
+		ORDER BY so.date DESC, so.id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset, journalSearchPattern(search))
 	if err != nil {
 		return nil, err
 	}
 	ops := make([]domain.SawingOperation, 0)
 	for rows.Next() {
 		var op domain.SawingOperation
-		if err := rows.Scan(&op.ID, &op.WorkerID, &op.Date, &op.CreatedAt); err != nil {
+		if err := rows.Scan(&op.ID, &op.WorkerID, &op.Date, &op.CreatedAt, &op.WorkerName); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -880,38 +944,77 @@ func (r *Repository) GetAllLogs(ctx context.Context, orgID int64, filter domain.
 	return logs, rows.Err()
 }
 
-func (r *Repository) GetStatisticsSummary(ctx context.Context, orgID int64, startDate, endDate string) (*domain.StatisticsSummary, error) {
+func (r *Repository) GetStatisticsSummary(ctx context.Context, orgID int64, startDate, endDate string, comparePrevious ...bool) (*domain.StatisticsSummary, error) {
 	stats := &domain.StatisticsSummary{}
-	q1 := `SELECT COALESCE(SUM(li.volume_m3), 0) FROM log_items li JOIN log_arrivals la ON li.arrival_id = la.id AND li.organization_id = la.organization_id WHERE li.organization_id = $1 AND la.arrival_date >= $2 AND la.arrival_date <= $3`
-	if err := r.db.QueryRow(ctx, q1, orgID, startDate, endDate).Scan(&stats.TotalLogsArrivedVolume); err != nil {
-		return nil, err
-	}
+	var previous domain.StatisticsComparison
+	withPrevious := len(comparePrevious) > 0 && comparePrevious[0]
 
 	// boards хранит текущий остаток. Восстанавливаем выпуск по продажам
 	// и всем корректировкам партий, напиленных в выбранном периоде.
-	q2 := `WITH operations AS (
-		SELECT id FROM sawing_operations WHERE organization_id = $1 AND date >= $2 AND date <= $3
-	), produced AS (
-		SELECT b.id, b.volume_m3 FROM boards b JOIN operations so ON b.sawing_id = so.id WHERE b.organization_id = $1
+	query := `WITH bounds AS (
+		SELECT $2::date AS start_date, $3::date AS end_date
+	), periods AS (
+		SELECT FALSE AS is_previous, start_date, end_date FROM bounds
+		UNION ALL
+		SELECT TRUE, start_date - (end_date - start_date + 1), start_date - 1 FROM bounds WHERE $4::boolean
+	), totals AS (
+		SELECT p.is_previous, arrivals.volume AS logs_arrived, production.sawed, production.produced,
+			sales.volume AS sales_volume, sales.amount AS sales_amount
+		FROM periods p
+		CROSS JOIN LATERAL (
+			SELECT COALESCE(SUM(li.volume_m3), 0) AS volume
+			FROM log_arrivals la JOIN log_items li ON li.organization_id = la.organization_id AND li.arrival_id = la.id
+			WHERE la.organization_id = $1 AND la.arrival_date >= p.start_date AND la.arrival_date <= p.end_date
+		) arrivals
+		CROSS JOIN LATERAL (
+			WITH operations AS (
+				SELECT id FROM sawing_operations WHERE organization_id = $1 AND date >= p.start_date AND date <= p.end_date
+			), produced AS (
+				SELECT b.id, b.volume_m3 FROM boards b JOIN operations so ON b.sawing_id = so.id WHERE b.organization_id = $1
+			)
+			SELECT (SELECT COALESCE(SUM(sl.volume_m3), 0) FROM sawed_logs sl JOIN operations so ON sl.sawing_id = so.id WHERE sl.organization_id = $1) AS sawed,
+				CASE WHEN NOT p.is_previous THEN
+					(SELECT COALESCE(SUM(volume_m3), 0) FROM produced)
+					+ (SELECT COALESCE(SUM(sb.volume_m3), 0) FROM sale_boards sb JOIN produced b ON b.id = sb.board_id WHERE sb.organization_id = $1)
+					- (SELECT COALESCE(SUM(a.delta_volume), 0) FROM stock_adjustments a JOIN produced b ON b.id = a.item_id WHERE a.organization_id = $1 AND a.kind = 'board')
+				END AS produced
+		) production
+		CROSS JOIN LATERAL (
+			SELECT COALESCE(SUM(s.total_volume), 0) AS volume, COALESCE(SUM(s.total_price), 0) AS amount
+			FROM sales s WHERE s.organization_id = $1 AND s.created_at >= p.start_date AND s.created_at < p.end_date + 1
+		) sales
+	), firewood_arrived AS (
+		SELECT COALESCE(SUM(volume_m3), 0) AS volume FROM firewood_arrivals
+		WHERE organization_id = $1 AND arrival_date >= $2 AND arrival_date <= $3
+	), firewood_produced AS (
+		SELECT COALESCE(SUM(volume_m3) FILTER (WHERE kind = 'split'), 0) AS split,
+			COALESCE(SUM(volume_m3) FILTER (WHERE kind = 'round'), 0) AS round,
+			COALESCE(SUM(raw_m3), 0) AS raw
+		FROM firewood_processing WHERE organization_id = $1 AND date >= $2 AND date <= $3
 	)
-	SELECT (SELECT COALESCE(SUM(sl.volume_m3), 0) FROM sawed_logs sl JOIN operations so ON sl.sawing_id = so.id WHERE sl.organization_id = $1),
-		(SELECT COALESCE(SUM(volume_m3), 0) FROM produced)
-		+ (SELECT COALESCE(SUM(sb.volume_m3), 0) FROM sale_boards sb JOIN produced b ON b.id = sb.board_id WHERE sb.organization_id = $1)
-		- (SELECT COALESCE(SUM(a.delta_volume), 0) FROM stock_adjustments a JOIN produced b ON b.id = a.item_id WHERE a.organization_id = $1 AND a.kind = 'board')`
-	if err := r.db.QueryRow(ctx, q2, orgID, startDate, endDate).Scan(&stats.TotalLogsSawedVolume, &stats.TotalBoardsProducedVolume); err != nil {
+	SELECT t.logs_arrived, t.sawed, t.produced, t.sales_volume, t.sales_amount,
+		a.volume, f.split, f.round, f.raw,
+		COALESCE(prev.logs_arrived, 0), COALESCE(prev.sawed, 0), COALESCE(prev.sales_volume, 0), COALESCE(prev.sales_amount, 0)
+	FROM totals t LEFT JOIN totals prev ON prev.is_previous
+	CROSS JOIN firewood_arrived a CROSS JOIN firewood_produced f
+	WHERE NOT t.is_previous`
+	err := r.db.QueryRow(ctx, query, orgID, startDate, endDate, withPrevious).Scan(
+		&stats.TotalLogsArrivedVolume, &stats.TotalLogsSawedVolume, &stats.TotalBoardsProducedVolume,
+		&stats.TotalSalesVolume, &stats.TotalSalesAmount,
+		&stats.FirewoodArrivedVolume, &stats.FirewoodSplitProducedVolume, &stats.FirewoodRoundProducedVolume, &stats.FirewoodRawConsumedVolume,
+		&previous.TotalLogsArrivedVolume, &previous.TotalLogsSawedVolume, &previous.TotalSalesVolume, &previous.TotalSalesAmount)
+	if err != nil {
 		return nil, err
 	}
 
-	q3 := `SELECT COALESCE(SUM(total_price), 0) FROM sales WHERE organization_id = $1 AND created_at >= $2::timestamp AND created_at <= $3::timestamp + interval '23 hours 59 minutes 59 seconds'`
-	if err := r.db.QueryRow(ctx, q3, orgID, startDate, endDate).Scan(&stats.TotalSalesAmount); err != nil {
+	stock, err := readFirewoodStock(ctx, orgID, r.db)
+	if err != nil {
 		return nil, err
 	}
-
-	q4 := `SELECT COALESCE(SUM(s.total_volume), 0) FROM sales s WHERE s.organization_id = $1 AND s.created_at >= $2::timestamp AND s.created_at <= $3::timestamp + interval '23 hours 59 minutes 59 seconds'`
-	if err := r.db.QueryRow(ctx, q4, orgID, startDate, endDate).Scan(&stats.TotalSalesVolume); err != nil {
-		return nil, err
+	stats.FirewoodStock = *stock
+	if withPrevious {
+		stats.Previous = &previous
 	}
-
 	return stats, nil
 }
 

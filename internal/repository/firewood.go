@@ -35,10 +35,18 @@ func (r *Repository) CreateFirewoodArrival(ctx context.Context, orgID int64, sup
 	return &a, nil
 }
 
-func (r *Repository) GetFirewoodArrivals(ctx context.Context, orgID int64, limit, offset int) ([]domain.FirewoodArrival, error) {
+func (r *Repository) GetFirewoodArrivals(ctx context.Context, orgID int64, limit, offset int, search ...string) ([]domain.FirewoodArrival, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, supplier_id, carrier_id, truck_number, volume_m3, to_char(arrival_date, 'YYYY-MM-DD'), created_at
-		FROM firewood_arrivals WHERE organization_id = $1 ORDER BY arrival_date DESC, id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset)
+		SELECT fa.id, fa.supplier_id, fa.carrier_id, fa.truck_number, fa.volume_m3, to_char(fa.arrival_date, 'YYYY-MM-DD'), fa.created_at
+		FROM firewood_arrivals fa
+		WHERE fa.organization_id = $1
+			AND ($4 = '' OR ('Дрова №' || fa.id::text) ILIKE $4 OR fa.truck_number ILIKE $4
+				OR EXISTS (
+					SELECT 1 FROM contractors c
+					WHERE c.organization_id = fa.organization_id
+						AND c.id IN (fa.supplier_id, fa.carrier_id) AND c.name ILIKE $4
+				))
+		ORDER BY fa.arrival_date DESC, fa.created_at DESC, fa.id DESC LIMIT $2 OFFSET $3`, orgID, limit, offset, journalSearchPattern(search))
 	if err != nil {
 		return nil, err
 	}
