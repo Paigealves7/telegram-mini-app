@@ -1,0 +1,1 @@
+ALTER TABLE organization_invites ADD COLUMN IF NOT EXISTS code TEXT NOT NULL DEFAULT '';

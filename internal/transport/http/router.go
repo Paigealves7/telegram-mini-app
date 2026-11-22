@@ -203,6 +203,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRoles(domain.RoleManager, domain.RoleMaster))
+				r.Post("/contractors", dictHandler.CreateContractor)
 				r.Get("/arrivals", arrivalHandler.GetList)
 				r.Post("/arrivals", arrivalHandler.CreateArrival)
 				r.Get("/firewood/arrivals", firewoodHandler.GetArrivals)
@@ -237,7 +238,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 				r.Delete("/firewood/processing/{id}", firewoodHandler.DeleteProcessing)
 				r.Get("/statistics", statsHandler.GetSummary)
 				r.Post("/users", authHandler.Register) // создание сотрудников: только менеджер
-				r.Post("/contractors", dictHandler.CreateContractor)
 				r.Put("/contractors/{id}", dictHandler.UpdateContractor)
 				r.Delete("/contractors/{id}", dictHandler.DeleteContractor)
 				r.Delete("/payments/{id}", paymentHandler.Delete)

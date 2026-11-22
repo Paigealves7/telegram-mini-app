@@ -23,7 +23,7 @@ var (
 )
 
 const organizationColumns = "id, name, company_info, is_demo, is_active, last_order_number, created_at"
-const inviteColumns = "id, organization_id, role, max_uses, used_count, expires_at, revoked_at, created_by, created_at"
+const inviteColumns = "id, organization_id, role, max_uses, used_count, expires_at, revoked_at, created_by, created_at, code"
 
 func organizationError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -220,7 +220,11 @@ func (r *Repository) AddOrganizationMember(ctx context.Context, orgID, userID in
 	return tx.Commit(ctx)
 }
 
-func (r *Repository) CreateInvite(ctx context.Context, orgID int64, codeHash string, role domain.Role, maxUses int, expiresAt time.Time, createdBy int64) (*domain.OrganizationInvite, error) {
+func (r *Repository) CreateInvite(ctx context.Context, orgID int64, codeHash string, role domain.Role, maxUses int, expiresAt time.Time, createdBy int64, code ...string) (*domain.OrganizationInvite, error) {
+	var plainCode string
+	if len(code) > 0 {
+		plainCode = code[0]
+	}
 	tx, err := r.beginOrgWrite(ctx, orgID)
 	if err != nil {
 		return nil, err
@@ -228,11 +232,11 @@ func (r *Repository) CreateInvite(ctx context.Context, orgID int64, codeHash str
 	defer tx.Rollback(ctx)
 
 	var invite domain.OrganizationInvite
-	err = tx.QueryRow(ctx, `INSERT INTO organization_invites (organization_id, code_hash, role, max_uses, expires_at, created_by)
-		VALUES ($1, $2, $3, $4, $5, NULLIF($6::bigint, 0)) RETURNING `+inviteColumns,
-		orgID, codeHash, role, maxUses, expiresAt, createdBy).
+	err = tx.QueryRow(ctx, `INSERT INTO organization_invites (organization_id, code, code_hash, role, max_uses, expires_at, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7::bigint, 0)) RETURNING `+inviteColumns,
+		orgID, plainCode, codeHash, role, maxUses, expiresAt, createdBy).
 		Scan(&invite.ID, &invite.OrganizationID, &invite.Role, &invite.MaxUses, &invite.UsedCount,
-			&invite.ExpiresAt, &invite.RevokedAt, &invite.CreatedBy, &invite.CreatedAt)
+			&invite.ExpiresAt, &invite.RevokedAt, &invite.CreatedBy, &invite.CreatedAt, &invite.Code)
 	if err != nil {
 		return nil, err
 	}

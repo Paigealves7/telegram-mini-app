@@ -77,7 +77,7 @@ type OrganizationInvite struct {
 	RevokedAt      *time.Time `json:"revoked_at,omitempty"`
 	CreatedBy      *int64     `json:"created_by,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
-	Code           string     `json:"code,omitempty"` // Заполняется только в ответе при создании.
+	Code           string     `json:"code,omitempty"` // У приглашений, выпущенных до миграции, сохранён только хеш.
 }
 
 type User struct {

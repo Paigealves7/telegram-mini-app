@@ -106,6 +106,7 @@ button.li:active{background-color:rgba(255,255,255,.06)}
 .grp b{font-weight:500}#view>section:first-child>.grp,#jl>section:first-child>.grp{margin-top:8px}
 .st{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500}.st i{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
 .empty{padding:48px 0;text-align:center;color:var(--t2)}.empty b{display:block;margin-bottom:4px;color:var(--t1);font-weight:500}
+#ol>.empty,#sl>.empty,#jl>.empty,.card-group>.empty{grid-column:1/-1;justify-self:center;width:100%}
 .empty .btn{width:auto;margin:24px auto 0;padding:0 32px}
 .sk{height:56px;margin-bottom:8px;border-radius:20px;background:var(--s1);animation:pulse 1.4s ease-in-out infinite}@keyframes pulse{50%{opacity:.5}}
 /* управление */
@@ -131,6 +132,13 @@ button.li:active{background-color:rgba(255,255,255,.06)}
 .two{display:flex;gap:8px;margin-top:24px}.two .btn{flex:1}.stackb{display:grid;gap:8px;margin-top:24px}
 /* формы */
 .fgrid{display:grid;grid-template-columns:1fr 1fr;column-gap:16px}
+.quickcon-label{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}
+.quickcon-label label{min-width:0;color:var(--t2);font-size:14px;font-weight:500;overflow-wrap:anywhere}
+.lnk.quickcon-trigger{margin:0;padding:4px 2px;min-height:34px;font-size:12px;white-space:nowrap}
+.quickcon-edit{grid-column:1/-1;display:grid;gap:10px;min-width:0;margin-bottom:16px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--s1)}
+.quickcon-edit .fld{margin:0}
+.quickcon-edit .two{margin:0}
+@media(max-width:767px){#tabs .tab[data-v="cons"]{display:none}}
 .fs{grid-column:span 2;margin:32px 0 16px;font-size:20px;font-weight:500}.fgrid>.fs:first-child{margin-top:0}
 .fld{grid-column:span 2;margin-bottom:16px;min-width:0}.fld.half{grid-column:span 1;align-self:end}
 .fld>label{display:block;margin-bottom:8px;color:var(--t2);font-size:14px;font-weight:500}
@@ -345,7 +353,7 @@ html.lite .stock,html.lite .tabs,html.lite .login,html.lite .hbtn,html.lite .ava
 
 /* Рабочее пространство: компактный обзор, списки и независимый инспектор. */
 [hidden]{display:none!important}
-.side-brand,.side-create,.side-footer{display:none}
+.side-brand,.side-org,.side-create,.side-footer{display:none}
 body[data-view="home"] #view{display:block}
 .quickbar{display:flex;gap:8px;position:sticky;top:0;z-index:12;background:var(--bg);padding:0 0 12px;overflow-x:auto;scrollbar-width:none}
 .quick-btn{display:flex;align-items:center;justify-content:center;gap:5px;flex:1;white-space:nowrap;padding:9px 10px;min-height:42px;border:1px solid var(--line2);border-radius:12px;background:var(--s1);font-size:12px}
@@ -369,9 +377,12 @@ body[data-view="home"] #view{display:block}
 .filterbar{position:sticky;top:0;z-index:15;display:flex;flex-wrap:wrap;gap:8px;padding:10px 0;background:var(--bg);border-bottom:1px solid var(--line);margin-bottom:12px}
 .filterbar .srch{flex:1 1 200px;margin:0;height:44px;border-radius:12px;padding:0 12px;font-size:13px}
 .filterbar .seg,.filterbar .utabs{flex:1 1 auto;min-width:0;max-width:100%;margin:0;border-radius:12px}
+.stock-filter .seg{flex-basis:260px}
 .filterbar .seg button,.filterbar .utab{min-height:36px;padding:0 10px;font-size:12px;border-radius:9px}
 .filterbar .chips{flex-basis:100%;margin:0;border:0;background:none;padding:0;border-radius:0}
 .filterbar .chip{min-height:32px;font-size:11px;padding:0 12px}
+.firewood-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.firewood-actions .btn{width:auto;min-height:44px;padding:6px 14px;border-radius:12px;font-size:13px}
 .tots,#ssum .tots,#osum .tots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0 16px}
 .tots .tt{grid-column:auto!important;min-height:72px;padding:10px 12px;border-radius:12px}
 .tt-l{font-size:11px;color:var(--t2)}.tt-v{font-size:21px;line-height:1.2}
@@ -435,7 +446,7 @@ body.noauth #sheet{display:none}
  body:not(.noauth){display:grid;grid-template-columns:240px minmax(0,1fr) var(--inspector);grid-template-rows:76px minmax(0,1fr);height:100vh;height:100dvh;overflow:hidden}
  .tabs{position:relative;grid-column:1;grid-row:1/3;inset:auto;width:auto;height:100%;padding:24px 16px;gap:6px;overflow-y:auto}
  .tabs::before{display:none}
- .side-brand{display:flex;gap:12px;align-items:center;margin:0 4px 26px;font-size:18px;font-weight:600}
+ .side-brand{display:flex;gap:12px;align-items:center;margin:0 4px 8px;font-size:18px;font-weight:600}
  .side-brand small{display:block;font-size:10px;color:var(--t2);font-weight:400;margin-top:4px}.side-brand svg{width:28px;height:28px}
  .tab{height:44px;padding:0 12px}.tab span{font-size:13px}
  .side-create{display:grid;gap:8px;margin-top:16px}.side-create .section-label{margin:0 0 4px 12px}
@@ -443,7 +454,6 @@ body.noauth #sheet{display:none}
  .side-footer{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:24px}
  .side-profile{display:flex;align-items:center;gap:8px;flex:1;min-width:0;text-align:left;border:0;background:none;padding:8px 0;font-size:12px}
  .side-profile span{min-width:0}.side-profile b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}.side-profile small{display:block;color:var(--t2);font-size:10px}
- .theme-button{width:36px;height:36px;flex:none;border:1px solid var(--line);border-radius:10px;background:var(--s2)}.theme-button svg{width:18px;height:18px}
  .top{grid-column:2;grid-row:1;position:relative;margin:0;padding:16px 20px;min-width:0;gap:6px}
  #title,body.sub #title{font-size:24px;line-height:36px}
  #hact{border:0;padding:0;background:none;gap:6px}
@@ -644,13 +654,10 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
  body:has(#sheet.on) #workspace{overflow:hidden}
  body.noauth #workspace{width:100%;overflow:visible}
  .filterbar{position:static;top:auto;margin:0 0 16px;padding:0 0 4px;border:0;background:transparent;box-shadow:none}
- .side-create .quick-btn{position:relative;justify-content:flex-start;min-height:42px;padding:10px 30px 10px 12px;border-radius:12px;background:var(--s2);border:1px solid var(--line);cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease,transform .15s ease}
- .side-create .quick-btn::after{content:'+';position:absolute;right:12px;opacity:0;color:var(--t1);transition:opacity .15s}
- .side-create .quick-btn:hover,.side-create .quick-btn:focus-visible{background:var(--s3);border-color:var(--line2);color:var(--t1)}
- .side-create .quick-btn:hover svg,.side-create .quick-btn:focus-visible svg{color:var(--t1)}
- .side-create .quick-btn:hover::after,.side-create .quick-btn:focus-visible::after{opacity:1}
+ .side-create .quick-btn{justify-content:flex-start;padding-inline:12px;border:1px solid transparent;background:transparent;color:var(--t2);font-weight:500;transition:transform .15s var(--ease)}
+ @media(hover:hover){.side-create .quick-btn:hover{background:var(--s2);color:var(--t1)}}
  .side-create .quick-btn:active{transform:scale(.97)}
- body[data-active-form="arrival"] .side-create [data-v="arrival"],body[data-active-form="fwarr"] .side-create [data-v="fwarr"],body[data-active-form="sawing"] .side-create [data-v="sawing"],body[data-active-form="order"] .side-create [data-v="order"],body[data-active-form="fwproc"] .side-create [data-v="fwproc"]{background:var(--s3);border-color:var(--line2);color:var(--t1)}
+ body[data-active-form="arrival"] .side-create [data-v="arrival"],body[data-active-form="fwarr"] .side-create [data-v="fwarr"],body[data-active-form="sawing"] .side-create [data-v="sawing"],body[data-active-form="order"] .side-create [data-v="order"],body[data-active-form="fwproc"] .side-create [data-v="fwproc"]{background:var(--s2);color:var(--t1)}
  .side-footer{padding-top:24px}
  .side-profile{display:flex;gap:10px;width:100%;min-width:0;padding:10px 12px;background:var(--s1);border:1px solid var(--line);border-radius:14px;transition:background .15s,border-color .15s}
  .side-profile:hover,.side-profile.on{background:var(--s2);border-color:var(--line2);box-shadow:none}
@@ -680,23 +687,30 @@ body[data-view="home"] .home-grid,body[data-view="home"] .home-feed{display:grid
 .org-admin-card p{margin:3px 0}
 .org-actions{flex-wrap:wrap}
 .org-actions .btn{width:auto;min-height:44px;max-width:100%;white-space:normal}
-.org-code{display:block;margin:14px 0;font-size:clamp(20px,6vw,32px);font-weight:700;letter-spacing:.07em;white-space:nowrap}
-#title .org-title{max-width:100%;min-height:44px}
-#title button.org-title{padding:0;border:0;background:transparent;color:inherit;font:inherit;letter-spacing:inherit;text-align:left;transition:transform 100ms var(--ease)}
-#title button.org-title:active{transform:scale(.97)}
+.org-code{display:block;margin:14px 0;font:700 clamp(20px,6vw,32px)/1.3 ui-monospace,monospace;letter-spacing:.07em;white-space:nowrap}
+.org-admin-card .org-code{width:fit-content;margin:0;padding:4px 8px;border-radius:8px;background:var(--s2);font-size:16px}
+.org-id-label{display:grid;min-width:0;gap:3px;flex:1}
+.side-org{flex:none;min-width:0;align-items:center;gap:8px;width:100%;margin-bottom:8px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--s1);color:var(--t1);text-align:left;font-size:13px;font-weight:600}
+.side-org-state{display:flex;align-items:center;gap:6px;color:var(--t2);font-size:11px;font-weight:500}
+.side-org-state::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.side-org-state.demo::before{background:var(--warn)}
+.mobile-org{display:flex;align-items:center;gap:5px;width:fit-content;max-width:100%;min-width:0;min-height:24px;padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:var(--s1);color:var(--t2);font-size:12px;line-height:18px;font-weight:500;letter-spacing:0}
+button:is(.side-org,.mobile-org){transition:transform 100ms var(--ease)}
+button:is(.side-org,.mobile-org):active{transform:scale(.97)}
+@media(hover:hover){button:is(.side-org,.mobile-org):hover{background:var(--s2);color:var(--t1)}}
 .org-chevron{flex:none;font-size:14px;color:var(--t2)}
 body[data-view="home"] #hact{flex-wrap:nowrap}
+#title .home-section-title{display:block;line-height:1.2}
+.header-operations{display:flex;gap:4px}
 @media(max-width:399px){
-  #title .org-title{gap:4px}
   body[data-view="home"] #hact .home-reports{gap:4px;padding:0 8px}
   body[data-view="home"] #hact .home-reports span{font-size:12px}
   body[data-view="home"] #hact .home-reports svg{width:16px;height:16px}
 }
-html.lite .org-choice,html.lite #title button.org-title{transition:none}
-html.lite .org-choice:active,html.lite #title button.org-title:active{transform:none}
-@media(prefers-reduced-motion:reduce){.org-choice:active,#title button.org-title:active{transform:none}}
+html.lite .org-choice,html.lite button:is(.side-org,.mobile-org){transition:none}
+html.lite .org-choice:active,html.lite button:is(.side-org,.mobile-org):active{transform:none}
+@media(prefers-reduced-motion:reduce){.org-choice:active,button:is(.side-org,.mobile-org):active{transform:none}}
 
-.home-tools{display:none}
 .shift-grid{display:grid;gap:14px;margin-bottom:16px}
 .shift-grid>#tdy{margin:0}
 #hd .workspace-card{min-width:0;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--s1);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
@@ -723,10 +737,10 @@ html.lite .org-choice:active,html.lite #title button.org-title:active{transform:
  body:not(.noauth) .top{max-width:none;width:100%;margin:0;padding-inline:clamp(28px,2vw,32px);border-bottom:1px solid var(--line)}
  body:not(.noauth) #view,body:not(.noauth).form #view,body[data-view="stats"] #view{max-width:1560px;margin:0;padding:24px clamp(28px,2vw,32px) 40px}
  body[data-view="profile"]:not(.noauth) #view{max-width:760px}
- .tabs .tab,.side-create .quick-btn{min-height:38px;height:38px;border:0;border-radius:8px;padding-block:0}
- .side-create{gap:3px;border-top:1px solid var(--line);padding-top:16px}.side-create .quick-btn{background:transparent}.tabs .tab svg,.side-create svg{width:18px;height:18px}
- .home-tools{display:flex;gap:6px;align-items:center}body[data-view="home"] #hact .avatar{display:none}
- body[data-view="home"] #hact .hbtn{display:inline-flex;align-items:center;gap:5px;padding:0 10px;width:auto}body[data-view="home"] #hact .hbtn span{display:inline}
+ .tabs .tab,.side-create .quick-btn{min-height:38px;height:38px;border-radius:8px;padding-block:0}
+ .side-create{gap:3px;border-top:1px solid var(--line);padding-top:16px}.tabs .tab svg,.side-create svg{width:18px;height:18px}
+ .side-org{display:flex}
+ .mobile-org,#hact>.header-operations,body[data-view="home"] #hact{display:none}
  .shift-grid:has(>.workspace-card:nth-child(2)){grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
  #hd .workspace-card{padding:20px}
 }
@@ -742,7 +756,6 @@ html.lite .org-choice:active,html.lite #title button.org-title:active{transform:
 .open-balance{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:auto;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--t2)}
 .open-balance b{font-size:17px;color:var(--t1);white-space:nowrap;font-variant-numeric:tabular-nums}
 .home-order{padding-block:14px}.home-order:hover,.home-order:focus-visible{background:var(--s2)}
-.home-tools .hbtn:nth-child(2){background:var(--s2);border:1px solid var(--line);color:var(--t1)}
 @media(max-width:767px){body[data-view="home"] #hd{margin-top:8px}body[data-view="home"] .quickbar{margin-bottom:8px}.open-balance{margin-top:12px}}
 #jl .journal-entry{display:block;min-width:0;padding:0;align-self:start;overflow:hidden}
 #jl .journal-entry>.li{margin:0;border:0;border-radius:0;background:transparent;box-shadow:none}
@@ -802,7 +815,7 @@ const ICP = {
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>', check: '<path d="M20 6 9 17l-5-5"/>',
   file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
   back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>', chev: '<path d="m9 18 6-6-6-6"/>', arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
-  arrival: '<path d="m10 11 11 .9a1 1 0 0 1 .8 1.1l-.665 4.158a1 1 0 0 1-.988.842H20"/><path d="M16 18h-5"/><path d="M18 5a1 1 0 0 0-1 1v5.573"/><path d="M3 4h8.129a1 1 0 0 1 .99.863L13 11.246"/><path d="M4 11V4"/><path d="M7 15h.01"/><path d="M8 10.1V4"/><circle cx="18" cy="18" r="2"/><circle cx="7" cy="15" r="5"/>',
+  arrival: '<circle cx="8" cy="16" r="3"/><circle cx="16" cy="16" r="3"/><circle cx="12" cy="9" r="3"/><path d="M5 20h14"/>',
   sawing: '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
   order: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
   journal: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
@@ -1078,19 +1091,20 @@ function buildTabs() {
   const t = [['home', 'home', 'Главная'], ['stock', 'box', 'Склад']];
   if (canOrd()) t.push(['orders', 'order', 'Заказы']);
   t.push(['journal', 'journal', 'Журнал']);
-  if(S.role==='manager') t.push(['stats','chart','Отчёты']);
-  $('#tabs').innerHTML = '<div class="side-brand">'+ic('box')+`<span class="org-title">${orgTitle()}</span></div>` + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile"><span class="side-avatar">${esc((S.name || '?')[0].toUpperCase())}</span><span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span>${ic('chev')}</button></div>`;
+  if(S.role==='manager') t.push(['stats','chart','Отчёты'], ['cons','user','Контрагенты']);
+  $('#tabs').innerHTML = `<div class="side-brand">${ic('mark')}<span>URMANIT<small>Система учёта</small></span></div>${orgIdentity()}` + t.map(x => `<button class="tab" data-a="go" data-v="${x[0]}" aria-label="${x[2]}" title="${x[2]}">${ic(x[1])}<span>${x[2]}</span></button>`).join('') + `<div class="side-create"><span class="section-label">Создать</span>${quickBar()}</div><div class="side-footer"><button class="side-profile" data-a="go" data-v="profile"><span class="side-avatar">${esc((S.name || '?')[0].toUpperCase())}</span><span><b>${esc(S.name || 'Профиль')}</b><small>${esc(ROLE[S.role])}</small></span>${ic('chev')}</button></div>`;
   theme();
 }
 const hbtn = (k, l) => `<button class="hbtn" data-a="new" data-v="${k}" aria-label="Создать: ${l}" title="Создать: ${l}">${ic('plus')}<span>${l}</span></button>`;
 function setAct(v) {
-  const actions = v === 'staff' ? hbtn('user','Сотрудник') : v === 'cons' ? '<button class="hbtn" data-a="cedit" data-v="new">'+ic('plus')+'<span>Контрагент</span></button>' : v === 'orders' ? hbtn('order', 'Новый заказ')
-    : v === 'journal' ? (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
+  const operations = v === 'orders' ? hbtn('order', 'Новый заказ') : v === 'journal' ?
+    (S.jt === 'arrivals' ? hbtn('arrival', 'Лес') + hbtn('fwarr', 'Дрова') : S.jt === 'production' ? hbtn('sawing', 'Распил') : '') : '';
+  const actions = v === 'staff' ? hbtn('user', 'Сотрудник') : v === 'cons' ?
+    '<button class="hbtn" data-a="cedit" data-v="new">' + ic('plus') + '<span>Контрагент</span></button>' :
+    operations ? `<div class="header-operations">${operations}</div>` : '';
   $('#hact').innerHTML = (v === 'home' ?
-    `<div class="home-tools">${canOrd() ? hbtn('order','Заказ') + hbtn('arrival','Приход') : ''}<button class="theme-button" data-a="theme"></button></div>` +
     (S.role === 'manager' ? '<button class="hbtn home-reports" data-a="go" data-v="stats" aria-label="Отчёты">' + ic('chart') + '<span>Отчёты</span></button>' : '') +
     '<button class="avatar" data-a="go" data-v="profile" aria-label="Профиль" title="Профиль">' + esc((S.name || '?')[0].toUpperCase()) + '</button>' : '') + actions;
-  theme();
 }
 function go(v, p) {
   if(ASK) settle(false);
@@ -1114,9 +1128,7 @@ function show(v, p) {
   const f = FORMS[v], sub = !!f || v === 'stats' || v === 'profile' || v === 'staff' || v === 'cons' || v === 'adjlog';
   document.body.classList.toggle('form', !!f);
   document.body.classList.toggle('sub', sub);
-  if (v === 'home') $('#title').innerHTML = canSwitchOrg()
-    ? `<button class="org-title" type="button" data-a="orgswitch" aria-label="Сменить лесопилку, текущая — ${esc(orgName())}">${orgTitle()}<span class="org-chevron" aria-hidden="true">▾</span></button>`
-    : `<span class="org-title">${orgTitle()}</span>`;
+  if (v === 'home') $('#title').innerHTML = `<span class="home-section-title">Главная</span>${orgIdentity(true)}`;
   else $('#title').textContent = f ? f.t : TT[v] || orgName();
   setAct(v);
   const profileButton=$('.side-profile'); if(profileButton){profileButton.classList.toggle('on',v==='profile');v==='profile'?profileButton.setAttribute('aria-current','page'):profileButton.removeAttribute('aria-current');}
@@ -1349,7 +1361,7 @@ async function vStock(fetchNew = true) {
   const v = $('#view');
   if (fetchNew) { v.innerHTML = sk(5); const ok = await loadStock(); if (S.cur !== 'stock') return; if (!ok) { v.innerHTML = fail('Не удалось загрузить склад', 'stock'); return; } }
   const fwOn = S.wt === 'firewood', list = S.wt === 'boards' ? D.boards : D.logs, sps = fwOn ? [] : [...new Set(list.map(x => x.species || '—'))];
-  v.innerHTML = `<div class="filterbar">${fwOn ? '' : `<div class="srch">${ic('search')}<input id="q" placeholder="Поиск: порода, размер, №" aria-label="Поиск" value="${esc(S.wq)}"></div>`}
+  v.innerHTML = `<div class="filterbar stock-filter"><div class="srch">${ic('search')}<input id="q" placeholder="${fwOn ? 'Поиск по остаткам дров' : 'Поиск: порода, размер, №'}" aria-label="Поиск" value="${esc(S.wq)}"></div>
     <div class="seg">${[['boards', 'Пиломатериалы'], ['logs', 'Сырьё'], ['firewood', 'Дрова']].map(([k, l]) => `<button class="${S.wt === k ? 'on' : ''}" data-a="wt" data-v="${k}">${l}</button>`).join('')}</div>
     ${sps.length > 1 ? `<div class="chips"><button class="chip ${S.wsp ? '' : 'on'}" data-a="sp" data-v="">Все</button>${sps.map(x => `<button class="chip ${S.wsp === x ? 'on' : ''}" data-a="sp" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : ''}
     </div><div id="ssum"></div><div id="sl"></div>`;
@@ -1399,8 +1411,20 @@ function stockList() {
   if (S.wt === 'firewood') {
     const f = D.fw || {raw_m3: 0};
     $('#ssum').innerHTML = tots([['Сырьё, м³', fmt(f.raw_m3, 2)], ['Колотые, м³', fmt(f.split_m3||0,2)], ['Чурбаки, м³', fmt(f.round_m3||0,2)]]);
-    $('#sl').innerHTML = li('Дрова, берёза (сырьё)', 'Приходы дров общим объёмом', `${fmt(f.raw_m3, 3)} м³`, '', {});
-    $('#sl').innerHTML += Object.entries(FW_NAMES).map(([k,n])=>li(n,'Готовые дрова',`${fmt(f[k+'_m3']||0,3)} м³`,'',{})).join('') + `<div class="stackb">${S.role==='manager'||S.role==='worker'?'<button class="btn" data-a="mk" data-v="fwproc">Напилили / Накололи</button>':''}<button class="btn ghost" data-a="fwhistory">История переработки</button>${S.role==='manager'?'<button class="btn ghost" data-a="mk" data-v="fwsettings">Коэффициенты</button>':''}${canSuper()?'<button class="btn ghost" data-a="fwstockedit">Скорректировать остатки</button>':''}</div>`;    return;
+    const q = S.wq.trim().toLowerCase().replaceAll('ё', 'е');
+    const rows = [
+      ['Сырьё', 'Приходы дров общим объёмом', f.raw_m3],
+      ...Object.entries(FW_NAMES).map(([kind, label]) => [label, 'Готовые дрова', f[kind + '_m3'] || 0])
+    ].filter(([label, detail]) => `береза дрова ${label.toLowerCase()} ${detail.toLowerCase()}`.replaceAll('ё', 'е').includes(q))
+      .map(([label, detail, volume]) => li(label, detail, `${fmt(volume, 3)} м³`, '', {})).join('');
+    $('#sl').innerHTML = grp('Берёза · Дрова', '', rows || none('Ничего не найдено', 'Измените запрос')) + `
+      <div class="firewood-actions">
+        ${S.role === 'manager' || S.role === 'worker' ? '<button class="btn" data-a="mk" data-v="fwproc">Напилили / Накололи</button>' : ''}
+        <button class="btn ghost" data-a="fwhistory">История переработки</button>
+        ${S.role === 'manager' ? '<button class="btn ghost" data-a="mk" data-v="fwsettings">Коэффициенты</button>' : ''}
+        ${canSuper() ? '<button class="btn ghost" data-a="fwstockedit">Скорректировать остатки</button>' : ''}
+      </div>`;
+    return;
   }
   const t = S.wt, q = S.wq.toLowerCase().replace(/(\d)\s*[*xх]\s*(\d)/g, '$1×$2');
   let list = (t === 'boards' ? D.boards : D.logs).filter(x => (!S.wsp || (x.species || '—') === S.wsp) && (!q || skey(x).includes(q))).sort((a, b) => b.volume_m3 - a.volume_m3);
@@ -1588,7 +1612,8 @@ async function vAdjLog() {
     : none('Корректировок пока не было', 'Списание и излишки появятся здесь');
 }
 
-/* ---------- контрагенты (только руководитель) ---------- */
+/* ---------- контрагенты ---------- */
+const CONTRACTOR_TYPES = {sup: 'is_supplier', car: 'is_carrier', cli: 'is_client'};
 const conOpts = k => D.cl.filter(c => c.is_active && c[k]).sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(c => [c.id, c.name]);
 const conTypes = c => [c.is_supplier && 'поставщик', c.is_carrier && 'перевозчик', c.is_client && 'клиент'].filter(Boolean).join(', ');
 async function vCons() {
@@ -1632,6 +1657,15 @@ const orgName = () => S.org?.name || 'Лесопилка';
 const orgTitle = () => `<span class="org-title-name" title="${esc(orgName())}">${esc(orgName())}</span>`;
 const orgDemoBadge = org => org?.is_demo ? '<span class="role-badge org-demo">ДЕМО</span>' : '';
 const canSwitchOrg = () => S.orgs.length > 1;
+function orgIdentity(mobile = false) {
+  const cls = mobile ? 'mobile-org' : 'side-org';
+  const demo = S.org?.is_demo;
+  const label = mobile ? orgTitle() : `<span class="org-id-label">${orgTitle()}
+    <span class="side-org-state${demo ? ' demo' : ''}">${demo ? 'Демо' : 'Активна'}</span></span>`;
+  return canSwitchOrg()
+    ? `<button class="${cls}" type="button" data-a="orgswitch" aria-label="Сменить лесопилку, текущая — ${esc(orgName())}">${label}<span class="org-chevron" aria-hidden="true">▾</span></button>`
+    : `<span class="${cls}">${label}</span>`;
+}
 const adminLink = () => `<a class="profile-link" href="/admin"><span class="profile-icon">${ic('lock')}</span><b>Панель управления платформой</b>${ic('chev')}</a>`;
 const logoutButton = () => inTg ? '' : '<button class="btn ghost" data-a="logout">Выйти</button>';
 
@@ -1708,7 +1742,12 @@ function staffInvites(invites) {
     <div class="org-list">${invites === null ? '<p class="mut">Не удалось загрузить приглашения</p>' : active.length ? active.map(i => `
       <article class="org-admin-card"><b>${esc(ROLE[i.role])}</b>
         <p class="mut">Использовано ${esc(i.used_count)} из ${esc(i.max_uses)} · до ${esc(sdate(i.expires_at))}</p>
-        <div class="org-actions"><button class="btn ghost" data-a="inviterevoke" data-v="${esc(i.id)}">Отозвать</button></div>
+        ${i.code ? `<code class="org-code">${esc(i.code)}</code>` : `<p class="mut">${i.role === 'manager' && !canSuper() ? 'Код доступен администратору платформы' : 'Код не сохранён. Создайте новое приглашение.'}</p>`}
+        <div class="org-actions">
+          ${i.code ? `<button class="btn ghost" data-a="invitecopy" data-v="${esc(i.code)}">Скопировать код</button>
+            <button class="btn ghost" data-a="invitecopy" data-v="${esc(invitationText(i.code))}">Скопировать приглашение</button>` : ''}
+          <button class="btn ghost" data-a="inviterevoke" data-v="${esc(i.id)}">Отозвать</button>
+        </div>
       </article>`).join('') : '<p class="mut">Активных приглашений нет</p>'}</div>
   </section>`;
 }
@@ -1725,13 +1764,24 @@ function inviteSheet() {
   </form>`);
 }
 
-function inviteCodeSheet(invite) {
+function inviteTelegramLink(code) {
   const username = String(CFG.bot_username || '').replace(/^@/, '');
-  const link = /^[A-Za-z0-9_]+$/.test(username) ? `https://t.me/${username}?startapp=inv_${encodeURIComponent(invite.code)}` : '';
+  return /^[A-Za-z0-9_]+$/.test(username) ? `https://t.me/${username}?startapp=inv_${encodeURIComponent(code)}` : '';
+}
+
+function invitationText(code) {
+  const link = inviteTelegramLink(code);
+  return [`Приглашение в «${orgName()}»`, `Код приглашения: ${code}`,
+    `Вход с ПК: ${location.origin}`, link && `Вход через Telegram: ${link}`].filter(Boolean).join('\n');
+}
+
+function inviteCodeSheet(invite) {
+  const link = inviteTelegramLink(invite.code);
   sheet(`<h3>Код приглашения</h3>
     <p class="mut">${esc(ROLE[invite.role] || invite.role)} · действует до ${esc(sdate(invite.expires_at))}</p>
     <output class="org-code" id="issued-code">${esc(invite.code)}</output>
     <button class="btn" data-a="invitecopy">Скопировать код</button>
+    <button class="btn ghost" data-a="invitecopy" data-v="${esc(invitationText(invite.code))}">Скопировать приглашение</button>
     <p class="mut sm org-check">Отправьте код сотруднику. Его можно ввести на экране входа по приглашению.</p>
     ${link ? `<button class="btn ghost" data-a="invitecopy" data-v="${esc(link)}">Скопировать ссылку Telegram</button>` : ''}`);
 }
@@ -1744,12 +1794,16 @@ async function copyInvite(text) {
     catch {}
   }
   const field = document.createElement('textarea');
+  const focused = document.activeElement;
   field.value = value;
-  $('#sb').append(field);
+  field.readOnly = true;
+  field.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+  document.body.append(field);
+  field.focus({preventScroll:true});
   field.select();
   let copied;
   try { copied = document.execCommand('copy'); }
-  finally { field.remove(); }
+  finally { field.remove(); focused?.focus({preventScroll:true}); }
   toast(copied ? 'Скопировано' : 'Выделите и скопируйте код вручную', copied ? 'ok' : 'err');
 }
 
@@ -2085,6 +2139,8 @@ const fe = (k, scope = document) => $(`input[data-k="${k}"],select[data-k="${k}"
 const fval = (f, x) => (f.m && MEM[f.k] != null) ? MEM[f.k] : (x ?? f.v ?? '');
 function fld(f, id = '') {
   let c;
+  const quick = Object.hasOwn(CONTRACTOR_TYPES, f.src);
+  if (quick && !id) id = 'form-' + f.k;
   const attr = id ? ` id="${id}"` : '';
   if (f.t === 'sel') c = `<div class="sel"><select${attr} data-k="${f.k}">${(f.o || []).map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select></div>`;
   else if (f.t === 'num') c = `<div class="num"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="-1" aria-label="Меньше">${ic('minus')}</button><input${attr} data-k="${f.k}" inputmode="decimal" value="${esc(fval(f))}"><button type="button" class="rip" data-a="st" data-k="${f.k}" data-v="1" aria-label="Больше">${ic('plus')}</button></div>`;
@@ -2092,7 +2148,9 @@ function fld(f, id = '') {
   else if (f.t === 'txt') c = `<input${attr} data-k="${f.k}" value="${esc(fval(f))}" placeholder="${esc(f.ph || '')}" autocomplete="off">`;
   else c = '';
   const ch = f.c ? `<div class="chips">${f.c.map(x => `<button type="button" class="chip rip" data-a="${f.t === 'pre' ? 'size' : 'chip'}" data-k="${f.k}" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : '';
-  return `${f.h ? `<h3 class="fs">${f.h}</h3>` : ''}<div class="fld${f.half ? ' half' : ''}"><label${id ? ` for="${id}"` : ''}>${f.l}</label>${c}${ch}</div>`;
+  const label = `<label${id ? ` for="${id}"` : ''}>${f.l}</label>`;
+  const heading = quick ? `<div class="quickcon-label">${label}<button type="button" class="lnk quickcon-trigger" data-a="quickcon" data-k="${f.k}" aria-label="Новый контрагент: ${f.l}" aria-expanded="false" disabled>+ Новый</button></div>` : label;
+  return `${f.h ? `<h3 class="fs">${f.h}</h3>` : ''}<div class="fld${f.half ? ' half' : ''}">${heading}${c}${ch}</div>`;
 }
 function readFields(fields, scope = document, strict = false) {
   const v = {};
@@ -2116,6 +2174,62 @@ function fillSelect(f, scope, want) {
   const el = fe(f.k, scope), options = SRC[f.src]();
   el.innerHTML = options.length ? options.map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join('') : '<option value="">Нет данных</option>';
   if (want != null && options.some(([id]) => String(id) === String(want))) el.value = want;
+}
+function closeQuickContractor(form) {
+  const trigger = $(`[data-a="quickcon"][data-k="${form.dataset.quickcon}"]`, form.parentElement);
+  form.remove();
+  trigger.setAttribute('aria-expanded', 'false');
+  return trigger;
+}
+function openQuickContractor(trigger) {
+  const fields = trigger.closest('.fgrid');
+  const field = FORMS[FK]?.f.find(f => f.k === trigger.dataset.k);
+  if (!fields || !field || !Object.hasOwn(CONTRACTOR_TYPES, field.src)) return;
+  const current = $('.quickcon-edit', fields);
+  if (current && $('button[type="submit"]', current).disabled) return;
+  if (current && closeQuickContractor(current) === trigger) return;
+  const anchors = $$('[data-a="quickcon"]', fields);
+  anchors.at(-1).closest('.fld').insertAdjacentHTML('afterend', `<form class="quickcon-edit" data-quickcon="${field.k}">
+    <b>${field.l}</b><div class="fld"><label for="quickcon-name">Название</label><input id="quickcon-name" name="name" autocomplete="off" maxlength="100" required></div>
+    <div class="two"><button type="button" class="btn ghost" data-a="quickconclose">Отмена</button><button class="btn" type="submit">Добавить</button></div>
+  </form>`);
+  trigger.setAttribute('aria-expanded', 'true');
+  $('#quickcon-name', fields).focus();
+}
+async function saveQuickContractor(form) {
+  const fields = form.parentElement;
+  const field = FORMS[FK]?.f.find(f => f.k === form.dataset.quickcon);
+  const type = CONTRACTOR_TYPES[field?.src];
+  const submit = $('button[type="submit"]', form);
+  if (!type || submit.disabled) return;
+  const input = $('#quickcon-name', form);
+  const name = input.value.trim().replace(/\s+/g, ' ');
+  if ([...name].length < 2) { input.focus(); toast('Название: от 2 символов', 'err'); return; }
+  const mainSubmit = $('#ok');
+  submit.disabled = true;
+  input.readOnly = true;
+  mainSubmit.disabled = true;
+  const cancel = $('[data-a="quickconclose"]', form);
+  cancel.disabled = true;
+  try {
+    const contractor = await api('/contractors', {method: 'POST', body: JSON.stringify({name, [type]: true})});
+    D.cl = D.cl.filter(c => c.id !== contractor.id);
+    D.cl.push(contractor);
+    D.con[contractor.id] = contractor.name;
+    if (!form.isConnected) return;
+    fillSelect(field, fields, contractor.id);
+    closeQuickContractor(form);
+    fe(field.k, fields).focus();
+    calcForm();
+    notify('success');
+    toast('Контрагент добавлен');
+  } catch (error) { reportError(error); }
+  finally {
+    submit.disabled = false;
+    cancel.disabled = false;
+    input.readOnly = false;
+    if (fields.isConnected) mainSubmit.disabled = false;
+  }
 }
 function updateLogRow(row, field) {
   const input = fe('vol', row), {len, dia, cnt} = readFields(FORM_ROWS.log.fields, row, true);
@@ -2199,6 +2313,7 @@ async function vForm(kind, p = {}) {
       }
     } else fillSelect(f, target, p[f.k] ?? (f.m ? MEM[f.k] : null));
   });
+  $$('[data-a="quickcon"]', fields).forEach(button => button.disabled = false);
   if (F.rows) {
     $('.form-row-tools', target).innerHTML = Object.entries(F.rows).map(([type, label]) =>
       `<button type="button" class="btn ghost" data-a="addrow" data-v="${type}">${label}</button>`).join('');
@@ -2411,6 +2526,8 @@ ${(o.firewood_items||[]).map(p=>`<div class="dl"><span>${esc(FW_NAMES[p.kind])}<
       catch (e) { if (e === staleRequest) return; notify('error'); toast(e.message, 'err'); }
     });
   },
+  quickcon: (_, button) => openQuickContractor(button),
+  quickconclose: (_, button) => closeQuickContractor(button.form).focus(),
   cedit: v => {
     const c = v === 'new' ? {id: 0, name: '', is_supplier: true, is_carrier: false, is_client: false, is_active: true} : D.cl.find(x => x.id == v);
     if (!c) return;
@@ -2599,6 +2716,11 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('submit', async e => {
   const form = e.target;
+  if (form.matches('.quickcon-edit')) {
+    e.preventDefault();
+    await saveQuickContractor(form);
+    return;
+  }
   if (form.id === 'login-form') {
     e.preventDefault();
     await login();

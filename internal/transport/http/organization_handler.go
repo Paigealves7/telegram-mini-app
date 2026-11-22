@@ -41,12 +41,8 @@ func (h OrganizationHandler) issueInvite(ctx context.Context, orgID, actorID int
 	for i, b := range code {
 		code[i] = inviteAlphabet[int(b)%len(inviteAlphabet)]
 	}
-	invite, err := h.repo.CreateInvite(ctx, orgID, inviteHash(string(code[:])), role, maxUses, time.Now().AddDate(0, 0, days), actorID)
-	if err != nil {
-		return nil, err
-	}
-	invite.Code = string(code[:])
-	return invite, nil
+	plainCode := string(code[:])
+	return h.repo.CreateInvite(ctx, orgID, inviteHash(plainCode), role, maxUses, time.Now().AddDate(0, 0, days), actorID, plainCode)
 }
 
 func (h OrganizationHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +75,8 @@ func (h OrganizationHandler) AcceptInvite(w http.ResponseWriter, r *http.Request
 
 func (h OrganizationHandler) ListInvites(w http.ResponseWriter, r *http.Request) {
 	if orgID, ok := requireOrgID(w, r); ok {
-		h.listInvites(w, r, orgID)
+		actor, _ := currentUser(r)
+		h.listInvites(w, r, orgID, actor.IsSuperAdmin)
 	}
 }
 
@@ -92,10 +89,10 @@ func (h OrganizationHandler) ListAdminInvites(w http.ResponseWriter, r *http.Req
 		adminResult(w, r, "не удалось получить организацию", err)
 		return
 	}
-	h.listInvites(w, r, orgID)
+	h.listInvites(w, r, orgID, true)
 }
 
-func (h OrganizationHandler) listInvites(w http.ResponseWriter, r *http.Request, orgID int64) {
+func (h OrganizationHandler) listInvites(w http.ResponseWriter, r *http.Request, orgID int64, canIssueManagerInvite bool) {
 	invites, err := h.repo.ListOrganizationInvites(r.Context(), orgID)
 	if err != nil {
 		serverError(w, r, "не удалось получить приглашения", err)
@@ -104,6 +101,14 @@ func (h OrganizationHandler) listInvites(w http.ResponseWriter, r *http.Request,
 	if invites == nil {
 		invites = []domain.OrganizationInvite{}
 	}
+	if !canIssueManagerInvite {
+		for i := range invites {
+			if invites[i].Role == domain.RoleManager {
+				invites[i].Code = ""
+			}
+		}
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	pdfWriteJSON(w, http.StatusOK, invites)
 }
 
@@ -153,6 +158,7 @@ func (h OrganizationHandler) createInvite(w http.ResponseWriter, r *http.Request
 		adminResult(w, r, "не удалось создать приглашение", err)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	pdfWriteJSON(w, http.StatusCreated, invite)
 }
 
@@ -241,6 +247,7 @@ func (h OrganizationHandler) Create(w http.ResponseWriter, r *http.Request) {
 			out["manager_invite_error"] = "организация создана, создайте приглашение руководителя отдельно"
 		} else {
 			out["manager_invite"] = invite
+			w.Header().Set("Cache-Control", "no-store")
 		}
 	}
 	pdfWriteJSON(w, http.StatusCreated, out)
