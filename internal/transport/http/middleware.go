@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 
@@ -127,6 +129,9 @@ type organizationOption struct {
 	IsDemo      bool        `json:"is_demo"`
 	IsActive    bool        `json:"is_active"`
 	Role        domain.Role `json:"role"`
+	PaidUntil   *time.Time  `json:"paid_until"`
+	IsExpired   bool        `json:"is_expired"`
+	DaysLeft    *int        `json:"days_left,omitempty"`
 }
 
 func availableOrganizations(ctx context.Context, repo *repository.Repository, claims *Claims) ([]organizationOption, error) {
@@ -137,7 +142,10 @@ func availableOrganizations(ctx context.Context, repo *repository.Repository, cl
 	options := make([]organizationOption, 0, len(memberships))
 	if !claims.IsSuperAdmin {
 		for _, m := range memberships {
-			options = append(options, organizationOption{m.OrganizationID, m.Name, m.CompanyInfo, m.IsDemo, m.IsActive, m.Role})
+			options = append(options, organizationOption{
+				ID: m.OrganizationID, Name: m.Name, CompanyInfo: m.CompanyInfo,
+				IsDemo: m.IsDemo, IsActive: m.IsActive, Role: m.Role, PaidUntil: m.PaidUntil,
+			})
 		}
 		return options, nil
 	}
@@ -154,7 +162,10 @@ func availableOrganizations(ctx context.Context, repo *repository.Repository, cl
 		if role == "" {
 			role = domain.RoleManager
 		}
-		options = append(options, organizationOption{org.ID, org.Name, org.CompanyInfo, org.IsDemo, org.IsActive, role})
+		options = append(options, organizationOption{
+			ID: org.ID, Name: org.Name, CompanyInfo: org.CompanyInfo,
+			IsDemo: org.IsDemo, IsActive: org.IsActive, Role: role, PaidUntil: org.PaidUntil,
+		})
 	}
 	return options, nil
 }
@@ -202,6 +213,10 @@ func ResolveOrganization(repo *repository.Repository) func(http.Handler) http.Ha
 				http.Error(w, message, status)
 				return
 			}
+			if !claims.IsSuperAdmin && org.PaidUntil != nil && org.PaidUntil.Before(time.Now()) && requiresActiveSubscription(r) {
+				http.Error(w, "Срок подписки вашей лесопилки истёк. Просмотр склада, заказов и скачивание накладных доступны, а создание новых записей откроется после продления подписки.", http.StatusPaymentRequired)
+				return
+			}
 			if claims.IsSuperAdmin && len(r.Header.Values("X-Organization-ID")) > 0 {
 				organization, err := repo.GetOrganizationByID(r.Context(), org.ID)
 				if errors.Is(err, repository.ErrOrganizationNotFound) {
@@ -219,4 +234,23 @@ func ResolveOrganization(repo *repository.Repository) func(http.Handler) http.Ha
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), UserContextKey, &scoped)))
 		})
 	}
+}
+
+func requiresActiveSubscription(r *http.Request) bool {
+	if strings.HasPrefix(r.URL.Path, "/api/v1/admin/") {
+		return false
+	}
+	switch r.Method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return false
+	case http.MethodPost:
+		// Выдача подписанной ссылки не изменяет данные организации.
+		if rest, ok := strings.CutPrefix(r.URL.Path, "/api/v1/orders/"); ok {
+			if id, ok := strings.CutSuffix(rest, "/pdf/link"); ok {
+				number, err := strconv.ParseInt(id, 10, 64)
+				return err != nil || number <= 0
+			}
+		}
+	}
+	return true
 }

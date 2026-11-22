@@ -202,29 +202,34 @@ func (r *Repository) CreateLogArrival(ctx context.Context, orgID int64, arrival 
 	}
 	defer tx.Rollback(ctx)
 
-	arrivalQuery := `
-		INSERT INTO log_arrivals (organization_id, supplier_id, carrier_id, truck_number, arrival_date, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`
-	err = tx.QueryRow(ctx, arrivalQuery, orgID, arrival.SupplierID, arrival.CarrierID, arrival.TruckNumber, arrival.ArrivalDate, arrival.CreatedBy).Scan(&arrival.ID, &arrival.CreatedAt)
-	if err != nil {
+	if err := createLogArrivalTx(ctx, tx, orgID, arrival, grouped); err != nil {
 		return nil, err
-	}
-
-	itemQuery := `INSERT INTO log_items (organization_id, arrival_id, length_mm, diameter_mm, species, count, volume_m3) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
-	for i := range grouped {
-		item := &grouped[i]
-		item.ArrivalID = arrival.ID
-		item.VolumeM3 = round3(item.VolumeM3)
-		err := tx.QueryRow(ctx, itemQuery, orgID, arrival.ID, item.LengthMM, item.DiameterMM, item.Species, item.Count, item.VolumeM3).Scan(&item.ID)
-		if err != nil {
-			return nil, err
-		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	arrival.Items = grouped
 	return arrival, nil
+}
+
+func createLogArrivalTx(ctx context.Context, tx pgx.Tx, orgID int64, arrival *domain.LogArrival, items []domain.LogItem) error {
+	arrivalQuery := `
+		INSERT INTO log_arrivals (organization_id, supplier_id, carrier_id, truck_number, arrival_date, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`
+	if err := tx.QueryRow(ctx, arrivalQuery, orgID, arrival.SupplierID, arrival.CarrierID, arrival.TruckNumber, arrival.ArrivalDate, arrival.CreatedBy).Scan(&arrival.ID, &arrival.CreatedAt); err != nil {
+		return err
+	}
+
+	itemQuery := `INSERT INTO log_items (organization_id, arrival_id, length_mm, diameter_mm, species, count, volume_m3) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	for i := range items {
+		item := &items[i]
+		item.ArrivalID = arrival.ID
+		item.VolumeM3 = round3(item.VolumeM3)
+		if err := tx.QueryRow(ctx, itemQuery, orgID, arrival.ID, item.LengthMM, item.DiameterMM, item.Species, item.Count, item.VolumeM3).Scan(&item.ID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Repository) CreateSawingOperation(ctx context.Context, orgID int64, op *domain.SawingOperation, sawedLogs []domain.SawedLog, producedBoards []domain.Board) (*domain.SawingOperation, error) {
@@ -245,10 +250,21 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, orgID int64, op 
 	}
 	defer tx.Rollback(ctx)
 
-	sawingQuery := `INSERT INTO sawing_operations (organization_id, worker_id, date) VALUES ($1, $2, $3) RETURNING id, created_at`
-	err = tx.QueryRow(ctx, sawingQuery, orgID, op.WorkerID, op.Date).Scan(&op.ID, &op.CreatedAt)
-	if err != nil {
+	if err := createSawingOperationTx(ctx, tx, orgID, op, sawedLogs, producedBoards); err != nil {
 		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	op.Logs = sawedLogs
+	op.Boards = producedBoards
+	return op, nil
+}
+
+func createSawingOperationTx(ctx context.Context, tx pgx.Tx, orgID int64, op *domain.SawingOperation, sawedLogs []domain.SawedLog, producedBoards []domain.Board) error {
+	sawingQuery := `INSERT INTO sawing_operations (organization_id, worker_id, date) VALUES ($1, $2, $3) RETURNING id, created_at`
+	if err := tx.QueryRow(ctx, sawingQuery, orgID, op.WorkerID, op.Date).Scan(&op.ID, &op.CreatedAt); err != nil {
+		return err
 	}
 
 	logQuery := `INSERT INTO sawed_logs (organization_id, sawing_id, log_id, volume_m3, consumed_count, consumed_volume_m3)
@@ -256,12 +272,12 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, orgID int64, op 
 	logIDs := make([]int64, 0, len(sawedLogs))
 	for _, item := range sawedLogs {
 		if item.LogID == nil {
-			return nil, ErrLogNotFound
+			return ErrLogNotFound
 		}
 		logIDs = append(logIDs, *item.LogID)
 	}
 	if _, err := tx.Exec(ctx, `SELECT id FROM log_items WHERE organization_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE`, orgID, logIDs); err != nil {
-		return nil, err
+		return err
 	}
 	for i := range sawedLogs {
 		logID := *sawedLogs[i].LogID
@@ -271,22 +287,22 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, orgID int64, op 
 		err := tx.QueryRow(ctx, `SELECT remaining_volume_m3, remaining_count FROM log_items WHERE organization_id = $1 AND id = $2`, orgID, logID).Scan(&remVol, &remCount)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, ErrLogNotFound
+				return ErrLogNotFound
 			}
-			return nil, err
+			return err
 		}
 		newVol, newCount, err := consumeLog(remVol, remCount, sawedLogs[i].VolumeM3)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE log_items SET remaining_volume_m3 = $2, remaining_count = $3 WHERE organization_id = $1 AND id = $4`, orgID, newVol, newCount, logID); err != nil {
-			return nil, err
+			return err
 		}
 
 		sawedLogs[i].SawingID = op.ID
 		err = tx.QueryRow(ctx, logQuery, orgID, op.ID, logID, sawedLogs[i].VolumeM3, remCount-newCount, round3(remVol-newVol)).Scan(&sawedLogs[i].ID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -294,15 +310,10 @@ func (r *Repository) CreateSawingOperation(ctx context.Context, orgID int64, op 
 	for i := range producedBoards {
 		err := tx.QueryRow(ctx, boardQuery, orgID, producedBoards[i].HeightMM, producedBoards[i].WidthMM, producedBoards[i].LengthMM, producedBoards[i].Species, producedBoards[i].Grade, producedBoards[i].Count, producedBoards[i].VolumeM3, producedBoards[i].PricePerM3, op.ID).Scan(&producedBoards[i].ID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
-	op.Logs = sawedLogs
-	op.Boards = producedBoards
-	return op, nil
+	return nil
 }
 
 const sawingVolumeTolerance = 0.0005 // Допуск на округление объёма до трёх знаков.
@@ -477,8 +488,19 @@ func (r *Repository) CompleteOrder(ctx context.Context, orgID int64, orderID, us
 	}
 	defer tx.Rollback(ctx)
 
+	order, err := r.completeOrderTx(ctx, tx, orgID, orderID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return order, nil
+}
+
+func (r *Repository) completeOrderTx(ctx context.Context, tx pgx.Tx, orgID, orderID, userID int64) (*domain.Order, error) {
 	var o domain.Order
-	err = tx.QueryRow(ctx, `SELECT id, order_number, COALESCE(master_id,0), contractor_id, COALESCE(notes,''), delivery_price, extra_price, status, created_at, updated_at FROM orders WHERE organization_id = $1 AND id = $2 FOR UPDATE`, orgID, orderID).
+	err := tx.QueryRow(ctx, `SELECT id, order_number, COALESCE(master_id,0), contractor_id, COALESCE(notes,''), delivery_price, extra_price, status, created_at, updated_at FROM orders WHERE organization_id = $1 AND id = $2 FOR UPDATE`, orgID, orderID).
 		Scan(&o.ID, &o.OrderNumber, &o.MasterID, &o.ContractorID, &o.Notes, &o.DeliveryPrice, &o.ExtraPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -544,9 +566,6 @@ func (r *Repository) CompleteOrder(ctx context.Context, orgID int64, orderID, us
 	if _, err := tx.Exec(ctx, `UPDATE orders SET status = $2, updated_at = NOW() WHERE organization_id = $1 AND id = $3`, orgID, domain.OrderStatusCompleted, orderID); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
 	o.Status = domain.OrderStatusCompleted
 	return &o, nil
 }
@@ -595,10 +614,20 @@ func (r *Repository) CreateOrder(ctx context.Context, orgID int64, order *domain
 		}
 	}
 
-	orderQuery := `INSERT INTO orders (organization_id, order_number, master_id, contractor_id, notes, delivery_price, extra_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at`
-	err = tx.QueryRow(ctx, orderQuery, orgID, order.OrderNumber, order.MasterID, order.ContractorID, order.Notes, order.DeliveryPrice, order.ExtraPrice, order.Status).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
-	if err != nil {
+	if err := createOrderTx(ctx, tx, orgID, order, items); err != nil {
 		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	order.Items = items
+	return order, nil
+}
+
+func createOrderTx(ctx context.Context, tx pgx.Tx, orgID int64, order *domain.Order, items []domain.OrderItem) error {
+	orderQuery := `INSERT INTO orders (organization_id, order_number, master_id, contractor_id, notes, delivery_price, extra_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at`
+	if err := tx.QueryRow(ctx, orderQuery, orgID, order.OrderNumber, order.MasterID, order.ContractorID, order.Notes, order.DeliveryPrice, order.ExtraPrice, order.Status).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt); err != nil {
+		return err
 	}
 
 	itemQuery := `INSERT INTO order_boards (organization_id, order_id, board_id, count, volume_m3, price) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
@@ -609,14 +638,14 @@ func (r *Repository) CreateOrder(ctx context.Context, orgID int64, order *domain
 		err := tx.QueryRow(ctx, `SELECT count, volume_m3 FROM boards WHERE organization_id = $1 AND id = $2`, orgID, boardID).Scan(&stock.count, &stock.volume)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, ErrBoardNotFound
+				return ErrBoardNotFound
 			}
-			return nil, err
+			return err
 		}
 		boardStocks[boardID] = stock
 	}
 	if err := validateOrderStock(requestedByBoard, boardStocks); err != nil {
-		return nil, err
+		return err
 	}
 
 	for i := range items {
@@ -625,26 +654,21 @@ func (r *Repository) CreateOrder(ctx context.Context, orgID int64, order *domain
 		items[i].VolumeM3 = domain.ItemVolume(stock.count, stock.volume, items[i].Count)
 
 		items[i].OrderID = order.ID
-		err = tx.QueryRow(ctx, itemQuery, orgID, order.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID)
-		if err != nil {
-			return nil, err
+		if err := tx.QueryRow(ctx, itemQuery, orgID, order.ID, items[i].BoardID, items[i].Count, items[i].VolumeM3, items[i].Price).Scan(&items[i].ID); err != nil {
+			return err
 		}
 	}
-	if err = checkFirewoodOrderStock(ctx, tx, orgID, order.FirewoodItems); err != nil {
-		return nil, err
+	if err := checkFirewoodOrderStock(ctx, tx, orgID, order.FirewoodItems); err != nil {
+		return err
 	}
 	for i := range order.FirewoodItems {
 		p := &order.FirewoodItems[i]
 		p.Price = domain.Round2(p.Price)
-		if _, err = tx.Exec(ctx, `INSERT INTO order_firewood(organization_id, order_id,kind,volume_m3,price) VALUES($1, $2,$3,$4,$5)`, orgID, order.ID, p.Kind, p.VolumeM3, p.Price); err != nil {
-			return nil, err
+		if _, err := tx.Exec(ctx, `INSERT INTO order_firewood(organization_id, order_id,kind,volume_m3,price) VALUES($1, $2,$3,$4,$5)`, orgID, order.ID, p.Kind, p.VolumeM3, p.Price); err != nil {
+			return err
 		}
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
-	order.Items = items
-	return order, nil
+	return nil
 }
 
 func (r *Repository) GetOrders(ctx context.Context, orgID int64, limit, offset int) ([]domain.Order, error) {

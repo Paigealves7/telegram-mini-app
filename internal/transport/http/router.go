@@ -170,6 +170,8 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			adminOrganizations.Get("/admin/organizations", organizations.List)
 			adminOrganizations.Post("/admin/organizations", organizations.Create)
 			adminOrganizations.Put("/admin/organizations/{id}", organizations.Update)
+			adminOrganizations.Post("/admin/organizations/{id}/subscription", organizations.UpdateSubscription)
+			adminOrganizations.Post("/admin/organizations/{id}/seed-demo", organizations.SeedDemo)
 			adminOrganizations.Get("/admin/organizations/{id}/invites", organizations.ListAdminInvites)
 			adminOrganizations.Post("/admin/organizations/{id}/invites", organizations.CreateAdminInvite)
 			adminOrganizations.Delete("/admin/organizations/{id}/invites/{inviteID}", organizations.RevokeAdminInvite)

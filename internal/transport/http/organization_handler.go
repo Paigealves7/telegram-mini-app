@@ -196,7 +196,60 @@ func writeInviteRevocation(w http.ResponseWriter, r *http.Request, revoked bool,
 	adminResult(w, r, "не удалось отозвать приглашение", err)
 }
 
+type subscriptionRequest struct {
+	PaidUntil      json.RawMessage `json:"paid_until"`
+	ExtendDays     *int            `json:"extend_days"`
+	ClearPaidUntil bool            `json:"clear_paid_until"`
+}
+
+func (req subscriptionRequest) change() ([]domain.SubscriptionChange, error) {
+	actions := 0
+	if req.PaidUntil != nil {
+		actions++
+	}
+	if req.ExtendDays != nil {
+		actions++
+	}
+	if req.ClearPaidUntil {
+		actions++
+	}
+	if actions > 1 {
+		return nil, errors.New("выберите одно действие для подписки")
+	}
+	if actions == 0 {
+		return nil, nil
+	}
+	var change domain.SubscriptionChange
+	switch {
+	case req.ExtendDays != nil:
+		switch *req.ExtendDays {
+		case 0, 7, 30:
+			change.ExtendDays = *req.ExtendDays
+		default:
+			return nil, errors.New("для продления укажите 7 или 30 дней, для бессрочной подписки — 0")
+		}
+	case req.PaidUntil != nil:
+		var value *string
+		if err := json.Unmarshal(req.PaidUntil, &value); err != nil {
+			return nil, errors.New("укажите дату окончания подписки в формате ГГГГ-ММ-ДД или RFC3339")
+		}
+		if value != nil {
+			date, err := time.Parse(time.RFC3339, *value)
+			if err != nil {
+				date, err = time.Parse(time.DateOnly, *value)
+				if err != nil {
+					return nil, errors.New("укажите дату окончания подписки в формате ГГГГ-ММ-ДД или RFC3339")
+				}
+				date = date.AddDate(0, 0, 1).Add(-time.Microsecond)
+			}
+			change.PaidUntil = &date
+		}
+	}
+	return []domain.SubscriptionChange{change}, nil
+}
+
 type organizationRequest struct {
+	subscriptionRequest
 	Name                string `json:"name"`
 	CompanyInfo         string `json:"company_info"`
 	IsDemo              bool   `json:"is_demo"`
@@ -233,7 +286,12 @@ func (h OrganizationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	org, err := h.repo.CreateOrganization(r.Context(), req.Name, req.CompanyInfo, req.IsDemo)
+	subscription, err := req.change()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	org, err := h.repo.CreateOrganization(r.Context(), req.Name, req.CompanyInfo, req.IsDemo, subscription...)
 	if err != nil {
 		serverError(w, r, "не удалось создать организацию", err)
 		return
@@ -266,12 +324,64 @@ func (h OrganizationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "укажите, активна ли организация", http.StatusBadRequest)
 		return
 	}
-	org, err := h.repo.UpdateOrganization(r.Context(), id, req.Name, req.CompanyInfo, req.IsDemo, *req.IsActive)
+	subscription, err := req.change()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	org, err := h.repo.UpdateOrganization(r.Context(), id, req.Name, req.CompanyInfo, req.IsDemo, *req.IsActive, subscription...)
 	if err != nil {
 		adminResult(w, r, "не удалось обновить организацию", err)
 		return
 	}
 	pdfWriteJSON(w, http.StatusOK, org)
+}
+
+func (h OrganizationHandler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
+	id, ok := adminID(w, r)
+	if !ok {
+		return
+	}
+	var req subscriptionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "некорректное тело запроса", http.StatusBadRequest)
+		return
+	}
+	changes, err := req.change()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(changes) == 0 {
+		http.Error(w, "выберите действие для подписки", http.StatusBadRequest)
+		return
+	}
+	change := changes[0]
+	var org *domain.Organization
+	if change.ExtendDays > 0 {
+		org, err = h.repo.ExtendOrganizationSubscriptionDays(r.Context(), id, change.ExtendDays)
+	} else {
+		org, err = h.repo.ExtendOrganizationSubscription(r.Context(), id, change.PaidUntil)
+	}
+	if err != nil {
+		adminResult(w, r, "не удалось обновить подписку", err)
+		return
+	}
+	pdfWriteJSON(w, http.StatusOK, org)
+}
+
+func (h OrganizationHandler) SeedDemo(w http.ResponseWriter, r *http.Request) {
+	id, ok := adminID(w, r)
+	if !ok {
+		return
+	}
+	actor, _ := currentUser(r)
+	err := h.repo.SeedDemoData(r.Context(), id, actor.UserID)
+	if errors.Is(err, repository.ErrResetNotDemo) {
+		http.Error(w, "загрузка демо-примера доступна только для демонстрационной организации", http.StatusConflict)
+		return
+	}
+	adminResult(w, r, "не удалось загрузить демо-пример", err)
 }
 
 func (h OrganizationHandler) Reset(w http.ResponseWriter, r *http.Request) {

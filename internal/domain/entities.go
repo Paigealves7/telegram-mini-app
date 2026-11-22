@@ -26,13 +26,23 @@ const (
 )
 
 type Organization struct {
-	ID              int64     `json:"id"`
-	Name            string    `json:"name"`
-	CompanyInfo     string    `json:"company_info"`
-	IsDemo          bool      `json:"is_demo"`
-	IsActive        bool      `json:"is_active"`
-	LastOrderNumber int64     `json:"last_order_number"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID              int64      `json:"id"`
+	Name            string     `json:"name"`
+	CompanyInfo     string     `json:"company_info"`
+	IsDemo          bool       `json:"is_demo"`
+	IsActive        bool       `json:"is_active"`
+	LastOrderNumber int64      `json:"last_order_number"`
+	CreatedAt       time.Time  `json:"created_at"`
+	PaidUntil       *time.Time `json:"paid_until,omitempty"`
+}
+
+func (o Organization) IsExpired() bool {
+	return o.PaidUntil != nil && o.PaidUntil.Before(time.Now())
+}
+
+type SubscriptionChange struct {
+	PaidUntil  *time.Time
+	ExtendDays int
 }
 
 type OrganizationStats struct {
@@ -59,12 +69,17 @@ type PlatformOverview struct {
 }
 
 type UserOrganization struct {
-	OrganizationID int64  `json:"organization_id"`
-	Name           string `json:"name"`
-	CompanyInfo    string `json:"company_info"`
-	IsDemo         bool   `json:"is_demo"`
-	IsActive       bool   `json:"is_active"`
-	Role           Role   `json:"role"`
+	OrganizationID int64      `json:"organization_id"`
+	Name           string     `json:"name"`
+	CompanyInfo    string     `json:"company_info"`
+	IsDemo         bool       `json:"is_demo"`
+	IsActive       bool       `json:"is_active"`
+	Role           Role       `json:"role"`
+	PaidUntil      *time.Time `json:"paid_until,omitempty"`
+}
+
+func (o UserOrganization) IsExpired() bool {
+	return o.PaidUntil != nil && o.PaidUntil.Before(time.Now())
 }
 
 type OrganizationInvite struct {

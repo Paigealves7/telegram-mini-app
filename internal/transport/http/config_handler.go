@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
 	"telegram-mini-app/internal/domain"
 	"telegram-mini-app/internal/repository"
 )
@@ -29,6 +31,15 @@ func ConfigHandler(repo *repository.Repository) http.HandlerFunc {
 		if err != nil {
 			serverError(w, r, "не удалось получить список организаций", err)
 			return
+		}
+		now := time.Now()
+		for i := range options {
+			option := &options[i]
+			if option.PaidUntil != nil {
+				option.IsExpired = option.PaidUntil.Before(now)
+				days := int(max(0, option.PaidUntil.Sub(now)) / (24 * time.Hour))
+				option.DaysLeft = &days
+			}
 		}
 		org, _, _ := selectOrganization(r, options, user.IsSuperAdmin)
 		role, orgID := domain.Role(user.Role), int64(0)

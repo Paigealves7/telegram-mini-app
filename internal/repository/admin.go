@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"telegram-mini-app/internal/domain"
 
@@ -23,25 +24,135 @@ func (r *Repository) ResetTestData(ctx context.Context, orgID int64) error {
 		if err != nil {
 			return err
 		}
-		if !org.IsDemo {
-			return ErrResetNotDemo
-		}
-		if err := lockFirewood(ctx, tx, orgID); err != nil {
+		if err := clearDemoOperations(ctx, tx, org); err != nil {
 			return err
-		}
-		tables := []string{
-			"order_payments", "order_boards", "order_firewood", "sale_boards", "sales", "orders",
-			"sawed_logs", "boards", "sawing_operations", "log_items", "log_arrivals",
-			"firewood_processing", "firewood_arrivals", "stock_adjustments", "firewood_stock_adjustments",
-		}
-		for _, table := range tables {
-			if _, err := tx.Exec(ctx, "DELETE FROM "+table+" WHERE organization_id = $1", orgID); err != nil {
-				return err
-			}
 		}
 		_, err = tx.Exec(ctx, `UPDATE organizations SET last_order_number = 0 WHERE id = $1`, orgID)
 		return err
 	})
+}
+
+func clearDemoOperations(ctx context.Context, tx pgx.Tx, org *domain.Organization) error {
+	if !org.IsDemo {
+		return ErrResetNotDemo
+	}
+	if err := lockFirewood(ctx, tx, org.ID); err != nil {
+		return err
+	}
+	tables := []string{
+		"order_payments", "order_boards", "order_firewood", "sale_boards", "sales", "orders",
+		"sawed_logs", "boards", "sawing_operations", "log_items", "log_arrivals",
+		"firewood_processing", "firewood_arrivals", "stock_adjustments", "firewood_stock_adjustments",
+	}
+	for _, table := range tables {
+		if _, err := tx.Exec(ctx, "DELETE FROM "+table+" WHERE organization_id = $1", org.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) SeedDemoData(ctx context.Context, orgID, actorID int64) error {
+	return pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		org, err := r.lockOrgExclusive(ctx, tx, orgID)
+		if err != nil {
+			return err
+		}
+		if err := clearDemoOperations(ctx, tx, org); err != nil {
+			return err
+		}
+
+		supplier := domain.Contractor{Name: "ООО «СеверЛесЗаготовка»", IsSupplier: true}
+		carrier := domain.Contractor{Name: "ИП Морозов А.В. (Лесовозы)", IsCarrier: true}
+		builder := domain.Contractor{Name: "СК «УютСтрой»", IsClient: true}
+		store := domain.Contractor{Name: "База стройматериалов «Кедр»", IsClient: true}
+		for _, contractor := range []*domain.Contractor{&supplier, &carrier, &builder, &store} {
+			err := tx.QueryRow(ctx, `INSERT INTO contractors (organization_id, name, is_supplier, is_carrier, is_client)
+				VALUES ($1, $2, $3, $4, $5)
+				ON CONFLICT (organization_id, name) DO UPDATE SET
+					is_supplier = contractors.is_supplier OR EXCLUDED.is_supplier,
+					is_carrier = contractors.is_carrier OR EXCLUDED.is_carrier,
+					is_client = contractors.is_client OR EXCLUDED.is_client,
+					is_active = TRUE
+				RETURNING id`, orgID, contractor.Name, contractor.IsSupplier, contractor.IsCarrier, contractor.IsClient).Scan(&contractor.ID)
+			if err != nil {
+				return err
+			}
+		}
+
+		boards, err := seedDemoProduction(ctx, tx, orgID, actorID, supplier.ID, carrier.ID)
+		if err != nil {
+			return err
+		}
+		first := domain.Order{OrderNumber: 1, MasterID: actorID, ContractorID: builder.ID, DeliveryPrice: 2500,
+			Status: domain.OrderStatusInProgress, FirewoodItems: []domain.FirewoodOrderItem{{Kind: "split", VolumeM3: 4, Price: 3200}}}
+		if err := createOrderTx(ctx, tx, orgID, &first, []domain.OrderItem{{BoardID: boards[0].ID, Count: 20, Price: *boards[0].PricePerM3}}); err != nil {
+			return err
+		}
+		if _, err := r.completeOrderTx(ctx, tx, orgID, first.ID, actorID); err != nil {
+			return err
+		}
+		if _, err := addPaymentTx(ctx, tx, orgID, first.ID, 15000, "Аванс по безналу", actorID); err != nil {
+			return err
+		}
+
+		second := domain.Order{OrderNumber: 2, MasterID: actorID, ContractorID: store.ID, Status: domain.OrderStatusInProgress}
+		if err := createOrderTx(ctx, tx, orgID, &second, []domain.OrderItem{
+			{BoardID: boards[1].ID, Count: 30, Price: *boards[1].PricePerM3},
+			{BoardID: boards[2].ID, Count: 5, Price: *boards[2].PricePerM3},
+		}); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `UPDATE organizations SET last_order_number = $2 WHERE id = $1`, orgID, second.OrderNumber)
+		return err
+	})
+}
+
+func seedDemoProduction(ctx context.Context, tx pgx.Tx, orgID, actorID, supplierID, carrierID int64) ([]domain.Board, error) {
+	now := time.Now()
+	today, yesterday := now.Format(time.DateOnly), now.AddDate(0, 0, -1).Format(time.DateOnly)
+	pine := domain.LogArrival{SupplierID: supplierID, CarrierID: carrierID, TruckNumber: "А450КХ196", ArrivalDate: yesterday, CreatedBy: actorID}
+	pineLogs := []domain.LogItem{
+		{LengthMM: 6000, DiameterMM: 220, Species: "Сосна", Count: 20, VolumeM3: 5.600},
+		{LengthMM: 6000, DiameterMM: 260, Species: "Сосна", Count: 15, VolumeM3: 5.850},
+	}
+	if err := createLogArrivalTx(ctx, tx, orgID, &pine, pineLogs); err != nil {
+		return nil, err
+	}
+	spruce := domain.LogArrival{SupplierID: supplierID, CarrierID: carrierID, TruckNumber: "В712МН196", ArrivalDate: today, CreatedBy: actorID}
+	if err := createLogArrivalTx(ctx, tx, orgID, &spruce, []domain.LogItem{
+		{LengthMM: 6000, DiameterMM: 240, Species: "Ель", Count: 12, VolumeM3: 3.960},
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := ensureFirewoodSettings(ctx, tx, orgID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO firewood_arrivals (organization_id, supplier_id, carrier_id, truck_number, volume_m3, arrival_date, created_by)
+		VALUES ($1, $2, $3, 'К805ОР196', 18, $4::date, $5)`, orgID, supplierID, carrierID, yesterday, actorID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO firewood_processing (organization_id, kind, volume_m3, coefficient, raw_m3, performer, date, comment, created_by)
+		SELECT s.organization_id, s.kind, p.volume, s.coefficient, p.volume * s.coefficient, 'Бригада переработки', $2::date, 'Берёзовые дрова', $3
+		FROM firewood_settings s JOIN (VALUES ('split', 10.000), ('round', 6.000)) AS p(kind, volume) USING (kind)
+		WHERE s.organization_id = $1`, orgID, today, actorID); err != nil {
+		return nil, err
+	}
+
+	widePrice, narrowPrice, beamPrice := 18500.0, 16000.0, 19000.0
+	boards := []domain.Board{
+		{HeightMM: 50, WidthMM: 150, LengthMM: 6000, Species: "Сосна", Grade: "1", Count: 50, VolumeM3: 2.250, PricePerM3: &widePrice},
+		{HeightMM: 25, WidthMM: 100, LengthMM: 6000, Species: "Сосна", Grade: "1", Count: 80, VolumeM3: 1.200, PricePerM3: &narrowPrice},
+		{HeightMM: 100, WidthMM: 100, LengthMM: 6000, Species: "Сосна", Grade: "1", Count: 10, VolumeM3: 0.600, PricePerM3: &beamPrice},
+	}
+	sawing := domain.SawingOperation{WorkerID: actorID, Date: today}
+	if err := createSawingOperationTx(ctx, tx, orgID, &sawing, []domain.SawedLog{
+		{LogID: &pineLogs[0].ID, VolumeM3: 5.600},
+	}, boards); err != nil {
+		return nil, err
+	}
+	return boards, nil
 }
 
 func (r *Repository) DeleteOrder(ctx context.Context, orgID int64, id int64) error {

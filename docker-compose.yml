@@ -26,6 +26,7 @@ services:
       - ./migrations/000011_pending_role.up.sql:/docker-entrypoint-initdb.d/11_pending_role.sql
       - ./migrations/000012_organizations.up.sql:/docker-entrypoint-initdb.d/12_organizations.sql
       - ./migrations/000013_invite_code.up.sql:/docker-entrypoint-initdb.d/13_invite_code.sql
+      - ./migrations/000014_subscriptions_and_demo.up.sql:/docker-entrypoint-initdb.d/14_subscriptions_and_demo.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d telegram-mini-app_db"]
       interval: 5s

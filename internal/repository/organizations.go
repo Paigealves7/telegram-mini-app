@@ -22,7 +22,7 @@ var (
 	ErrWebUserProtected               = errors.New("эта операция недоступна для выбранного аккаунта")
 )
 
-const organizationColumns = "id, name, company_info, is_demo, is_active, last_order_number, created_at"
+const organizationColumns = "id, name, company_info, is_demo, is_active, last_order_number, created_at, paid_until"
 const inviteColumns = "id, organization_id, role, max_uses, used_count, expires_at, revoked_at, created_by, created_at, code"
 
 func organizationError(err error) error {
@@ -60,7 +60,7 @@ func (r *Repository) beginOrganizationWrite(ctx context.Context, orgID int64, ac
 
 func scanOrganization(row pgx.Row) (*domain.Organization, error) {
 	var org domain.Organization
-	err := row.Scan(&org.ID, &org.Name, &org.CompanyInfo, &org.IsDemo, &org.IsActive, &org.LastOrderNumber, &org.CreatedAt)
+	err := row.Scan(&org.ID, &org.Name, &org.CompanyInfo, &org.IsDemo, &org.IsActive, &org.LastOrderNumber, &org.CreatedAt, &org.PaidUntil)
 	if err != nil {
 		return nil, organizationError(err)
 	}
@@ -71,15 +71,20 @@ func (r *Repository) lockOrgExclusive(ctx context.Context, tx pgx.Tx, orgID int6
 	return scanOrganization(tx.QueryRow(ctx, `SELECT `+organizationColumns+` FROM organizations WHERE id = $1 FOR UPDATE`, orgID))
 }
 
-func (r *Repository) CreateOrganization(ctx context.Context, name, companyInfo string, isDemo bool) (*domain.Organization, error) {
+func (r *Repository) CreateOrganization(ctx context.Context, name, companyInfo string, isDemo bool, subscription ...domain.SubscriptionChange) (*domain.Organization, error) {
+	var change domain.SubscriptionChange
+	if len(subscription) > 0 {
+		change = subscription[0]
+	}
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
-	org, err := scanOrganization(tx.QueryRow(ctx, `INSERT INTO organizations (name, company_info, is_demo)
-		VALUES ($1, $2, $3) RETURNING `+organizationColumns, name, companyInfo, isDemo))
+	org, err := scanOrganization(tx.QueryRow(ctx, `INSERT INTO organizations (name, company_info, is_demo, paid_until)
+		VALUES ($1, $2, $3, CASE WHEN $5::int > 0 THEN NOW() + make_interval(days => $5) ELSE $4::timestamptz END)
+		RETURNING `+organizationColumns, name, companyInfo, isDemo, change.PaidUntil, change.ExtendDays))
 	if err != nil {
 		return nil, err
 	}
@@ -92,9 +97,24 @@ func (r *Repository) CreateOrganization(ctx context.Context, name, companyInfo s
 	return org, nil
 }
 
-func (r *Repository) UpdateOrganization(ctx context.Context, id int64, name, companyInfo string, isDemo, isActive bool) (*domain.Organization, error) {
+func (r *Repository) UpdateOrganization(ctx context.Context, id int64, name, companyInfo string, isDemo, isActive bool, subscription ...domain.SubscriptionChange) (*domain.Organization, error) {
+	if len(subscription) > 0 {
+		change := subscription[0]
+		return scanOrganization(r.db.QueryRow(ctx, `UPDATE organizations SET name = $2, company_info = $3, is_demo = $4, is_active = $5,
+			paid_until = CASE WHEN $7::int > 0 THEN GREATEST(paid_until, NOW()) + make_interval(days => $7) ELSE $6::timestamptz END
+			WHERE id = $1 RETURNING `+organizationColumns, id, name, companyInfo, isDemo, isActive, change.PaidUntil, change.ExtendDays))
+	}
 	return scanOrganization(r.db.QueryRow(ctx, `UPDATE organizations SET name = $2, company_info = $3, is_demo = $4, is_active = $5
 		WHERE id = $1 RETURNING `+organizationColumns, id, name, companyInfo, isDemo, isActive))
+}
+
+func (r *Repository) ExtendOrganizationSubscription(ctx context.Context, orgID int64, paidUntil *time.Time) (*domain.Organization, error) {
+	return scanOrganization(r.db.QueryRow(ctx, `UPDATE organizations SET paid_until = $2 WHERE id = $1 RETURNING `+organizationColumns, orgID, paidUntil))
+}
+
+func (r *Repository) ExtendOrganizationSubscriptionDays(ctx context.Context, orgID int64, days int) (*domain.Organization, error) {
+	return scanOrganization(r.db.QueryRow(ctx, `UPDATE organizations SET paid_until = GREATEST(paid_until, NOW()) + make_interval(days => $2)
+		WHERE id = $1 RETURNING `+organizationColumns, orgID, days))
 }
 
 func (r *Repository) GetOrganizationByID(ctx context.Context, id int64) (*domain.Organization, error) {
@@ -140,7 +160,7 @@ func (r *Repository) GetPlatformOverview(ctx context.Context) (*domain.PlatformO
 	), sale_activity AS (
 		SELECT organization_id, MAX(created_at) AS last_activity FROM sales GROUP BY organization_id
 	)
-	SELECT o.id, o.name, o.company_info, o.is_demo, o.is_active, o.last_order_number, o.created_at,
+	SELECT o.id, o.name, o.company_info, o.is_demo, o.is_active, o.last_order_number, o.created_at, o.paid_until,
 		COALESCE(members.count, 0), COALESCE(order_stats.count, 0),
 		COALESCE(board_stock.volume, 0), COALESCE(log_stock.volume, 0),
 		firewood.raw, firewood.split + firewood.round,
@@ -164,7 +184,7 @@ func (r *Repository) GetPlatformOverview(ctx context.Context) (*domain.PlatformO
 	for rows.Next() {
 		var stats domain.OrganizationStats
 		err := rows.Scan(&stats.ID, &stats.Name, &stats.CompanyInfo, &stats.IsDemo, &stats.IsActive,
-			&stats.LastOrderNumber, &stats.CreatedAt, &stats.MembersCount, &stats.OrdersCount,
+			&stats.LastOrderNumber, &stats.CreatedAt, &stats.PaidUntil, &stats.MembersCount, &stats.OrdersCount,
 			&stats.BoardsVolumeM3, &stats.LogsVolumeM3, &stats.FirewoodRawM3, &stats.FirewoodReadyM3, &stats.LastActivityAt)
 		if err != nil {
 			return nil, err
@@ -186,7 +206,7 @@ func (r *Repository) GetPlatformOverview(ctx context.Context) (*domain.PlatformO
 }
 
 func (r *Repository) ListUserOrganizations(ctx context.Context, userID int64) ([]domain.UserOrganization, error) {
-	rows, err := r.db.Query(ctx, `SELECT o.id AS organization_id, o.name, o.company_info, o.is_demo, o.is_active, m.role
+	rows, err := r.db.Query(ctx, `SELECT o.id AS organization_id, o.name, o.company_info, o.is_demo, o.is_active, o.paid_until, m.role
 		FROM organization_members m JOIN organizations o ON o.id = m.organization_id
 		WHERE m.user_id = $1 AND o.is_active = TRUE ORDER BY o.id`, userID)
 	if err != nil {
@@ -362,8 +382,8 @@ func (r *Repository) AcceptInvite(ctx context.Context, codeHash string, userID i
 	if _, err := tx.Exec(ctx, `UPDATE users SET role = $2 WHERE id = $1 AND role = 'pending'`, userID, membership.Role); err != nil {
 		return nil, err
 	}
-	err = tx.QueryRow(ctx, `SELECT name, company_info, is_demo, is_active FROM organizations WHERE id = $1`, orgID).
-		Scan(&membership.Name, &membership.CompanyInfo, &membership.IsDemo, &membership.IsActive)
+	err = tx.QueryRow(ctx, `SELECT name, company_info, is_demo, is_active, paid_until FROM organizations WHERE id = $1`, orgID).
+		Scan(&membership.Name, &membership.CompanyInfo, &membership.IsDemo, &membership.IsActive, &membership.PaidUntil)
 	if err != nil {
 		return nil, err
 	}

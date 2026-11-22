@@ -771,6 +771,11 @@ html.lite .org-choice:active,html.lite button:is(.side-org,.mobile-org):active{t
 @starting-style{.journal-entry>.li-l:not([hidden]){opacity:0}}
 html.lite :is(.journal-entry>.li-l,.journal-chevron){transition:none}
 @media(prefers-reduced-motion:reduce){.journal-entry>.li-l,.journal-chevron{transition:none}}
+#subscription-banner:not([hidden]){display:flex;align-items:flex-start;gap:10px;min-width:0;margin:12px var(--sp) 0;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:var(--s1);color:var(--t2);font-size:13px;overflow-wrap:anywhere}
+#subscription-banner svg{width:18px;height:18px;margin-top:1px}
+#subscription-banner[data-state="warning"]{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,var(--line));background:color-mix(in srgb,var(--warn) 7%,var(--s1))}
+body.noauth #subscription-banner:not([hidden]){display:none}
+@media(min-width:768px){#subscription-banner:not([hidden]){margin-inline:max(24px,calc((100% - 1072px)/2))}}
 </style>
 </head>
 <body class="noauth">
@@ -779,7 +784,7 @@ html.lite :is(.journal-entry>.li-l,.journal-chevron){transition:none}
   <h1 id="title">Лесопилка</h1>
   <div id="hact"></div>
 </header>
-<div id="workspace"><main id="view"></main></div>
+<div id="workspace"><div id="subscription-banner" role="status" hidden></div><main id="view"></main></div>
 <nav class="tabs" id="tabs" aria-label="Разделы"></nav>
 <div class="act"><button class="btn" id="ok" data-a="ok"></button></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="scrim" data-a="no"></div><div class="panel"><div class="grab"></div><div class="inspector-heading"><span>Детали и действия</span><button data-a="no" aria-label="Закрыть панель">×</button></div><div class="inspector-empty"><span>Выберите объект</span><p>Откройте заказ или позицию склада, чтобы увидеть детали и доступные действия.</p></div><div id="sb"></div></div></div>
@@ -956,6 +961,7 @@ async function api(path, opts = {}) {
       await loadConfig({forceChoice: true});
       throw staleRequest;
     }
+    if (r.status === 402 && path !== '/config' && S.org && !S.org.is_expired) void loadConfig();
     if (r.status === 401 || r.status === 403) throw new Error(message || 'Нет доступа. Возможно, нужно войти снова.');
     if (r.status >= 500) throw new Error(message || 'На сервере произошла ошибка. Попробуйте позже.');
     throw new Error(message || (r.status === 400 ? 'Проверьте введённые данные.' : `Не удалось выполнить запрос (${r.status}).`));
@@ -991,6 +997,21 @@ async function selectOrg(id) {
   await loadConfig({open: 'home'});
 }
 
+function renderSubscription() {
+  const banner = $('#subscription-banner');
+  const org = S.org;
+  const expired = org?.is_expired === true;
+  const warn = S.role === 'manager' && Number.isInteger(org?.days_left) && org.days_left <= 3;
+  banner.hidden = !org?.paid_until || (!expired && !warn);
+  if (banner.hidden) return;
+  banner.dataset.state = expired ? 'expired' : 'warning';
+  const date = new Date(org.paid_until).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric'});
+  const message = expired
+    ? 'Срок подписки истёк — включён режим просмотра (склад, история и накладные доступны). Для продления обратитесь к администратору Urmanit.'
+    : `Подписка активна до ${date} (осталось ${org.days_left} дн.)`;
+  banner.innerHTML = ic(expired ? 'eye' : 'warn') + `<span>${esc(message)}</span>`;
+}
+
 async function loadConfig({open, forceChoice = false} = {}) {
   try {
     const c = await api('/config');
@@ -1011,6 +1032,7 @@ async function loadConfig({open, forceChoice = false} = {}) {
     S.isSuperAdmin = superAdmin;
     S.previewRole = id && rolePreview ? rolePreview.role : '';
     S.role = S.previewRole || c.role;
+    renderSubscription();
     if (!id) {
       if (S.orgs.length) vOrgSelect(unavailablePreview ? 'Выбранная лесопилка недоступна.' : '');
       else if (superAdmin) vNoOrganizations();

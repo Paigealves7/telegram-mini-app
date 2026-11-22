@@ -37,6 +37,17 @@ func (r *Repository) AddPayment(ctx context.Context, orgID int64, orderID int64,
 	}
 	defer tx.Rollback(ctx)
 
+	payment, err := addPaymentTx(ctx, tx, orgID, orderID, amount, note, userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return payment, nil
+}
+
+func addPaymentTx(ctx context.Context, tx pgx.Tx, orgID, orderID int64, amount float64, note string, userID int64) (*domain.Payment, error) {
 	var status domain.OrderStatus
 	if err := tx.QueryRow(ctx, `SELECT status FROM orders WHERE organization_id = $1 AND id = $2 FOR UPDATE`, orgID, orderID).Scan(&status); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -62,12 +73,9 @@ func (r *Repository) AddPayment(ctx context.Context, orgID int64, orderID int64,
 	}
 
 	p := domain.Payment{OrderID: orderID, Amount: amount, Note: note, CreatedBy: userID}
-	err = tx.QueryRow(ctx, `INSERT INTO order_payments (organization_id, order_id, amount, note, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
+	err := tx.QueryRow(ctx, `INSERT INTO order_payments (organization_id, order_id, amount, note, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
 		orgID, orderID, amount, note, userID).Scan(&p.ID, &p.CreatedAt)
 	if err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	return &p, nil
